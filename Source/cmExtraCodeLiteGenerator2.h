@@ -2,6 +2,7 @@
   CMake - Cross Platform Makefile Generator
   Copyright 2004-2009 Kitware, Inc.
   Copyright 2004 Alexander Neundorf (neundorf@kde.org)
+  Copyright 2012-2016 Poul Bondo (poul.bondo@gmail.com)
 
   Distributed under the OSI-approved BSD License (the "License");
   see accompanying file Copyright.txt for details.
@@ -21,7 +22,9 @@ class cmLocalGenerator;
 class cmExtraCodeLiteGenerator2 : public cmExternalMakefileProjectGenerator
 {
 public:
+
   cmExtraCodeLiteGenerator2();
+
   std::string CreateWorkspaceHeader( const std::string& name );
   std::string CreateWorkspaceFooter( const std::string& config );
 
@@ -37,12 +40,11 @@ public:
   static cmExternalMakefileProjectGenerator* New()
   { return new cmExtraCodeLiteGenerator2; }
 
-  /** Get the documentation entry for this generator.  */
+  // Get the documentation entry for this generator.
   virtual void GetDocumentation(cmDocumentationEntry& entry, 
                                 const std::string& fullName) const override;
 
   virtual void Generate() override;
-  void Generate2();
 
   bool CreateProjectFile(const cmGeneratorTarget &_genTarget, //const cmTarget& lgs, 
     const cmLocalGenerator& _local, 

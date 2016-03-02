@@ -2,7 +2,7 @@
   CMake - Cross Platform Makefile Generator
   Copyright 2004-2009 Kitware, Inc.
   Copyright 2004 Alexander Neundorf (neundorf@kde.org)
-  Copyright 2012-2015 Poul Bondo (poul.bondo@gmail.com)
+  Copyright 2012-2016 Poul Bondo (poul.bondo@gmail.com)
 
   Distributed under the OSI-approved BSD License (the "License");
   see accompanying file Copyright.txt for details.
@@ -34,7 +34,7 @@
 #include <fstream>
 using namespace std;
 
-std::ofstream logf2("dummy.log");
+//std::ofstream logf2("dummy.log");
 
 
 //----------------------------------------------------------------------------
@@ -49,21 +49,7 @@ void cmExtraCodeLiteGenerator2::GetDocumentation(cmDocumentationEntry& entry, co
 {
   entry.Name = this->GetName();
   entry.Brief = "Generates CodeLite project files.";
-//  entry.Full = "Project files for CodeLite will be created in the top directory ...";
 }
-
-
-void cmExtraCodeLiteGenerator2::Generate2()
-{
-  for (auto &proj : this->GlobalGenerator->GetProjectMap())
-  {
-    assert(!proj.second.empty());
-    //cmLocalGenerator    
-    //auto &lg = *proj.second.front();
-    
-  }
-}
-
 
 
 std::string cmExtraCodeLiteGenerator2::CreateWorkspaceHeader( const std::string& workspaceProjectName )
@@ -94,39 +80,28 @@ std::string cmExtraCodeLiteGenerator2::CreateWorkspaceFooter( const std::string&
 void cmExtraCodeLiteGenerator2::Generate()
 {
   std::string workspaceProjectName;
-  std::string workspaceOutputDir;
   std::string workspaceFileName;
-  std::string workspaceSourcePath;
   std::string configCMake;
   cmGeneratedFileStream fout; 
 
   // loop projects and locate the root project.
-  // and extract the information for creating the workspace. Do we know if this is always the first ?
-  for (std::map<std::string, std::vector<cmLocalGenerator*> >::const_iterator
-    it = this->GlobalGenerator->GetProjectMap().begin();
-    it!= this->GlobalGenerator->GetProjectMap().end();
-    ++it)
+  for (auto& p : this->GlobalGenerator->GetProjectMap())
   {
-    const cmMakefile* mf = it->second[0]->GetMakefile(); // Is this safe with index 0 ?
-    std::string projectName = it->second[0]->GetProjectName();
-
+    auto mf = p.second[0]->GetMakefile();
     if (strcmp(mf->GetCurrentBinaryDirectory(), mf->GetHomeOutputDirectory()) == 0)
     {
-      workspaceOutputDir = mf->GetCurrentBinaryDirectory();
-      workspaceProjectName = projectName; //mf->GetProjectName();
-      workspaceSourcePath = mf->GetHomeDirectory();
-      workspaceFileName = workspaceOutputDir+"/";
-      workspaceFileName+= workspaceProjectName + ".workspace";
+      workspaceProjectName = p.second[0]->GetProjectName();
+      workspaceFileName = std::string(mf->GetCurrentBinaryDirectory()) + "/" + workspaceProjectName + ".workspace";
       break;
     }
   }
 
-logf2 << "ws dir: " << workspaceOutputDir << " => " << workspaceFileName << std::endl;
+  //logf2 << workspaceProjectName << " => " << workspaceFileName << std::endl;
 
   // The following section attempts to find and remember the current active project. Will be restored at the end.
-	std::string activeProject;
-	{
-		std::ifstream ifs(workspaceFileName.c_str());
+  std::string activeProject;
+  {
+    std::ifstream ifs(workspaceFileName.c_str());
 		if (ifs.good())
 		{
 			std::string tmp;
@@ -136,7 +111,7 @@ logf2 << "ws dir: " << workspaceOutputDir << " => " << workspaceFileName << std:
 				// Looking for:  <Project Name="myproject" Path="/home/user/somewhere/cmake/build/myproject/myproject.project" Active="Yes"/>
 				if (sscanf(tmp.c_str(),"%s Name=\"%s Path=\"%s Active=\"%s\"", sz1, sz2, sz3, sz4 ) >= 4)
 				{
-          logf2 << "Found project: " << sz1 << " : " << sz2 << " : " << sz3 << " : " << sz4 << std::endl;
+          //logf2 << "Found project: " << sz1 << " : " << sz2 << " : " << sz3 << " : " << sz4 << std::endl;
 					if (std::string(sz4).substr(0,3) == "Yes")
 					{
 						size_t pos = std::string(sz2).find("\"");
@@ -154,42 +129,30 @@ logf2 << "ws dir: " << workspaceOutputDir << " => " << workspaceFileName << std:
   fout << this->CreateWorkspaceHeader(workspaceProjectName);
 
   // For all the projects, for all the generators, find all the targets
-  for (std::map<std::string, std::vector<cmLocalGenerator*> >::const_iterator
-    it = this->GlobalGenerator->GetProjectMap().begin();
-    it != this->GlobalGenerator->GetProjectMap().end();
-    ++it)
+  for (auto& p : this->GlobalGenerator->GetProjectMap())
   {
-    for (std::vector<cmLocalGenerator*>::const_iterator lg= it->second.begin(); lg!=it->second.end(); lg++)
+    // Local Generators
+    for (auto& lg : p.second)
     {
-      //cmMakefile* makefile=(*lg)->GetMakefile();
-      //cmTargets& targets=makefile->GetTargets();
-      //for (cmTargets::iterator ti = targets.begin(); ti != targets.end(); ti++)
-      std::vector<cmGeneratorTarget*> targets=(*lg)->GetGeneratorTargets();
-      for (std::vector<cmGeneratorTarget*>::iterator ti = targets.begin(); ti != targets.end(); ti++)
+      // Generator Targets
+      for (auto& gt : lg->GetGeneratorTargets())
       {
-        auto & target = *(*ti);
-
-        logf2 << "\tTarget: " << " : " << target.GetType() << " : " << target.GetName() << endl;
-        switch(target.GetType())
+        //logf2 << "\tTarget: " << " : " << gt->GetType() << " : " << gt->GetName() << endl;
+        switch(gt->GetType())
         {
         case cmState::EXECUTABLE: // 0
         case cmState::STATIC_LIBRARY: // 1
         case cmState::SHARED_LIBRARY: // 2
         //case cmTarget::MODULE_LIBRARY:
         //case cmTarget::OBJECT_LIBRARY:
-//NB!!        
         case cmState::UTILITY: // 5
         {
           std::string projectName;
           std::string filename;
-
-         std::vector<cmGeneratorTarget*> targetGenerators=(*lg)->GetGeneratorTargets();
-          
-          //cmGeneratorTarget* gt = *targetGenerators.begin();
-          if ( this->CreateProjectFile(target, *(*lg), projectName, filename) )
+          if (this->CreateProjectFile(*gt, *lg, projectName, filename))
           {
               std::string activeValue = "No";
-              if ( projectName == activeProject ) // || activeProject.empty() )
+              if (projectName == activeProject)
               {
                 activeValue = "Yes";
               }
@@ -285,23 +248,16 @@ bool cmExtraCodeLiteGenerator2::CreateProjectFile(const cmGeneratorTarget &_targ
   {
     sogr.insert(sogr.begin(),source_group(*it));
   }
-//  sogr.push_back(source_group("source","(.*)\\.cpp"));
-//  sogr.push_back(source_group("include","(.*)\\.h"));
-//  sogr.push_back(source_group("other","(.*)"));
-
 
   std::string outputDir=mf->GetCurrentBinaryDirectory();
 
   _projectName= _target.GetName();
   std::string targettype; // Defaults to empty if no recognized target type is detected.
   std::string make_cmd = mf->GetRequiredDefinition("CMAKE_MAKE_PROGRAM");
-  std::string workspaceSourcePath = mf->GetHomeDirectory();
-  //std::string cmakelist = mf->GetCurrentListFile();
 
   _projectFilename = outputDir + "/" + _projectName + ".project";
-  std::string cmakelist_txt = std::string(mf->GetCurrentSourceDirectory()) + "/CMakeLists.txt";
 
-logf2 << "Project: " << _projectName << " " << _projectFilename << " " << mf->GetHomeDirectory() << " | " << mf->GetHomeOutputDirectory() << " | " << mf->GetCurrentSourceDirectory() << " | " << mf->GetCurrentBinaryDirectory() << "|" << outputDir << std::endl;
+  //logf2 << "Project: " << _projectName << " " << _projectFilename << " " << mf->GetHomeDirectory() << " | " << mf->GetHomeOutputDirectory() << " | " << mf->GetCurrentSourceDirectory() << " | " << mf->GetCurrentBinaryDirectory() << "|" << outputDir << std::endl;
 
   // We try to merge some of the usable information from the project file.
   std::string generalTag = "      <General OutputFile=\"$(IntermediateDirectory)/$(ProjectName)\" IntermediateDirectory=\"" + outputDir + "\" Command=\"$(IntermediateDirectory)/$(ProjectName)\" CommandArguments=\"\" WorkingDirectory=\"$(IntermediateDirectory)\" PauseExecWhenProcTerminates=\"yes\"/>\n";
@@ -321,147 +277,49 @@ logf2 << "Project: " << _projectName << " " << _projectFilename << " " << mf->Ge
       }
     }
   }
-
   cmGeneratedFileStream fout(_projectFilename.c_str());
   fout << this->CreateProjectHeader(_projectName);
 
-  // The following file lists are generated in each own virtual folder
-  // This would be nice to make configurable.
-  //std::vector<std::string> source_files, include_files, other_files, rule_files, qt_files, web_files;
+  //logf2 << "\tTarget: " << _target.GetType() << " : " << _target.GetName() << endl;
 
-  //other_files.push_back( cmakelist ); // Add the CMakeLists.txt file.
-
-  logf2 << "\tTarget: " << _target.GetType() << " : " << _target.GetName() << endl;
-
-  // The following casting is only required until the const issue is fixed in cmTarget.h
-  //const std::vector<cmSourceFile*> &sources = ((cmTarget&)_target).GetSourceFiles();
   std::vector<cmSourceFile*> sources;
-  //_target.GetSourceFiles(sources,mf->GetSafeDefinition("CMAKE_BUILD_TYPE"));
-  //sources.push_back(new cmSourceFile(mf,cmakelist));
-  //cmGeneratorTarget* gt = &_target;
   _target.GetSourceFiles(sources, mf->GetSafeDefinition("CMAKE_BUILD_TYPE"));
 
   
   std::vector<std::string> filenames;
-  for (std::vector<cmSourceFile*>::const_iterator si=sources.begin(); si!=sources.end(); si++)
+  //for (std::vector<cmSourceFile*>::const_iterator si=sources.begin(); si!=sources.end(); si++)
+  for (auto& si : sources)
   {
-logf2 << "Target: " << _projectName << " => " << (*si)->GetFullPath() << std::endl;
-    filenames.push_back((*si)->GetFullPath());
+    //logf2 << "Target: " << _projectName << " => " << (si)->GetFullPath() << std::endl;
+    filenames.push_back((si)->GetFullPath());
   }
 
-  {
+  { // Check if we have a local CMakeLists.txt we want to add.
+    std::string cmakelist_txt = std::string(mf->GetCurrentSourceDirectory()) + "/CMakeLists.txt";
     std::ifstream ifs(cmakelist_txt);
     if (ifs.good())
     {
-logf2 << "Found: " << cmakelist_txt << std::endl; 
       filenames.push_back(cmakelist_txt);
     }
-    else
-    {
-logf2 << "Failed: " << cmakelist_txt << std::endl;
-    }
   }
-//NB!!!  filenames.push_back(cmakelist);
-  for (std::vector<std::string>::const_iterator it = filenames.begin(); it != filenames.end(); it++)
+  // For each file check if we have a matching source group.
+  for (auto& file : filenames)
   {
-     for (std::vector<source_group>::iterator sgi = sogr.begin(); sgi != sogr.end(); sgi++)
+     for (auto& sg : sogr)
      {
-       //logf2 << "sg: " << sgi->sogr_.GetName() << std::endl;
-       if (sgi->sogr_.MatchesFiles((*it).c_str()) || sgi->sogr_.MatchesRegex((*it).c_str()))
+       if (sg.sogr_.MatchesFiles(file.c_str()) || sg.sogr_.MatchesRegex(file.c_str()))
        {
-         sgi->filenames_.push_back((*it));
+         sg.filenames_.push_back(file);
          break;
        }
      }
   }
-  
-/*  
-  
-  for (std::vector<cmSourceFile*>::const_iterator si=sources.begin(); si!=sources.end(); si++)
+  for (auto& sg : sogr)
   {
-     logf2 << "\tCFile: " << (*si)->GetFullPath() << endl;
-     std::string lang;
-     cmSourceFile &source = *(*si);
-     if ( !source.GetLanguage().empty() )
-     {
-        lang = source.GetLanguage();
-     }
-     std::string ext = source.GetExtension(); // Should be lowercase.
-     std::string fullname = source.GetFullPath(); // Should be lowercase.
-     if (!cmSystemTools::FileExists(fullname.c_str()) )
-     {
-       logf << "File: " << fullname << " does not exist. It is not being added" << endl;
-       continue;
-     }
-     
-     for (std::vector<source_group>::iterator sgi = sogr.begin(); sgi != sogr.end(); sgi++)
-     {
-       logf << "sg: " << sgi->sogr_.GetName() << std::endl;
-       
-       const std::vector<const cmSourceFile*>& sgf = sgi->sogr_.GetSourceFiles();
-       for (std::vector<const cmSourceFile*>::const_iterator sgfit = sgf.begin(); sgfit != sgf.end(); sgfit++)
-       {
-         const cmSourceFile *p = (*sgfit);
-         logf << " File: " << p->GetFullPath() << std::endl;
-       }
-       logf << "--" << std::endl;
-
-        if (sgi->sogr_.MatchesFiles(fullname.c_str()) || sgi->sogr_.MatchesRegex(fullname.c_str()))
-        {
-          sgi->filenames_.push_back(fullname);
-          break;
-        }
-     }
-
-     // The following filter is not very good. It is considered a hack.
-     if ( lang == "C" || lang == "CXX" )
-     {
-        if ( fullname.find("_moc.cpp") != std::string::npos || fullname.find("_uic.cpp") != std::string::npos )
-        {
-           qt_files.push_back(source.GetFullPath());
-        }
-        else
-        {
-           source_files.push_back(source.GetFullPath());
-        }
-     }
-     else if ( ext == "h" || ext == "hpp" )
-     {
-        include_files.push_back(source.GetFullPath());
-     }
-     else if ( ext == "ui" )
-     {
-        qt_files.push_back(source.GetFullPath());
-     }
-     else if ( ext == "js" || ext == "html" || ext == "css" )
-     {
-        web_files.push_back(source.GetFullPath());
-     }
-     else if ( ext == "rule" )
-     {
-        rule_files.push_back(source.GetFullPath());
-     }
-     else
-     {
-        other_files.push_back(source.GetFullPath());
-     }
-
-  }
-
-  this->AddFolder(include_files, "include",fout);
-  this->AddFolder(source_files, "source",fout);
-  this->AddFolder(other_files, "other",fout);
-  this->AddFolder(rule_files, "rule",fout);
-  this->AddFolder(qt_files, "qt",fout);
-  this->AddFolder(web_files, "web",fout);
-*/
-  for (std::vector<source_group>::iterator sgi = sogr.begin(); sgi != sogr.end(); sgi++)
-  {
-    this->AddFolder(sgi->filenames_,sgi->sogr_.GetName(),fout);
+    this->AddFolder(sg.filenames_,sg.sogr_.GetName(),fout);
   }
   fout << this->CreateProjectFooter(targettype,make_cmd,generalTag);
-
-  return true; //source_files.size() > 0 || include_files.size() > 0  || web_files.size() > 0 || other_files.size() > 1;
+  return true;
 }
 
 
