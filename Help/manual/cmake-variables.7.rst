@@ -78,7 +78,6 @@ Variables that Provide Information
    /variable/CMAKE_VS_DEVENV_COMMAND
    /variable/CMAKE_VS_INTEL_Fortran_PROJECT_VERSION
    /variable/CMAKE_VS_MSBUILD_COMMAND
-   /variable/CMAKE_VS_MSDEV_COMMAND
    /variable/CMAKE_VS_NsightTegra_VERSION
    /variable/CMAKE_VS_PLATFORM_NAME
    /variable/CMAKE_VS_PLATFORM_TOOLSET
@@ -115,6 +114,7 @@ Variables that Change Behavior
    /variable/CMAKE_COLOR_MAKEFILE
    /variable/CMAKE_CONFIGURATION_TYPES
    /variable/CMAKE_DEBUG_TARGET_PROPERTIES
+   /variable/CMAKE_DEPENDS_IN_PROJECT_ONLY
    /variable/CMAKE_DISABLE_FIND_PACKAGE_PackageName
    /variable/CMAKE_ERROR_DEPRECATED
    /variable/CMAKE_ERROR_ON_ABSOLUTE_INSTALL_DESTINATION

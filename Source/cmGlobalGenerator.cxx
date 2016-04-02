@@ -398,6 +398,21 @@ cmGlobalGenerator::EnableLanguage(std::vector<std::string>const& languages,
     return;
     }
 
+  std::set<std::string> cur_languages(languages.begin(), languages.end());
+  for (std::set<std::string>::iterator li = cur_languages.begin();
+       li != cur_languages.end(); ++li)
+    {
+    if (!this->LanguagesInProgress.insert(*li).second)
+      {
+      std::ostringstream e;
+      e << "Language '" << *li << "' is currently being enabled.  "
+        "Recursive call not allowed.";
+      mf->IssueMessage(cmake::FATAL_ERROR, e.str());
+      cmSystemTools::SetFatalErrorOccured();
+      return;
+      }
+    }
+
   if(this->TryCompileOuterMakefile)
     {
     // In a try-compile we can only enable languages provided by caller.
@@ -805,7 +820,7 @@ cmGlobalGenerator::EnableLanguage(std::vector<std::string>const& languages,
   // Now load files that can override any settings on the platform or for
   // the project First load the project compatibility file if it is in
   // cmake
-  std::string projectCompatibility = mf->GetDefinition("CMAKE_ROOT");
+  std::string projectCompatibility = cmSystemTools::GetCMakeRoot();
   projectCompatibility += "/Modules/";
   projectCompatibility += mf->GetSafeDefinition("PROJECT_NAME");
   projectCompatibility += "Compatibility.cmake";
@@ -822,6 +837,12 @@ cmGlobalGenerator::EnableLanguage(std::vector<std::string>const& languages,
   if(fatalError)
     {
     cmSystemTools::SetFatalErrorOccured();
+    }
+
+  for (std::set<std::string>::iterator li = cur_languages.begin();
+       li != cur_languages.end(); ++li)
+    {
+    this->LanguagesInProgress.erase(*li);
     }
 }
 

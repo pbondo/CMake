@@ -733,26 +733,6 @@ void cmMakefile::ConfigureFinalPass()
       "with CMake 2.4 or later. For compatibility with older versions please "
       "use any CMake 2.8.x release or lower.");
     }
-#if defined(_WIN32) && !defined(__CYGWIN__)
-  // Do old-style link dependency analysis only for CM_USE_OLD_VS6.
-  if(this->GetGlobalGenerator()->IsForVS6())
-    {
-    for (cmTargets::iterator l = this->Targets.begin();
-         l != this->Targets.end(); l++)
-      {
-      if (l->second.GetType() == cmState::INTERFACE_LIBRARY)
-        {
-        continue;
-        }
-      // Erase any cached link information that might have been comptued
-      // on-demand during the configuration.  This ensures that build
-      // system generation uses up-to-date information even if other cache
-      // invalidation code in this source file is buggy.
-
-      l->second.AnalyzeLibDependenciesForVS6(*this);
-      }
-    }
-#endif
 }
 
 //----------------------------------------------------------------------------
@@ -1330,14 +1310,6 @@ bool cmMakefile::ParseDefineFlag(std::string const& def, bool remove)
 
   // Make sure the definition matches.
   if(!valid.find(def.c_str()))
-    {
-    return false;
-    }
-
-  // VS6 IDE does not support definition values with spaces in
-  // combination with '"', '$', or ';'.
-  if((this->GetGlobalGenerator()->GetName() == "Visual Studio 6") &&
-     (def.find(" ") != def.npos && def.find_first_of("\"$;") != def.npos))
     {
     return false;
     }
@@ -2531,15 +2503,22 @@ const char* cmMakefile::GetDefinition(const std::string& name) const
   cmVariableWatch* vv = this->GetVariableWatch();
   if ( vv && !this->SuppressWatches )
     {
-    if ( def )
-      {
-      vv->VariableAccessed(name, cmVariableWatch::VARIABLE_READ_ACCESS,
-        def, this);
-      }
-    else
-      {
+    bool const watch_function_executed =
       vv->VariableAccessed(name,
-          cmVariableWatch::UNKNOWN_VARIABLE_READ_ACCESS, def, this);
+                           def ? cmVariableWatch::VARIABLE_READ_ACCESS
+                           : cmVariableWatch::UNKNOWN_VARIABLE_READ_ACCESS,
+                           def, this);
+
+    if (watch_function_executed)
+      {
+      // A callback was executed and may have caused re-allocation of the
+      // variable storage.  Look it up again for now.
+      // FIXME: Refactor variable storage to avoid this problem.
+      def = this->StateSnapshot.GetDefinition(name);
+      if(!def)
+        {
+        def = this->GetState()->GetInitializedCacheValue(name);
+        }
       }
     }
 #endif
@@ -3766,17 +3745,13 @@ std::string cmMakefile::GetModulesFile(const char* filename) const
     }
 
   // Always search in the standard modules location.
-  const char* cmakeRoot = this->GetDefinition("CMAKE_ROOT");
-  if(cmakeRoot)
+  moduleInCMakeRoot = cmSystemTools::GetCMakeRoot();
+  moduleInCMakeRoot += "/Modules/";
+  moduleInCMakeRoot += filename;
+  cmSystemTools::ConvertToUnixSlashes(moduleInCMakeRoot);
+  if(!cmSystemTools::FileExists(moduleInCMakeRoot.c_str()))
     {
-    moduleInCMakeRoot = cmakeRoot;
-    moduleInCMakeRoot += "/Modules/";
-    moduleInCMakeRoot += filename;
-    cmSystemTools::ConvertToUnixSlashes(moduleInCMakeRoot);
-    if(!cmSystemTools::FileExists(moduleInCMakeRoot.c_str()))
-      {
-      moduleInCMakeRoot = "";
-      }
+    moduleInCMakeRoot = "";
     }
 
   // Normally, prefer the files found in CMAKE_MODULE_PATH. Only when the file
@@ -3791,7 +3766,7 @@ std::string cmMakefile::GetModulesFile(const char* filename) const
   if (!moduleInCMakeModulePath.empty() && !moduleInCMakeRoot.empty())
     {
     const char* currentFile = this->GetDefinition("CMAKE_CURRENT_LIST_FILE");
-    std::string mods = cmakeRoot + std::string("/Modules/");
+    std::string mods = cmSystemTools::GetCMakeRoot() + "/Modules/";
     if (currentFile && strncmp(currentFile, mods.c_str(), mods.size()) == 0)
       {
       switch (this->GetPolicyStatus(cmPolicies::CMP0017))

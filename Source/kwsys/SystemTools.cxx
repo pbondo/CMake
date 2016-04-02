@@ -2855,6 +2855,7 @@ static bool DeleteJunction(const std::wstring& source)
   return false;
 #endif
 }
+
 #endif
 
 bool SystemTools::RemoveFile(const std::string& source)
@@ -2884,9 +2885,9 @@ bool SystemTools::RemoveFile(const std::string& source)
     SetLastError(err);
     return false;
     }
-  if (IsJunction(ws) && !DeleteJunction(ws))
+  if (IsJunction(ws) && DeleteJunction(ws))
     {
-    return false;
+    return true;
     }
   if (DeleteFileW(ws.c_str()) ||
       GetLastError() == ERROR_FILE_NOT_FOUND ||
@@ -4758,8 +4759,9 @@ bool SystemTools::GetLineFromStream(std::istream& is,
   // been reached.  Clear the fail bit just before reading.
   while(!haveNewline &&
         leftToRead != 0 &&
-        (is.clear(is.rdstate() & ~std::ios::failbit),
-         is.getline(buffer, bufferSize), is.gcount() > 0))
+        (static_cast<void>(is.clear(is.rdstate() & ~std::ios::failbit)),
+         static_cast<void>(is.getline(buffer, bufferSize)),
+         is.gcount() > 0))
     {
     // We have read at least one byte.
     haveData = true;

@@ -51,8 +51,6 @@
 // include the generator
 #if defined(_WIN32) && !defined(__CYGWIN__)
 #  if !defined(CMAKE_BOOT_MINGW)
-#    include "cmGlobalVisualStudio6Generator.h"
-#    include "cmGlobalVisualStudio7Generator.h"
 #    include "cmGlobalVisualStudio71Generator.h"
 #    include "cmGlobalVisualStudio8Generator.h"
 #    include "cmGlobalVisualStudio9Generator.h"
@@ -1432,8 +1430,6 @@ int cmake::ActualConfigure()
         const char* GeneratorName;
       };
       VSRegistryEntryName version[] = {
-        {"6.0", "Visual Studio 6"},
-        {"7.0", "Visual Studio 7"},
         {"7.1", "Visual Studio 7 .NET 2003"},
         {"8.0", "Visual Studio 8 2005"},
         {"9.0", "Visual Studio 9 2008"},
@@ -1839,10 +1835,6 @@ void cmake::AddDefaultGenerators()
     cmGlobalVisualStudio8Generator::NewFactory());
   this->Generators.push_back(
     cmGlobalVisualStudio71Generator::NewFactory());
-  this->Generators.push_back(
-    cmGlobalVisualStudio7Generator::NewFactory());
-  this->Generators.push_back(
-    cmGlobalVisualStudio6Generator::NewFactory());
   this->Generators.push_back(
     cmGlobalBorlandMakefileGenerator::NewFactory());
   this->Generators.push_back(
@@ -2420,8 +2412,7 @@ int cmake::GetSystemInformation(std::vector<std::string>& args)
 
   // we have to find the module directory, so we can copy the files
   this->AddCMakePaths();
-  std::string modulesPath =
-    this->State->GetInitializedCacheValue("CMAKE_ROOT");
+  std::string modulesPath = cmSystemTools::GetCMakeRoot();
   modulesPath += "/Modules";
   std::string inFile = modulesPath;
   inFile += "/SystemInformation.cmake";

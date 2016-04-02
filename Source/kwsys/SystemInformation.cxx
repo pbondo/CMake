@@ -176,13 +176,13 @@ typedef struct rlimit ResourceLimitType;
 # if defined(KWSYS_IOS_HAS_OSTREAM_LONG_LONG)
 #  define iostreamLongLong(x) (x)
 # else
-#  define iostreamLongLong(x) ((long)x)
+#  define iostreamLongLong(x) ((long)(x))
 # endif
 #elif defined(KWSYS_USE___INT64)
 # if defined(KWSYS_IOS_HAS_OSTREAM___INT64)
 #  define iostreamLongLong(x) (x)
 # else
-#  define iostreamLongLong(x) ((long)x)
+#  define iostreamLongLong(x) ((long)(x))
 # endif
 #else
 # error "No Long Long"
@@ -200,13 +200,13 @@ typedef struct rlimit ResourceLimitType;
 # endif
 #endif
 
-#if defined(_MSC_VER) && (_MSC_VER >= 1300) && !defined(_WIN64)
+#if defined(_MSC_VER) && (_MSC_VER >= 1300) && !defined(_WIN64) && !defined(__clang__)
 #define USE_ASM_INSTRUCTIONS 1
 #else
 #define USE_ASM_INSTRUCTIONS 0
 #endif
 
-#if defined(_MSC_VER) && (_MSC_VER >= 1400)
+#if defined(_MSC_VER) && (_MSC_VER >= 1400) && !defined(__clang__)
 #include <intrin.h>
 #define USE_CPUID_INTRINSICS 1
 #else
@@ -860,7 +860,7 @@ void SystemInformation::RunMemoryCheck()
 // --------------------------------------------------------------
 // SystemInformationImplementation starts here
 
-#define STORE_TLBCACHE_INFO(x,y)  x = (x < y) ? y : x
+#define STORE_TLBCACHE_INFO(x,y)  x = (x < (y)) ? (y) : x
 #define TLBCACHE_INFO_UNITS      (15)
 #define CLASSICAL_CPU_FREQ_LOOP    10000000
 #define RDTSC_INSTRUCTION      _asm _emit 0x0f _asm _emit 0x31
@@ -1583,7 +1583,7 @@ SystemInformationImplementation::~SystemInformationImplementation()
 
 void SystemInformationImplementation::RunCPUCheck()
 {
-#ifdef WIN32
+#ifdef _WIN32
   // Check to see if this processor supports CPUID.
   bool supportsCPUID = DoesCPUSupportCPUID();
 
@@ -2056,7 +2056,7 @@ bool SystemInformationImplementation::DoesCPUSupportFeature(long int dwFeature)
 
 void SystemInformationImplementation::Delay(unsigned int uiMS)
 {
-#ifdef WIN32
+#ifdef _WIN32
   LARGE_INTEGER Frequency, StartCounter, EndCounter;
   __int64 x;
 
@@ -2339,7 +2339,7 @@ bool SystemInformationImplementation::RetrieveClassicalCPUCacheDetails()
         case 13: TLBCacheUnit = ((TLBCacheData[3] & 0x00FF0000) >> 16); break;
         case 14: TLBCacheUnit = ((TLBCacheData[3] & 0xFF000000) >> 24); break;
 
-        // Default case - an error has occured.
+        // Default case - an error has occurred.
         default: return false;
         }
 
@@ -2401,7 +2401,7 @@ bool SystemInformationImplementation::RetrieveClassicalCPUCacheDetails()
         case 0x96: STORE_TLBCACHE_INFO (TLBCode, 262144); break;  // <-- FIXME: IA-64 Only
         case 0x9b: STORE_TLBCACHE_INFO (TLBCode, 262144); break;  // <-- FIXME: IA-64 Only
 
-        // Default case - an error has occured.
+        // Default case - an error has occurred.
         default: return false;
         }
       }
@@ -4632,7 +4632,7 @@ std::string SystemInformationImplementation::RunProcess(std::vector<const char*>
   double timeout = 255;
   int pipe; // pipe id as returned by kwsysProcess_WaitForData()
 
-  while( ( pipe = kwsysProcess_WaitForData(gp,&data,&length,&timeout),
+  while( ( static_cast<void>(pipe = kwsysProcess_WaitForData(gp,&data,&length,&timeout)),
            (pipe == kwsysProcess_Pipe_STDOUT || pipe == kwsysProcess_Pipe_STDERR) ) ) // wait for 1s
     {
       buffer.append(data, length);

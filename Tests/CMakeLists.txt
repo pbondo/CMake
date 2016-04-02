@@ -624,8 +624,8 @@ if(BUILD_TESTING)
   endif()
 
   # test for correct sub-project generation
-  # not implemented in VS 6, VS 7.0, Xcode, or Ninja
-  if(NOT CMAKE_GENERATOR MATCHES "Visual Studio [67]$|Xcode|Ninja")
+  # not implemented in VS 7.0, Xcode, or Ninja
+  if(NOT CMAKE_GENERATOR MATCHES "Visual Studio 7$|Xcode|Ninja")
     # run cmake and configure all of SubProject
     # but only build the independent executable car
     add_test(SubProject ${CMAKE_CTEST_COMMAND}
@@ -684,14 +684,17 @@ ${CMake_BINARY_DIR}/bin/cmake -DDIR=dev -P ${CMake_SOURCE_DIR}/Utilities/Release
     endif()
   endmacro()
   if(CMAKE_BUILD_NIGHTLY_RELEASES)
-    ADD_NIGHTLY_BUILD_TEST(CMakeNightlyWindows
-      dash3win7_release.cmake)
+    ADD_NIGHTLY_BUILD_TEST(CMakeNightlyWin32
+      win32_release.cmake)
+    ADD_NIGHTLY_BUILD_TEST(CMakeNightlyWin64
+      win64_release.cmake)
     ADD_NIGHTLY_BUILD_TEST(CMakeNightlyOSX
-      dashmacmini5_release.cmake)
+      osx_release.cmake)
     ADD_NIGHTLY_BUILD_TEST(CMakeNightlyLinux32
-      magrathea_release.cmake)
+      linux32_release.cmake)
     ADD_NIGHTLY_BUILD_TEST(CMakeNightlyLinux64
       linux64_release.cmake)
+    set_property(TEST CMakeNightlyWin64 PROPERTY DEPENDS CMakeNightlyWin32)
   endif()
 
   # add tests with more complex invocations
@@ -1371,6 +1374,10 @@ ${CMake_BINARY_DIR}/bin/cmake -DDIR=dev -P ${CMake_SOURCE_DIR}/Utilities/Release
     add_subdirectory(FindJsonCpp)
   endif()
 
+  if(CMake_TEST_FindLTTngUST)
+    add_subdirectory(FindLTTngUST)
+  endif()
+
   if(CMake_TEST_FindOpenSSL)
     add_subdirectory(FindOpenSSL)
   endif()
@@ -1740,7 +1747,9 @@ ${CMake_BINARY_DIR}/bin/cmake -DDIR=dev -P ${CMake_SOURCE_DIR}/Utilities/Release
   if(MSVC)
     ADD_TEST_MACRO(ForceInclude foo)
     ADD_TEST_MACRO(PDBDirectoryAndName myexe)
-    ADD_TEST_MACRO(PrecompiledHeader foo)
+    if(NOT CMAKE_C_COMPILER_ID STREQUAL "Clang")
+      ADD_TEST_MACRO(PrecompiledHeader foo)
+    endif()
   endif()
   if(MSVC OR
       "${CMAKE_GENERATOR}" MATCHES "(MSYS|MinGW) Makefiles")
@@ -1869,7 +1878,7 @@ ${CMake_BINARY_DIR}/bin/cmake -DDIR=dev -P ${CMake_SOURCE_DIR}/Utilities/Release
   endif()
 
   if(MSVC AND NOT MSVC_VERSION LESS 1310
-     AND NOT CMAKE_GENERATOR MATCHES "Visual Studio [67]( |$)"
+     AND NOT CMAKE_GENERATOR MATCHES "Visual Studio 7( |$)"
      AND (NOT CMAKE_GENERATOR MATCHES "Visual Studio [89]( |$)"
           OR CMAKE_SIZEOF_VOID_P EQUAL 4)
       )
@@ -1881,7 +1890,7 @@ ${CMake_BINARY_DIR}/bin/cmake -DDIR=dev -P ${CMake_SOURCE_DIR}/Utilities/Release
       ADD_TEST_MACRO(SBCS SBCS)
     endif()
 
-    if(NOT "${CMAKE_GENERATOR}" MATCHES "Visual Studio [6789]( |$)"
+    if(NOT "${CMAKE_GENERATOR}" MATCHES "Visual Studio [789]( |$)"
         AND NOT CMAKE_GENERATOR_TOOLSET)
       ADD_TEST_MACRO(VSWindowsFormsResx VSWindowsFormsResx)
     endif()
@@ -1910,7 +1919,6 @@ ${CMake_BINARY_DIR}/bin/cmake -DDIR=dev -P ${CMake_SOURCE_DIR}/Utilities/Release
 
     if(CMake_TEST_DEVENV)
       # The test (and tested property) works with .sln files, so it's skipped when:
-      # * Using VS6, which doesn't use .sln files
       # * cmake --build is set up to use MSBuild, since the MSBuild invocation does not use the .sln file
       set(_last_test "")
       foreach(config ${CMAKE_CONFIGURATION_TYPES})

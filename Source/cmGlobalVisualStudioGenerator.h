@@ -26,7 +26,6 @@ public:
   /** Known versions of Visual Studio.  */
   enum VSVersion
   {
-    VS6 = 60,
     VS7 = 70,
     VS71 = 71,
     VS8 = 80,
@@ -106,6 +105,8 @@ public:
                                       const std::string& config) const;
 
   void ComputeTargetObjectDirectory(cmGeneratorTarget* gt) const;
+
+  std::string GetStartupProjectName(cmLocalGenerator const* root) const;
 
   void AddSymbolExportCommand(
     cmGeneratorTarget*, std::vector<cmCustomCommand>& commands,
