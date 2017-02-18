@@ -1,3 +1,6 @@
+# Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
+# file Copyright.txt or https://cmake.org/licensing for details.
+
 #.rst:
 # FindLAPACK
 # ----------
@@ -33,26 +36,22 @@
 # ## List of vendors (BLA_VENDOR) valid in this module # Intel(mkl),
 # OpenBLAS, ACML,Apple, NAS, Generic
 
-#=============================================================================
-# Copyright 2007-2009 Kitware, Inc.
-#
-# Distributed under the OSI-approved BSD License (the "License");
-# see accompanying file Copyright.txt for details.
-#
-# This software is distributed WITHOUT ANY WARRANTY; without even the
-# implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-# See the License for more information.
-#=============================================================================
-# (To distribute this file outside of CMake, substitute the full
-#  License text for the above reference.)
-
 set(_lapack_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
 
-get_property(_LANGUAGES_ GLOBAL PROPERTY ENABLED_LANGUAGES)
-if (NOT _LANGUAGES_ MATCHES Fortran)
-include(${CMAKE_CURRENT_LIST_DIR}/CheckFunctionExists.cmake)
-else ()
+# Check the language being used
+if( NOT (CMAKE_C_COMPILER_LOADED OR CMAKE_CXX_COMPILER_LOADED OR CMAKE_Fortran_COMPILER_LOADED) )
+  if(LAPACK_FIND_REQUIRED)
+    message(FATAL_ERROR "FindLAPACK requires Fortran, C, or C++ to be enabled.")
+  else()
+    message(STATUS "Looking for LAPACK... - NOT found (Unsupported languages)")
+    return()
+  endif()
+endif()
+
+if (CMAKE_Fortran_COMPILER_LOADED)
 include(${CMAKE_CURRENT_LIST_DIR}/CheckFortranFunctionExists.cmake)
+else ()
+include(${CMAKE_CURRENT_LIST_DIR}/CheckFunctionExists.cmake)
 endif ()
 include(${CMAKE_CURRENT_LIST_DIR}/CMakePushCheckState.cmake)
 
@@ -125,7 +124,7 @@ if(_libraries_work)
     set(CMAKE_REQUIRED_LIBRARIES ${_flags} ${${LIBRARIES}} ${_blas} ${_threads})
   endif()
 #  message("DEBUG: CMAKE_REQUIRED_LIBRARIES = ${CMAKE_REQUIRED_LIBRARIES}")
-  if (NOT _LANGUAGES_ MATCHES Fortran)
+  if (NOT CMAKE_Fortran_COMPILER_LOADED)
     check_function_exists("${_name}_" ${_prefix}${_combined_name}_WORKS)
   else ()
     check_fortran_function_exists(${_name} ${_prefix}${_combined_name}_WORKS)
@@ -250,7 +249,7 @@ if (BLA_VENDOR MATCHES "Intel" OR BLA_VENDOR STREQUAL "All")
   if (NOT WIN32)
     set(LM "-lm")
   endif ()
-  if (_LANGUAGES_ MATCHES C OR _LANGUAGES_ MATCHES CXX)
+  if (CMAKE_C_COMPILER_LOADED OR CMAKE_CXX_COMPILER_LOADED)
     if(LAPACK_FIND_QUIETLY OR NOT LAPACK_FIND_REQUIRED)
       find_PACKAGE(Threads)
     else()

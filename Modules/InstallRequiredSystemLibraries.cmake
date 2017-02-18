@@ -1,3 +1,6 @@
+# Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
+# file Copyright.txt or https://cmake.org/licensing for details.
+
 #.rst:
 # InstallRequiredSystemLibraries
 # ------------------------------
@@ -23,6 +26,11 @@
 #   Set to TRUE to install only the debug runtime libraries with MSVC
 #   tools even if the release runtime libraries are also available.
 #
+# ``CMAKE_INSTALL_UCRT_LIBRARIES``
+#   Set to TRUE to install the Windows Universal CRT libraries for
+#   app-local deployment (e.g. to Windows XP).  This is meaningful
+#   only with MSVC from Visual Studio 2015 or higher.
+#
 # ``CMAKE_INSTALL_MFC_LIBRARIES``
 #   Set to TRUE to install the MSVC MFC runtime libraries.
 #
@@ -42,19 +50,6 @@
 # ``CMAKE_INSTALL_SYSTEM_RUNTIME_COMPONENT``
 #   Specify the :command:`install(PROGRAMS)` command ``COMPONENT``
 #   option.  If not specified, no such option will be used.
-
-#=============================================================================
-# Copyright 2006-2015 Kitware, Inc.
-#
-# Distributed under the OSI-approved BSD License (the "License");
-# see accompanying file Copyright.txt for details.
-#
-# This software is distributed WITHOUT ANY WARRANTY; without even the
-# implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-# See the License for more information.
-#=============================================================================
-# (To distribute this file outside of CMake, substitute the full
-#  License text for the above reference.)
 
 if(MSVC)
   file(TO_CMAKE_PATH "$ENV{SYSTEMROOT}" SYSTEMROOT)
@@ -171,12 +166,12 @@ if(MSVC)
     # Find the runtime library redistribution directory.
     get_filename_component(msvc_install_dir
       "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\VisualStudio\\${v}.0;InstallDir]" ABSOLUTE)
+    set(programfilesx86 "ProgramFiles(x86)")
     find_path(MSVC${v}_REDIST_DIR NAMES ${CMAKE_MSVC_ARCH}/Microsoft.VC${v}0.CRT
       PATHS
         "${msvc_install_dir}/../../VC/redist"
         "${base_dir}/VC/redist"
         "$ENV{ProgramFiles}/Microsoft Visual Studio ${v}.0/VC/redist"
-        set(programfilesx86 "ProgramFiles(x86)")
         "$ENV{${programfilesx86}}/Microsoft Visual Studio ${v}.0/VC/redist"
       )
     mark_as_advanced(MSVC${v}_REDIST_DIR)
@@ -187,7 +182,10 @@ if(MSVC)
         "${MSVC${v}_CRT_DIR}/msvcp${v}0.dll"
         )
       if(NOT v VERSION_LESS 14)
-        list(APPEND __install__libs "${MSVC${v}_CRT_DIR}/vcruntime${v}0.dll")
+        list(APPEND __install__libs
+            "${MSVC${v}_CRT_DIR}/vcruntime${v}0.dll"
+            "${MSVC${v}_CRT_DIR}/concrt${v}0.dll"
+            )
       else()
         list(APPEND __install__libs "${MSVC${v}_CRT_DIR}/msvcr${v}0.dll")
       endif()
@@ -202,9 +200,36 @@ if(MSVC)
         "${MSVC${v}_CRT_DIR}/msvcp${v}0d.dll"
         )
       if(NOT v VERSION_LESS 14)
-        list(APPEND __install__libs "${MSVC${v}_CRT_DIR}/vcruntime${v}0d.dll")
+        list(APPEND __install__libs
+            "${MSVC${v}_CRT_DIR}/vcruntime${v}0d.dll"
+            "${MSVC${v}_CRT_DIR}/concrt${v}0d.dll"
+            )
       else()
         list(APPEND __install__libs "${MSVC${v}_CRT_DIR}/msvcr${v}0d.dll")
+      endif()
+    endif()
+
+    if(CMAKE_INSTALL_UCRT_LIBRARIES AND NOT v VERSION_LESS 14)
+      # Find the Windows Kits directory.
+      get_filename_component(windows_kits_dir
+        "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows Kits\\Installed Roots;KitsRoot10]" ABSOLUTE)
+      set(programfilesx86 "ProgramFiles(x86)")
+      find_path(WINDOWS_KITS_DIR NAMES Redist/ucrt/DLLs/${CMAKE_MSVC_ARCH}/ucrtbase.dll
+        PATHS
+        "${windows_kits_dir}"
+        "$ENV{ProgramFiles}/Windows Kits/10"
+        "$ENV{${programfilesx86}}/Windows Kits/10"
+        )
+      mark_as_advanced(WINDOWS_KITS_DIR)
+
+      # Glob the list of UCRT DLLs.
+      if(NOT CMAKE_INSTALL_DEBUG_LIBRARIES_ONLY)
+        file(GLOB __ucrt_dlls "${WINDOWS_KITS_DIR}/Redist/ucrt/DLLs/${CMAKE_MSVC_ARCH}/*.dll")
+        list(APPEND __install__libs ${__ucrt_dlls})
+      endif()
+      if(CMAKE_INSTALL_DEBUG_LIBRARIES)
+        file(GLOB __ucrt_dlls "${WINDOWS_KITS_DIR}/bin/${CMAKE_MSVC_ARCH}/ucrt/*.dll")
+        list(APPEND __install__libs ${__ucrt_dlls})
       endif()
     endif()
   endmacro()

@@ -10,7 +10,7 @@ Synopsis
 
  cmake [<options>] (<path-to-source> | <path-to-existing-build>)
  cmake [(-D <var>=<value>)...] -P <cmake-script-file>
- cmake --build <dir> [<options>] [-- <build-tool-options>...]
+ cmake --build <dir> [<options>...] [-- <build-tool-options>...]
  cmake -E <command> [<options>...]
  cmake --find-package <options>...
 
@@ -49,23 +49,7 @@ Options
  display help for each variable.
 
 ``--build <dir>``
- Build a CMake-generated project binary tree.
-
- This abstracts a native build tool's command-line interface with the
- following options:
-
- ::
-
-   <dir>          = Project binary directory to be built.
-   --target <tgt> = Build <tgt> instead of default targets.
-                    May only be specified once.
-   --config <cfg> = For multi-configuration tools, choose <cfg>.
-   --clean-first  = Build target 'clean' first, then build.
-                    (To clean only, use --target 'clean'.)
-   --use-stderr   = Ignored.  Behavior is default in CMake >= 3.0.
-   --             = Pass remaining options to the native tool.
-
- Run ``cmake --build`` with no options for quick help.
+ See `Build Tool Mode`_.
 
 ``-N``
  View mode only.
@@ -82,12 +66,7 @@ Options
  done before the -P argument.
 
 ``--find-package``
- Run in pkg-config like mode.
-
- Search a package using find_package() and print the resulting flags
- to stdout.  This can be used to use cmake instead of pkg-config to
- find installed libraries in plain Makefile-based projects or in
- autoconf-based projects (via share/aclocal/cmake.m4).
+ See `Find-Package Tool Mode`_.
 
 ``--graphviz=[file]``
  Generate graphviz of dependencies, see CMakeGraphVizOptions.cmake for more.
@@ -129,6 +108,11 @@ Options
 
  Like ``--trace``, but with variables expanded.
 
+``--trace-source=<file>``
+ Put cmake in trace mode, but output only lines of a specified file.
+
+ Multiple options are allowed.
+
 ``--warn-uninitialized``
  Warn about uninitialized values.
 
@@ -154,6 +138,38 @@ Options
 
 .. include:: OPTIONS_HELP.txt
 
+Build Tool Mode
+===============
+
+CMake provides a command-line signature to build an already-generated
+project binary tree::
+
+ cmake --build <dir> [<options>...] [-- <build-tool-options>...]
+
+This abstracts a native build tool's command-line interface with the
+following options:
+
+``--build <dir>``
+  Project binary directory to be built.  This is required and must be first.
+
+``--target <tgt>``
+  Build ``<tgt>`` instead of default targets.  May only be specified once.
+
+``--config <cfg>``
+  For multi-configuration tools, choose configuration ``<cfg>``.
+
+``--clean-first``
+  Build target ``clean`` first, then build.
+  (To clean only, use ``--target clean``.)
+
+``--use-stderr``
+  Ignored.  Behavior is default in CMake >= 3.0.
+
+``--``
+  Pass remaining options to the native tool.
+
+Run ``cmake --build`` with no options for quick help.
+
 Command-Line Tool Mode
 ======================
 
@@ -164,12 +180,49 @@ CMake provides builtin command-line tools through the signature::
 Run ``cmake -E`` or ``cmake -E help`` for a summary of commands.
 Available commands are:
 
+``capabilities``
+  Report cmake capabilities in JSON format. The output is a JSON object
+  with the following keys:
+
+  ``version``
+    A JSON object with version information. Keys are:
+
+    ``string``
+      The full version string as displayed by cmake ``--version``.
+    ``major``
+      The major version number in integer form.
+    ``minor``
+      The minor version number in integer form.
+    ``patch``
+      The patch level in integer form.
+    ``suffix``
+      The cmake version suffix string.
+    ``isDirty``
+      A bool that is set if the cmake build is from a dirty tree.
+
+  ``generators``
+    A list available generators. Each generator is a JSON object with the
+    following keys:
+
+    ``name``
+      A string containing the name of the generator.
+    ``toolsetSupport``
+      ``true`` if the generator supports toolsets and ``false`` otherwise.
+    ``platformSupport``
+      ``true`` if the generator supports platforms and ``false`` otherwise.
+    ``extraGenerators``
+      A list of strings with all the extra generators compatible with
+      the generator.
+
+  ``serverMode``
+    ``true`` if cmake supports server-mode and ``false`` otherwise.
+
 ``chdir <dir> <cmd> [<arg>...]``
   Change the current working directory and run a command.
 
 ``compare_files <file1> <file2>``
   Check if ``<file1>`` is same as ``<file2>``. If files are the same,
-  then returns 0, if not itreturns 1.
+  then returns 0, if not it returns 1.
 
 ``copy <file>... <destination>``
   Copy files to ``<destination>`` (either file or directory).
@@ -204,7 +257,10 @@ Available commands are:
   silently ignored.
 
 ``md5sum <file>...``
-  Compute md5sum of files.
+  Create MD5 checksum of files in ``md5sum`` compatible format::
+
+     351abe79cd3800b38cdfb25d45015a15  file1.txt
+     052f86c15bbde68af55c7f7b340ab639  file2.txt
 
 ``remove [-f] <file>...``
   Remove the file(s), use ``-f`` to force it.  If a file does
@@ -216,6 +272,9 @@ Available commands are:
 
 ``rename <oldname> <newname>``
   Rename a file or directory (on one volume).
+
+``server``
+  Launch :manual:`cmake-server(7)` mode.
 
 ``sleep <number>...``
   Sleep for given number of seconds.
@@ -274,6 +333,24 @@ The following ``cmake -E`` commands are available only on Windows:
 
 ``write_regv <key> <value>``
   Write Windows registry value.
+
+Find-Package Tool Mode
+======================
+
+CMake provides a helper for Makefile-based projects with the signature::
+
+  cmake --find-package <options>...
+
+This runs in a pkg-config like mode.
+
+Search a package using :command:`find_package()` and print the resulting flags
+to stdout.  This can be used to use cmake instead of pkg-config to find
+installed libraries in plain Makefile-based projects or in autoconf-based
+projects (via ``share/aclocal/cmake.m4``).
+
+.. note::
+  This mode is not well-supported due to some technical limitations.
+  It is kept for compatibility but should not be used in new projects.
 
 See Also
 ========

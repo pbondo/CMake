@@ -1,3 +1,6 @@
+# Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
+# file Copyright.txt or https://cmake.org/licensing for details.
+
 #.rst:
 # CMakePackageConfigHelpers
 # -------------------------
@@ -37,7 +40,7 @@
 #    set(FOO_INCLUDE_DIR   "@CMAKE_INSTALL_FULL_INCLUDEDIR@" )
 #    set(FOO_DATA_DIR   "@CMAKE_INSTALL_PREFIX@/@RELATIVE_DATA_INSTALL_DIR@" )
 #    set(FOO_ICONS_DIR   "@CMAKE_INSTALL_PREFIX@/share/icons" )
-#    ...logic to determine installedPrefix from the own location...
+#    #...logic to determine installedPrefix from the own location...
 #    set(FOO_CONFIG_DIR  "${installedPrefix}/@CONFIG_INSTALL_DIR@" )
 #
 # All 4 options shown above are not sufficient, since the first 3 hardcode the
@@ -171,7 +174,7 @@
 #    set(INCLUDE_INSTALL_DIR include/ ... CACHE )
 #    set(LIB_INSTALL_DIR lib/ ... CACHE )
 #    set(SYSCONFIG_INSTALL_DIR etc/foo/ ... CACHE )
-#    ...
+#    #...
 #    include(CMakePackageConfigHelpers)
 #    configure_package_config_file(FooConfig.cmake.in
 #      ${CMAKE_CURRENT_BINARY_DIR}/FooConfig.cmake
@@ -187,7 +190,7 @@
 #
 # ``FooConfig.cmake.in``:
 #
-# .. code-block:: cmake
+# ::
 #
 #    set(FOO_VERSION x.y.z)
 #    ...
@@ -197,22 +200,6 @@
 #    set_and_check(FOO_SYSCONFIG_DIR "@PACKAGE_SYSCONFIG_INSTALL_DIR@")
 #
 #    check_required_components(Foo)
-
-
-#=============================================================================
-# Copyright 2012 Alexander Neundorf <neundorf@kde.org>
-#
-# Distributed under the OSI-approved BSD License (the "License");
-# see accompanying file Copyright.txt for details.
-#
-# This software is distributed WITHOUT ANY WARRANTY; without even the
-# implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-# See the License for more information.
-#=============================================================================
-# (To distribute this file outside of CMake, substitute the full
-#  License text for the above reference.)
-
-include(CMakeParseArguments)
 
 include(WriteBasicConfigVersionFile)
 
@@ -280,7 +267,7 @@ get_filename_component(PACKAGE_PREFIX_DIR \"\${CMAKE_CURRENT_LIST_DIR}/${PACKAGE
 
   if("${absInstallDir}" MATCHES "^(/usr)?/lib(64)?/.+")
     # Handle "/usr move" symlinks created by some Linux distros.
-    set(PACKAGE_INIT "${PACKAGE_INIT}
+    string(APPEND PACKAGE_INIT "
 # Use original install prefix when loaded through a \"/usr move\"
 # cross-prefix symbolic link such as /lib -> /usr/lib.
 get_filename_component(_realCurr \"\${CMAKE_CURRENT_LIST_DIR}\" REALPATH)
@@ -294,7 +281,7 @@ unset(_realCurr)
   endif()
 
   if(NOT CCF_NO_SET_AND_CHECK_MACRO)
-    set(PACKAGE_INIT "${PACKAGE_INIT}
+    string(APPEND PACKAGE_INIT "
 macro(set_and_check _var _file)
   set(\${_var} \"\${_file}\")
   if(NOT EXISTS \"\${_file}\")
@@ -306,7 +293,7 @@ endmacro()
 
 
   if(NOT CCF_NO_CHECK_REQUIRED_COMPONENTS_MACRO)
-    set(PACKAGE_INIT "${PACKAGE_INIT}
+    string(APPEND PACKAGE_INIT "
 macro(check_required_components _NAME)
   foreach(comp \${\${_NAME}_FIND_COMPONENTS})
     if(NOT \${_NAME}_\${comp}_FOUND)
@@ -319,7 +306,7 @@ endmacro()
 ")
   endif()
 
-  set(PACKAGE_INIT "${PACKAGE_INIT}
+  string(APPEND PACKAGE_INIT "
 ####################################################################################")
 
   configure_file("${_inputFile}" "${_outputFile}" @ONLY)

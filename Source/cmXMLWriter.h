@@ -1,18 +1,10 @@
-/*============================================================================
-  CMake - Cross Platform Makefile Generator
-  Copyright 2015 Daniel Pfeifer <daniel@pfeifer-mail.de>
-
-  Distributed under the OSI-approved BSD License (the "License");
-  see accompanying file Copyright.txt for details.
-
-  This software is distributed WITHOUT ANY WARRANTY; without even the
-  implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-  See the License for more information.
-============================================================================*/
+/* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
+   file Copyright.txt or https://cmake.org/licensing for details.  */
 #ifndef cmXMLWiter_h
 #define cmXMLWiter_h
 
-#include "cmStandardIncludes.h"
+#include <cmConfigure.h> // IWYU pragma: keep
+
 #include "cmXMLSafe.h"
 
 #include <ostream>
@@ -36,27 +28,27 @@ public:
 
   template <typename T>
   void Attribute(const char* name, T const& value)
-    {
+  {
     this->PreAttribute();
     this->Output << name << "=\"" << SafeAttribute(value) << '"';
-    }
+  }
 
   void Element(const char* name);
 
   template <typename T>
   void Element(std::string const& name, T const& value)
-    {
+  {
     this->StartElement(name);
     this->Content(value);
     this->EndElement();
-    }
+  }
 
   template <typename T>
   void Content(T const& content)
-    {
+  {
     this->PreContent();
     this->Output << SafeContent(content);
-    }
+  }
 
   void Comment(const char* comment);
 
@@ -81,36 +73,36 @@ private:
 
 private:
   static cmXMLSafe SafeAttribute(const char* value)
-    {
+  {
     return cmXMLSafe(value);
-    }
+  }
 
   static cmXMLSafe SafeAttribute(std::string const& value)
-    {
+  {
     return cmXMLSafe(value);
-    }
+  }
 
   template <typename T>
   static T SafeAttribute(T value)
-    {
+  {
     return value;
-    }
+  }
 
   static cmXMLSafe SafeContent(const char* value)
-    {
+  {
     return cmXMLSafe(value).Quotes(false);
-    }
+  }
 
   static cmXMLSafe SafeContent(std::string const& value)
-    {
+  {
     return cmXMLSafe(value).Quotes(false);
-    }
+  }
 
   template <typename T>
   static T SafeContent(T value)
-    {
+  {
     return value;
-    }
+  }
 
 private:
   std::ostream& Output;

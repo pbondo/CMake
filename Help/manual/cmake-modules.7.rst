@@ -14,6 +14,7 @@ All Modules
    :maxdepth: 1
 
    /module/AddFileDependencies
+   /module/AndroidTestUtilities
    /module/BundleUtilities
    /module/CheckCCompilerFlag
    /module/CheckCSourceCompiles
@@ -58,8 +59,10 @@ All Modules
    /module/CPackDeb
    /module/CPackDMG
    /module/CPackIFW
+   /module/CPackIFWConfigureFile
    /module/CPackNSIS
    /module/CPackPackageMaker
+   /module/CPackProductBuild
    /module/CPackRPM
    /module/CPack
    /module/CPackWIX
@@ -120,6 +123,7 @@ All Modules
    /module/FindHTMLHelp
    /module/FindIce
    /module/FindIcotool
+   /module/FindICU
    /module/FindImageMagick
    /module/FindIntl
    /module/FindITK
@@ -209,6 +213,7 @@ All Modules
    /module/FindTIFF
    /module/FindUnixCommands
    /module/FindVTK
+   /module/FindVulkan
    /module/FindWget
    /module/FindWish
    /module/FindwxWidgets
@@ -223,6 +228,7 @@ All Modules
    /module/GenerateExportHeader
    /module/GetPrerequisites
    /module/GNUInstallDirs
+   /module/GoogleTest
    /module/InstallRequiredSystemLibraries
    /module/MacroAddFileDependencies
    /module/ProcessorCount
