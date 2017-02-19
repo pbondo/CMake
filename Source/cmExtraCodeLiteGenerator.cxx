@@ -641,5 +641,12 @@ std::string cmExtraCodeLiteGenerator::GetSingleFileBuildCommand(
     ss << make << " -f$(ProjectPath)/Makefile $(CurrentFileName).cpp.o";
     buildCommand = ss.str();
   }
+  else if (generator == "Ninja")
+  {
+    std::string objectdir = "$(ProjectName)/CMakeFiles/$(ProjectName).dir";
+    std::ostringstream ss;
+    ss << make << " " << objectdir << "/$(CurrentFileName).cpp.o";
+    buildCommand = ss.str();
+  }
   return buildCommand;
 }

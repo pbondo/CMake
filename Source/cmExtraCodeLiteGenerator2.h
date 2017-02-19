@@ -15,6 +15,8 @@
 #define cmGlobalCodeLiteGenerator2_h
 
 #include "cmExternalMakefileProjectGenerator.h"
+#include "cmGeneratorTarget.h"
+#include "cmGeneratedFileStream.h"
 
 class cmLocalGenerator;
 
@@ -25,37 +27,28 @@ public:
 
   cmExtraCodeLiteGenerator2();
 
-  std::string CreateWorkspaceHeader( const std::string& name );
+  static cmExternalMakefileProjectGeneratorFactory* GetFactory();
+
+  std::string CreateWorkspaceHeader();
   std::string CreateWorkspaceFooter( const std::string& config );
 
-  std::string CreateProjectHeader( const std::string& name );
-  std::string CreateProjectFooter( const std::string& projectType, const std::string& make_cmd, const std::string& generalTag );
+  std::string CreateProjectHeader(const std::string& name);
+  std::string CreateProjectFooter(const std::string& projectType, const std::string& make_cmd,
+    const std::string& generalTag, const std::string& projectName);
 
-  virtual std::string GetName() const override
-  { return cmExtraCodeLiteGenerator2::GetActualName();}
+  void Generate() CM_OVERRIDE;
 
-  static const char* GetActualName()                     
-  { return "CodeLite2";}
+  bool CreateProjectFile(const cmGeneratorTarget &_genTarget,
+    const cmLocalGenerator& _local, std::string &_projectname, std::string &_projectfilename);
 
-  static cmExternalMakefileProjectGenerator* New()
-  { return new cmExtraCodeLiteGenerator2; }
-
-  // Get the documentation entry for this generator.
-  virtual void GetDocumentation(cmDocumentationEntry& entry, 
-                                const std::string& fullName) const override;
-
-  virtual void Generate() override;
-
-  bool CreateProjectFile(const cmGeneratorTarget &_genTarget, //const cmTarget& lgs, 
-    const cmLocalGenerator& _local, 
-    std::string &_projectname, std::string &_projectfilename );
-
-  void CreateNewProjectFile(const std::vector<cmLocalGenerator*>& lgs,
-                                const std::string& filename);
+  void CreateNewProjectFile(const std::vector<cmLocalGenerator*>& lgs, const std::string& filename);
 
   void AddFolder( const std::vector<std::string>& folder, const std::string& foldername, cmGeneratedFileStream& fout );
 
 private:
+
+  std::string workspaceProjectName;
+
 };
 
 #endif

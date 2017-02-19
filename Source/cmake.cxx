@@ -80,7 +80,7 @@
 #include "cmGlobalNinjaGenerator.h"
 #endif
 #include "cmExtraCodeLiteGenerator.h"
-//#include "cmExtraCodeLiteGenerator2.h"
+#include "cmExtraCodeLiteGenerator2.h"
 
 #if !defined(CMAKE_BOOT_MINGW)
 #include "cmExtraCodeBlocksGenerator.h"
@@ -904,6 +904,7 @@ void cmake::AddDefaultExtraGenerators()
 */
   this->ExtraGenerators.push_back(cmExtraCodeBlocksGenerator::GetFactory());
   this->ExtraGenerators.push_back(cmExtraCodeLiteGenerator::GetFactory());
+  this->ExtraGenerators.push_back(cmExtraCodeLiteGenerator2::GetFactory());
   this->ExtraGenerators.push_back(cmExtraSublimeTextGenerator::GetFactory());
   this->ExtraGenerators.push_back(cmExtraKateGenerator::GetFactory());
 

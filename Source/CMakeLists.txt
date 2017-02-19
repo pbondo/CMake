@@ -231,8 +231,8 @@ set(SRCS
   cmExtraCodeBlocksGenerator.h
   cmExtraCodeLiteGenerator.cxx
   cmExtraCodeLiteGenerator.h
-#  cmExtraCodeLiteGenerator2.cxx
-#  cmExtraCodeLiteGenerator2.h
+  cmExtraCodeLiteGenerator2.cxx
+  cmExtraCodeLiteGenerator2.h
   cmExtraEclipseCDT4Generator.cxx
   cmExtraEclipseCDT4Generator.h
   cmExtraKateGenerator.cxx

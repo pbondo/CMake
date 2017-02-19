@@ -34,25 +34,33 @@
 #include <fstream>
 using namespace std;
 
-//std::ofstream logf2("dummy.log");
+std::ofstream logf2("dummy.log");
 
 
 //----------------------------------------------------------------------------
 cmExtraCodeLiteGenerator2::cmExtraCodeLiteGenerator2()
 :cmExternalMakefileProjectGenerator()
 {
-   this->SupportedGlobalGenerators.push_back("Unix Makefiles");
+   //this->SupportedGlobalGenerators.push_back("Unix Makefiles");
 }
 
-
-void cmExtraCodeLiteGenerator2::GetDocumentation(cmDocumentationEntry& entry, const std::string &) const
+cmExternalMakefileProjectGeneratorFactory*
+cmExtraCodeLiteGenerator2::GetFactory()
 {
-  entry.Name = this->GetName();
-  entry.Brief = "Generates CodeLite project files.";
+  static cmExternalMakefileProjectGeneratorSimpleFactory<
+    cmExtraCodeLiteGenerator2>
+    factory("CodeLite2", "Generates CodeLite project files.");
+
+  if (factory.GetSupportedGlobalGenerators().empty()) {
+    factory.AddSupportedGlobalGenerator("Ninja");
+    factory.AddSupportedGlobalGenerator("Unix Makefiles");
+  }
+
+  return &factory;
 }
 
 
-std::string cmExtraCodeLiteGenerator2::CreateWorkspaceHeader( const std::string& workspaceProjectName )
+std::string cmExtraCodeLiteGenerator2::CreateWorkspaceHeader()
 {
    std::ostringstream result;
    result <<    "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
@@ -79,7 +87,6 @@ std::string cmExtraCodeLiteGenerator2::CreateWorkspaceFooter( const std::string&
 
 void cmExtraCodeLiteGenerator2::Generate()
 {
-  std::string workspaceProjectName;
   std::string workspaceFileName;
   std::string configCMake;
   cmGeneratedFileStream fout; 
@@ -126,7 +133,7 @@ void cmExtraCodeLiteGenerator2::Generate()
   }
 
   fout.Open(workspaceFileName.c_str(),false,false);
-  fout << this->CreateWorkspaceHeader(workspaceProjectName);
+  fout << this->CreateWorkspaceHeader();
 
   // For all the projects, for all the generators, find all the targets
   for (auto& p : this->GlobalGenerator->GetProjectMap())
@@ -137,15 +144,15 @@ void cmExtraCodeLiteGenerator2::Generate()
       // Generator Targets
       for (auto& gt : lg->GetGeneratorTargets())
       {
-        //logf2 << "\tTarget: " << " : " << gt->GetType() << " : " << gt->GetName() << endl;
+        logf2 << "\tTarget: " << " : " << gt->GetType() << " : " << gt->GetName() << endl;
         switch(gt->GetType())
         {
-        case cmState::EXECUTABLE: // 0
-        case cmState::STATIC_LIBRARY: // 1
-        case cmState::SHARED_LIBRARY: // 2
+        case cmStateEnums::EXECUTABLE: // 0
+        case cmStateEnums::STATIC_LIBRARY: // 1
+        case cmStateEnums::SHARED_LIBRARY: // 2
         //case cmTarget::MODULE_LIBRARY:
         //case cmTarget::OBJECT_LIBRARY:
-        case cmState::UTILITY: // 5
+        case cmStateEnums::UTILITY: // 5
         {
           std::string projectName;
           std::string filename;
@@ -180,7 +187,8 @@ std::string cmExtraCodeLiteGenerator2::CreateProjectHeader( const std::string& p
 }
 
 
-std::string cmExtraCodeLiteGenerator2::CreateProjectFooter( const std::string& projectType, const std::string& make_cmd, const std::string& generalTag )
+std::string cmExtraCodeLiteGenerator2::CreateProjectFooter(const std::string& projectType, const std::string& make_cmd,
+   const std::string& generalTag, const std::string& projectName)
 {
    std::ostringstream result;
 
@@ -200,7 +208,7 @@ std::string cmExtraCodeLiteGenerator2::CreateProjectFooter( const std::string& p
       "      <CustomBuild Enabled=\"yes\">\n"
       "        <RebuildCommand/>\n"
       "        <CleanCommand>make clean</CleanCommand>\n"
-      "        <BuildCommand>" << make_cmd << " $(ProjectName)</BuildCommand>\n"
+      "        <BuildCommand>" << make_cmd << " " << projectName << "</BuildCommand>\n"
       "        <PreprocessFileCommand>" << make_cmd << " -f$(ProjectPath)/Makefile $(CurrentFileName).i</PreprocessFileCommand>\n"
 //      "        <SingleFileCommand>" << make_cmd << " -f$(ProjectPath)/Makefile $(ProjectPath)A/$(WorkspacePath)B/$(ProjectName)C/$(IntermediateDirectory)D/$(ConfigurationName)E/$(OutDir)F/$(CurrentFilePath)G/$(CurrentFileFullPath)H/$(CodeLitePath)I/$(OutputFile)J/$(ObjectName)K/$(ObjectSuffix)L/$(FileName)M/$(FileFullName)N/$(FileFullPath)O $(CurrentFileName).o</SingleFileCommand>\n"
       "        <SingleFileCommand>" << make_cmd << " -f$(ProjectPath)/Makefile $(CurrentFileName).o</SingleFileCommand>\n"
@@ -318,7 +326,17 @@ bool cmExtraCodeLiteGenerator2::CreateProjectFile(const cmGeneratorTarget &_targ
   {
     this->AddFolder(sg.filenames_,sg.sogr_.GetName(),fout);
   }
-  fout << this->CreateProjectFooter(targettype,make_cmd,generalTag);
+  std::string project_build = "$(ProjectName)";
+  if (_projectName == workspaceProjectName)
+  {
+     project_build.clear();
+  }
+  std::string j;
+  if (cmsys::SystemTools::GetEnv("NUMCPUS", j) && !j.empty())
+  {
+     project_build = " -j " + j + " " + project_build;
+  }
+  fout << this->CreateProjectFooter(targettype, make_cmd, generalTag, project_build);
   return true;
 }
 
