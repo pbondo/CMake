@@ -3,13 +3,13 @@
 #ifndef cmCTestUpdateHandler_h
 #define cmCTestUpdateHandler_h
 
-#include <cmConfigure.h>
-
-#include "cmCTestGenericHandler.h"
+#include "cmConfigure.h" // IWYU pragma: keep
 
 #include <string>
 #include <utility>
 #include <vector>
+
+#include "cmCTestGenericHandler.h"
 
 /** \class cmCTestUpdateHandler
  * \brief A class that handles ctest -S invocations
@@ -18,12 +18,12 @@
 class cmCTestUpdateHandler : public cmCTestGenericHandler
 {
 public:
-  typedef cmCTestGenericHandler Superclass;
+  using Superclass = cmCTestGenericHandler;
 
   /*
    * The main entry point for this class
    */
-  int ProcessHandler() CM_OVERRIDE;
+  int ProcessHandler() override;
 
   cmCTestUpdateHandler();
 
@@ -42,7 +42,7 @@ public:
   /**
    * Initialize handler
    */
-  void Initialize() CM_OVERRIDE;
+  void Initialize() override;
 
 private:
   // Some structures needed for update

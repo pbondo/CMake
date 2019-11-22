@@ -3,7 +3,9 @@
 #ifndef cmCommand_h
 #define cmCommand_h
 
-#include <cmConfigure.h>
+#include "cmConfigure.h" // IWYU pragma: keep
+
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -27,29 +29,31 @@ public:
   /**
    * Construct the command. By default it has no makefile.
    */
-  cmCommand()
-    : Makefile(CM_NULLPTR)
-  {
-  }
+  cmCommand() = default;
 
   /**
    * Need virtual destructor to destroy real command type.
    */
-  virtual ~cmCommand() {}
+  virtual ~cmCommand() = default;
+
+  cmCommand(cmCommand const&) = delete;
+  cmCommand& operator=(cmCommand const&) = delete;
 
   /**
    * Specify the makefile.
    */
-  void SetMakefile(cmMakefile* m) { this->Makefile = m; }
   cmMakefile* GetMakefile() { return this->Makefile; }
+
+  void SetExecutionStatus(cmExecutionStatus* s);
+  cmExecutionStatus* GetExecutionStatus() { return this->Status; };
 
   /**
    * This is called by the cmMakefile when the command is first
    * encountered in the CMakeLists.txt file.  It expands the command's
    * arguments and then invokes the InitialPass.
    */
-  virtual bool InvokeInitialPass(const std::vector<cmListFileArgument>& args,
-                                 cmExecutionStatus& status);
+  bool InvokeInitialPass(const std::vector<cmListFileArgument>& args,
+                         cmExecutionStatus& status);
 
   /**
    * This is called when the command is first encountered in
@@ -59,58 +63,38 @@ public:
                            cmExecutionStatus&) = 0;
 
   /**
-   * This is called at the end after all the information
-   * specified by the command is accumulated. Most commands do
-   * not implement this method.  At this point, reading and
-   * writing to the cache can be done.
-   */
-  virtual void FinalPass() {}
-
-  /**
-   * Does this command have a final pass?  Query after InitialPass.
-   */
-  virtual bool HasFinalPass() const { return false; }
-
-  /**
    * This is a virtual constructor for the command.
    */
-  virtual cmCommand* Clone() = 0;
-
-  /**
-   * This determines if the command is invoked when in script mode.
-   */
-  virtual bool IsScriptable() const { return false; }
-
-  /**
-   * This determines if the command is defined in a cmake script.
-   * It is the case for cmMacroHelperCommand and cmFunctionHelperCommand.
-   */
-  virtual bool IsUserDefined() const { return false; }
-
-  /**
-   * The name of the command as specified in CMakeList.txt.
-   */
-  virtual std::string GetName() const = 0;
-
-  /**
-   * Return the last error string.
-   */
-  const char* GetError();
+  virtual std::unique_ptr<cmCommand> Clone() = 0;
 
   /**
    * Set the error message
    */
   void SetError(const std::string& e);
 
-private:
-  cmCommand(cmCommand const&);            // = delete;
-  cmCommand& operator=(cmCommand const&); // = delete;
-
 protected:
-  cmMakefile* Makefile;
+  cmMakefile* Makefile = nullptr;
 
 private:
-  std::string Error;
+  cmExecutionStatus* Status = nullptr;
+};
+
+class cmLegacyCommandWrapper
+{
+public:
+  explicit cmLegacyCommandWrapper(std::unique_ptr<cmCommand> cmd);
+
+  cmLegacyCommandWrapper(cmLegacyCommandWrapper const& other);
+  cmLegacyCommandWrapper& operator=(cmLegacyCommandWrapper const& other);
+
+  cmLegacyCommandWrapper(cmLegacyCommandWrapper&&) = default;
+  cmLegacyCommandWrapper& operator=(cmLegacyCommandWrapper&&) = default;
+
+  bool operator()(std::vector<cmListFileArgument> const& args,
+                  cmExecutionStatus& status) const;
+
+private:
+  std::unique_ptr<cmCommand> Command;
 };
 
 #endif

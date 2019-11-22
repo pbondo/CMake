@@ -4,7 +4,7 @@
 #ifndef cmStatePrivate_h
 #define cmStatePrivate_h
 
-#include <cmConfigure.h> // IWYU pragma: keep
+#include "cmConfigure.h" // IWYU pragma: keep
 
 #include <string>
 #include <vector>
@@ -42,24 +42,20 @@ struct cmStateDetail::SnapshotDataType
   std::vector<std::string>::size_type IncludeDirectoryPosition;
   std::vector<std::string>::size_type CompileDefinitionsPosition;
   std::vector<std::string>::size_type CompileOptionsPosition;
+  std::vector<std::string>::size_type LinkOptionsPosition;
+  std::vector<std::string>::size_type LinkDirectoriesPosition;
 };
 
 struct cmStateDetail::PolicyStackEntry : public cmPolicies::PolicyMap
 {
-  typedef cmPolicies::PolicyMap derived;
+  using derived = cmPolicies::PolicyMap;
   PolicyStackEntry(bool w = false)
-    : derived()
-    , Weak(w)
+    : Weak(w)
   {
   }
   PolicyStackEntry(derived const& d, bool w)
     : derived(d)
     , Weak(w)
-  {
-  }
-  PolicyStackEntry(PolicyStackEntry const& r)
-    : derived(r)
-    , Weak(r.Weak)
   {
   }
   bool Weak;
@@ -88,6 +84,12 @@ struct cmStateDetail::BuildsystemDirectoryStateType
 
   std::vector<std::string> CompileOptions;
   std::vector<cmListFileBacktrace> CompileOptionsBacktraces;
+
+  std::vector<std::string> LinkOptions;
+  std::vector<cmListFileBacktrace> LinkOptionsBacktraces;
+
+  std::vector<std::string> LinkDirectories;
+  std::vector<cmListFileBacktrace> LinkDirectoriesBacktraces;
 
   std::vector<std::string> NormalTargetNames;
 

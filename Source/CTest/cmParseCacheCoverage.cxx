@@ -1,15 +1,17 @@
 #include "cmParseCacheCoverage.h"
 
+#include <cstdio>
+#include <cstdlib>
+#include <map>
+#include <utility>
+
+#include "cmsys/Directory.hxx"
+#include "cmsys/FStream.hxx"
+
 #include "cmCTest.h"
 #include "cmCTestCoverageHandler.h"
+#include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
-
-#include <cmsys/Directory.hxx>
-#include <cmsys/FStream.hxx>
-#include <map>
-#include <stdio.h>
-#include <stdlib.h>
-#include <utility>
 
 cmParseCacheCoverage::cmParseCacheCoverage(
   cmCTestCoverageHandlerContainer& cont, cmCTest* ctest)
@@ -30,9 +32,7 @@ bool cmParseCacheCoverage::LoadCoverageData(const char* d)
   for (i = 0; i < numf; i++) {
     std::string file = dir.GetFile(i);
     if (file != "." && file != ".." && !cmSystemTools::FileIsDirectory(file)) {
-      std::string path = d;
-      path += "/";
-      path += file;
+      std::string path = cmStrCat(d, '/', file);
       if (cmSystemTools::GetFilenameLastExtension(path) == ".cmcov") {
         if (!this->ReadCMCovFile(path.c_str())) {
           return false;
@@ -48,15 +48,12 @@ void cmParseCacheCoverage::RemoveUnCoveredFiles()
 {
   // loop over the coverage data computed and remove all files
   // that only have -1 or 0 for the lines.
-  cmCTestCoverageHandlerContainer::TotalCoverageMap::iterator ci =
-    this->Coverage.TotalCoverage.begin();
+  auto ci = this->Coverage.TotalCoverage.begin();
   while (ci != this->Coverage.TotalCoverage.end()) {
     cmCTestCoverageHandlerContainer::SingleFileCoverageVector& v = ci->second;
     bool nothing = true;
-    for (cmCTestCoverageHandlerContainer::SingleFileCoverageVector::iterator
-           i = v.begin();
-         i != v.end(); ++i) {
-      if (*i > 0) {
+    for (int i : v) {
+      if (i > 0) {
         nothing = false;
         break;
       }
@@ -102,10 +99,11 @@ bool cmParseCacheCoverage::ReadCMCovFile(const char* file)
   std::string line;
   std::vector<std::string> separateLine;
   if (!cmSystemTools::GetLineFromStream(in, line)) {
-    cmCTestLog(this->CTest, ERROR_MESSAGE, "Empty file : "
-                 << file << "  referenced in this line of cmcov data:\n"
-                            "["
-                 << line << "]\n");
+    cmCTestLog(this->CTest, ERROR_MESSAGE,
+               "Empty file : " << file
+                               << "  referenced in this line of cmcov data:\n"
+                                  "["
+                               << line << "]\n");
     return false;
   }
   separateLine.clear();
@@ -114,8 +112,9 @@ bool cmParseCacheCoverage::ReadCMCovFile(const char* file)
       separateLine[1] != "Line" || separateLine[2] != "RtnLine" ||
       separateLine[3] != "Code") {
     cmCTestLog(this->CTest, ERROR_MESSAGE,
-               "Bad first line of cmcov file : " << file << "  line:\n"
-                                                            "["
+               "Bad first line of cmcov file : " << file
+                                                 << "  line:\n"
+                                                    "["
                                                  << line << "]\n");
   }
   std::string routine;
@@ -130,8 +129,9 @@ bool cmParseCacheCoverage::ReadCMCovFile(const char* file)
     if (separateLine.size() < 4) {
       cmCTestLog(this->CTest, ERROR_MESSAGE,
                  "Bad line of cmcov file expected at least 4 found: "
-                   << separateLine.size() << " " << file << "  line:\n"
-                                                            "["
+                   << separateLine.size() << " " << file
+                   << "  line:\n"
+                      "["
                    << line << "]\n");
       for (std::string::size_type i = 0; i < separateLine.size(); ++i) {
         cmCTestLog(this->CTest, ERROR_MESSAGE, "" << separateLine[1] << " ");
@@ -148,7 +148,7 @@ bool cmParseCacheCoverage::ReadCMCovFile(const char* file)
         cmCTestLog(this->CTest, ERROR_MESSAGE,
                    "Could not find mumps file for routine: " << routine
                                                              << "\n");
-        filepath = "";
+        filepath.clear();
         continue; // move to next line
       }
     }
@@ -156,8 +156,8 @@ bool cmParseCacheCoverage::ReadCMCovFile(const char* file)
     else {
       // Totals in arg 0 marks the end of a routine
       if (separateLine[0].substr(0, 6) == "Totals") {
-        routine = ""; // at the end of this routine
-        filepath = "";
+        routine.clear(); // at the end of this routine
+        filepath.clear();
         continue; // move to next line
       }
     }

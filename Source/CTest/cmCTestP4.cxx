@@ -2,16 +2,20 @@
    file Copyright.txt or https://cmake.org/licensing for details.  */
 #include "cmCTestP4.h"
 
+#include <algorithm>
+#include <ctime>
+#include <ostream>
+#include <utility>
+
+#include "cmsys/RegularExpression.hxx"
+
+#include "cmAlgorithms.h"
 #include "cmCTest.h"
 #include "cmCTestVC.h"
 #include "cmProcessTools.h"
+#include "cmRange.h"
+#include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
-
-#include <algorithm>
-#include <cmsys/RegularExpression.hxx>
-#include <ostream>
-#include <time.h>
-#include <utility>
 
 cmCTestP4::cmCTestP4(cmCTest* ct, std::ostream& log)
   : cmCTestGlobalVC(ct, log)
@@ -19,9 +23,7 @@ cmCTestP4::cmCTestP4(cmCTest* ct, std::ostream& log)
   this->PriorRev = this->Unknown;
 }
 
-cmCTestP4::~cmCTestP4()
-{
-}
+cmCTestP4::~cmCTestP4() = default;
 
 class cmCTestP4::IdentifyParser : public cmCTestVC::LineParser
 {
@@ -37,7 +39,7 @@ private:
   std::string& Rev;
   cmsys::RegularExpression RegexIdentify;
 
-  bool ProcessLine() CM_OVERRIDE
+  bool ProcessLine() override
   {
     if (this->RegexIdentify.find(this->Line)) {
       this->Rev = this->RegexIdentify.match(1);
@@ -61,7 +63,7 @@ private:
   cmsys::RegularExpression RegexIdentify;
   cmCTestP4* P4;
 
-  bool ProcessLine() CM_OVERRIDE
+  bool ProcessLine() override
   {
     if (this->RegexIdentify.find(this->Line)) {
       P4->ChangeLists.push_back(this->RegexIdentify.match(1));
@@ -84,7 +86,7 @@ private:
   cmsys::RegularExpression RegexUser;
   cmCTestP4* P4;
 
-  bool ProcessLine() CM_OVERRIDE
+  bool ProcessLine() override
   {
     if (this->RegexUser.find(this->Line)) {
       User NewUser;
@@ -127,7 +129,7 @@ private:
   std::string CurrentPath;
   cmsys::RegularExpression RegexDiff;
 
-  bool ProcessLine() CM_OVERRIDE
+  bool ProcessLine() override
   {
     if (!this->Line.empty() && this->Line[0] == '=' &&
         this->RegexDiff.find(this->Line)) {
@@ -145,8 +147,7 @@ private:
 
 cmCTestP4::User cmCTestP4::GetUserData(const std::string& username)
 {
-  std::map<std::string, cmCTestP4::User>::const_iterator it =
-    Users.find(username);
+  auto it = Users.find(username);
 
   if (it == Users.end()) {
     std::vector<char const*> p4_users;
@@ -155,7 +156,7 @@ cmCTestP4::User cmCTestP4::GetUserData(const std::string& username)
     p4_users.push_back("-m");
     p4_users.push_back("1");
     p4_users.push_back(username.c_str());
-    p4_users.push_back(CM_NULLPTR);
+    p4_users.push_back(nullptr);
 
     UserParser out(this, "users-out> ");
     OutputLogger err(this->Log, "users-err> ");
@@ -195,7 +196,7 @@ public:
   {
     this->SetLog(&P4->Log, prefix);
     this->RegexHeader.compile("^Change ([0-9]+) by (.+)@(.+) on (.*)$");
-    this->RegexDiff.compile("^\\.\\.\\. (.*)#[0-9]+ ([^ ]+)$");
+    this->RegexDiff.compile(R"(^\.\.\. (.*)#[0-9]+ ([^ ]+)$)");
   }
 
 private:
@@ -203,8 +204,8 @@ private:
   cmsys::RegularExpression RegexDiff;
   cmCTestP4* P4;
 
-  typedef cmCTestP4::Revision Revision;
-  typedef cmCTestP4::Change Change;
+  using Revision = cmCTestP4::Revision;
+  using Change = cmCTestP4::Change;
   std::vector<Change> Changes;
   enum SectionType
   {
@@ -217,7 +218,7 @@ private:
   SectionType Section;
   Revision Rev;
 
-  bool ProcessLine() CM_OVERRIDE
+  bool ProcessLine() override
   {
     if (this->Line.empty()) {
       this->NextSection();
@@ -307,34 +308,30 @@ void cmCTestP4::SetP4Options(std::vector<char const*>& CommandOptions)
 {
   if (P4Options.empty()) {
     const char* p4 = this->CommandLineTool.c_str();
-    P4Options.push_back(p4);
+    P4Options.emplace_back(p4);
 
     // The CTEST_P4_CLIENT variable sets the P4 client used when issuing
     // Perforce commands, if it's different from the default one.
     std::string client = this->CTest->GetCTestConfiguration("P4Client");
     if (!client.empty()) {
-      P4Options.push_back("-c");
+      P4Options.emplace_back("-c");
       P4Options.push_back(client);
     }
 
     // Set the message language to be English, in case the P4 admin
     // has localized them
-    P4Options.push_back("-L");
-    P4Options.push_back("en");
+    P4Options.emplace_back("-L");
+    P4Options.emplace_back("en");
 
     // The CTEST_P4_OPTIONS variable adds additional Perforce command line
     // options before the main command
     std::string opts = this->CTest->GetCTestConfiguration("P4Options");
-    std::vector<std::string> args =
-      cmSystemTools::ParseArguments(opts.c_str());
-
-    P4Options.insert(P4Options.end(), args.begin(), args.end());
+    cmAppend(P4Options, cmSystemTools::ParseArguments(opts));
   }
 
   CommandOptions.clear();
-  for (std::vector<std::string>::iterator i = P4Options.begin();
-       i != P4Options.end(); ++i) {
-    CommandOptions.push_back(i->c_str());
+  for (std::string const& o : P4Options) {
+    CommandOptions.push_back(o.c_str());
   }
 }
 
@@ -350,7 +347,7 @@ std::string cmCTestP4::GetWorkingRevision()
 
   std::string source = this->SourceDirectory + "/...#have";
   p4_identify.push_back(source.c_str());
-  p4_identify.push_back(CM_NULLPTR);
+  p4_identify.push_back(nullptr);
 
   std::string rev;
   IdentifyParser out(this, "p4_changes-out> ", rev);
@@ -373,8 +370,9 @@ bool cmCTestP4::NoteOldRevision()
 {
   this->OldRevision = this->GetWorkingRevision();
 
-  cmCTestLog(this->CTest, HANDLER_OUTPUT, "   Old revision of repository is: "
-               << this->OldRevision << "\n");
+  cmCTestLog(this->CTest, HANDLER_OUTPUT,
+             "   Old revision of repository is: " << this->OldRevision
+                                                  << "\n");
   this->PriorRev.Rev = this->OldRevision;
   return true;
 }
@@ -383,8 +381,9 @@ bool cmCTestP4::NoteNewRevision()
 {
   this->NewRevision = this->GetWorkingRevision();
 
-  cmCTestLog(this->CTest, HANDLER_OUTPUT, "   New revision of repository is: "
-               << this->NewRevision << "\n");
+  cmCTestLog(this->CTest, HANDLER_OUTPUT,
+             "   New revision of repository is: " << this->NewRevision
+                                                  << "\n");
   return true;
 }
 
@@ -399,7 +398,8 @@ bool cmCTestP4::LoadRevisions()
   // If any revision is unknown it means we couldn't contact the server.
   // Do not process updates
   if (this->OldRevision == "<unknown>" || this->NewRevision == "<unknown>") {
-    cmCTestLog(this->CTest, HANDLER_OUTPUT, "   At least one of the revisions "
+    cmCTestLog(this->CTest, HANDLER_OUTPUT,
+               "   At least one of the revisions "
                  << "is unknown. No repository changes will be reported.\n");
     return false;
   }
@@ -411,7 +411,7 @@ bool cmCTestP4::LoadRevisions()
 
   p4_changes.push_back("changes");
   p4_changes.push_back(range.c_str());
-  p4_changes.push_back(CM_NULLPTR);
+  p4_changes.push_back(nullptr);
 
   ChangesParser out(this, "p4_changes-out> ");
   OutputLogger err(this->Log, "p4_changes-err> ");
@@ -425,13 +425,12 @@ bool cmCTestP4::LoadRevisions()
 
   // p4 describe -s ...@1111111,2222222
   std::vector<char const*> p4_describe;
-  for (std::vector<std::string>::reverse_iterator i = ChangeLists.rbegin();
-       i != ChangeLists.rend(); ++i) {
+  for (std::string const& i : cmReverseRange(ChangeLists)) {
     SetP4Options(p4_describe);
     p4_describe.push_back("describe");
     p4_describe.push_back("-s");
-    p4_describe.push_back(i->c_str());
-    p4_describe.push_back(CM_NULLPTR);
+    p4_describe.push_back(i.c_str());
+    p4_describe.push_back(nullptr);
 
     DescribeParser outDescribe(this, "p4_describe-out> ");
     OutputLogger errDescribe(this->Log, "p4_describe-err> ");
@@ -451,7 +450,7 @@ bool cmCTestP4::LoadModifications()
   p4_diff.push_back("-dn");
   std::string source = this->SourceDirectory + "/...";
   p4_diff.push_back(source.c_str());
-  p4_diff.push_back(CM_NULLPTR);
+  p4_diff.push_back(nullptr);
 
   DiffParser out(this, "p4_diff-out> ");
   OutputLogger err(this->Log, "p4_diff-err> ");
@@ -461,15 +460,14 @@ bool cmCTestP4::LoadModifications()
 
 bool cmCTestP4::UpdateCustom(const std::string& custom)
 {
-  std::vector<std::string> p4_custom_command;
-  cmSystemTools::ExpandListArgument(custom, p4_custom_command, true);
+  std::vector<std::string> p4_custom_command = cmExpandedList(custom, true);
 
   std::vector<char const*> p4_custom;
-  for (std::vector<std::string>::const_iterator i = p4_custom_command.begin();
-       i != p4_custom_command.end(); ++i) {
-    p4_custom.push_back(i->c_str());
+  p4_custom.reserve(p4_custom_command.size() + 1);
+  for (std::string const& i : p4_custom_command) {
+    p4_custom.push_back(i.c_str());
   }
-  p4_custom.push_back(CM_NULLPTR);
+  p4_custom.push_back(nullptr);
 
   OutputLogger custom_out(this->Log, "p4_customsync-out> ");
   OutputLogger custom_err(this->Log, "p4_customsync-err> ");
@@ -501,10 +499,9 @@ bool cmCTestP4::UpdateImpl()
   if (opts.empty()) {
     opts = this->CTest->GetCTestConfiguration("P4UpdateOptions");
   }
-  std::vector<std::string> args = cmSystemTools::ParseArguments(opts.c_str());
-  for (std::vector<std::string>::const_iterator ai = args.begin();
-       ai != args.end(); ++ai) {
-    p4_sync.push_back(ai->c_str());
+  std::vector<std::string> args = cmSystemTools::ParseArguments(opts);
+  for (std::string const& arg : args) {
+    p4_sync.push_back(arg.c_str());
   }
 
   std::string source = this->SourceDirectory + "/...";
@@ -520,7 +517,7 @@ bool cmCTestP4::UpdateImpl()
   }
 
   p4_sync.push_back(source.c_str());
-  p4_sync.push_back(CM_NULLPTR);
+  p4_sync.push_back(nullptr);
 
   OutputLogger out(this->Log, "p4_sync-out> ");
   OutputLogger err(this->Log, "p4_sync-err> ");

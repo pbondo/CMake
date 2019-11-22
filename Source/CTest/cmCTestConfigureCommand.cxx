@@ -2,30 +2,32 @@
    file Copyright.txt or https://cmake.org/licensing for details.  */
 #include "cmCTestConfigureCommand.h"
 
+#include <cstring>
+#include <sstream>
+#include <vector>
+
+#include "cm_static_string_view.hxx"
+
 #include "cmCTest.h"
-#include "cmCTestGenericHandler.h"
+#include "cmCTestConfigureHandler.h"
 #include "cmGlobalGenerator.h"
 #include "cmMakefile.h"
+#include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 #include "cmake.h"
 
-#include <sstream>
-#include <string.h>
-#include <vector>
-
-cmCTestConfigureCommand::cmCTestConfigureCommand()
+void cmCTestConfigureCommand::BindArguments()
 {
-  this->Arguments[ctc_OPTIONS] = "OPTIONS";
-  this->Arguments[ctc_LAST] = CM_NULLPTR;
-  this->Last = ctc_LAST;
+  this->cmCTestHandlerCommand::BindArguments();
+  this->Bind("OPTIONS"_s, this->Options);
 }
 
 cmCTestGenericHandler* cmCTestConfigureCommand::InitializeHandler()
 {
   std::vector<std::string> options;
 
-  if (this->Values[ctc_OPTIONS]) {
-    cmSystemTools::ExpandListArgument(this->Values[ctc_OPTIONS], options);
+  if (!this->Options.empty()) {
+    cmExpandList(this->Options, options);
   }
 
   if (this->CTest->GetCTestConfiguration("BuildDirectory").empty()) {
@@ -33,7 +35,7 @@ cmCTestGenericHandler* cmCTestConfigureCommand::InitializeHandler()
       "Build directory not specified. Either use BUILD "
       "argument to CTEST_CONFIGURE command or set CTEST_BINARY_DIRECTORY "
       "variable");
-    return CM_NULLPTR;
+    return nullptr;
   }
 
   const char* ctestConfigureCommand =
@@ -53,15 +55,15 @@ cmCTestGenericHandler* cmCTestConfigureCommand::InitializeHandler()
           "Source directory not specified. Either use SOURCE "
           "argument to CTEST_CONFIGURE command or set CTEST_SOURCE_DIRECTORY "
           "variable");
-        return CM_NULLPTR;
+        return nullptr;
       }
 
       const std::string cmakelists_file = source_dir + "/CMakeLists.txt";
-      if (!cmSystemTools::FileExists(cmakelists_file.c_str())) {
+      if (!cmSystemTools::FileExists(cmakelists_file)) {
         std::ostringstream e;
         e << "CMakeLists.txt file does not exist [" << cmakelists_file << "]";
         this->SetError(e.str());
-        return CM_NULLPTR;
+        return nullptr;
       }
 
       bool multiConfig = false;
@@ -75,22 +77,16 @@ cmCTestGenericHandler* cmCTestConfigureCommand::InitializeHandler()
         delete gg;
       }
 
-      std::string cmakeConfigureCommand = "\"";
-      cmakeConfigureCommand += cmSystemTools::GetCMakeCommand();
-      cmakeConfigureCommand += "\"";
+      std::string cmakeConfigureCommand =
+        cmStrCat('"', cmSystemTools::GetCMakeCommand(), '"');
 
-      std::vector<std::string>::const_iterator it;
-      std::string option;
-      for (it = options.begin(); it != options.end(); ++it) {
-        option = *it;
-
+      for (std::string const& option : options) {
         cmakeConfigureCommand += " \"";
         cmakeConfigureCommand += option;
         cmakeConfigureCommand += "\"";
 
-        if ((CM_NULLPTR != strstr(option.c_str(), "CMAKE_BUILD_TYPE=")) ||
-            (CM_NULLPTR !=
-             strstr(option.c_str(), "CMAKE_BUILD_TYPE:STRING="))) {
+        if ((nullptr != strstr(option.c_str(), "CMAKE_BUILD_TYPE=")) ||
+            (nullptr != strstr(option.c_str(), "CMAKE_BUILD_TYPE:STRING="))) {
           cmakeBuildTypeInOptions = true;
         }
       }
@@ -137,17 +133,18 @@ cmCTestGenericHandler* cmCTestConfigureCommand::InitializeHandler()
         "Configure command is not specified. If this is a "
         "\"built with CMake\" project, set CTEST_CMAKE_GENERATOR. If not, "
         "set CTEST_CONFIGURE_COMMAND.");
-      return CM_NULLPTR;
+      return nullptr;
     }
   }
 
-  cmCTestGenericHandler* handler =
-    this->CTest->GetInitializedHandler("configure");
-  if (!handler) {
-    this->SetError(
-      "internal CTest error. Cannot instantiate configure handler");
-    return CM_NULLPTR;
+  if (const char* labelsForSubprojects =
+        this->Makefile->GetDefinition("CTEST_LABELS_FOR_SUBPROJECTS")) {
+    this->CTest->SetCTestConfiguration("LabelsForSubprojects",
+                                       labelsForSubprojects, this->Quiet);
   }
+
+  cmCTestConfigureHandler* handler = this->CTest->GetConfigureHandler();
+  handler->Initialize();
   handler->SetQuiet(this->Quiet);
   return handler;
 }

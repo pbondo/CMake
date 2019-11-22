@@ -3,15 +3,18 @@
 #ifndef cmCTestCoverageCommand_h
 #define cmCTestCoverageCommand_h
 
-#include <cmConfigure.h>
+#include "cmConfigure.h" // IWYU pragma: keep
+
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <cm/memory>
 
 #include "cmCTestHandlerCommand.h"
-
-#include <set>
-#include <string>
+#include "cmCommand.h"
 
 class cmCTestGenericHandler;
-class cmCommand;
 
 /** \class cmCTestCoverage
  * \brief Run a ctest script
@@ -21,40 +24,29 @@ class cmCommand;
 class cmCTestCoverageCommand : public cmCTestHandlerCommand
 {
 public:
-  cmCTestCoverageCommand();
-
   /**
    * This is a virtual constructor for the command.
    */
-  cmCommand* Clone() CM_OVERRIDE
+  std::unique_ptr<cmCommand> Clone() override
   {
-    cmCTestCoverageCommand* ni = new cmCTestCoverageCommand;
+    auto ni = cm::make_unique<cmCTestCoverageCommand>();
     ni->CTest = this->CTest;
     ni->CTestScriptHandler = this->CTestScriptHandler;
-    return ni;
+    return std::unique_ptr<cmCommand>(std::move(ni));
   }
 
   /**
    * The name of the command as specified in CMakeList.txt.
    */
-  std::string GetName() const CM_OVERRIDE { return "ctest_coverage"; }
-
-  typedef cmCTestHandlerCommand Superclass;
+  std::string GetName() const override { return "ctest_coverage"; }
 
 protected:
-  cmCTestGenericHandler* InitializeHandler() CM_OVERRIDE;
-
-  bool CheckArgumentKeyword(std::string const& arg) CM_OVERRIDE;
-  bool CheckArgumentValue(std::string const& arg) CM_OVERRIDE;
-
-  enum
-  {
-    ArgumentDoingLabels = Superclass::ArgumentDoingLast1,
-    ArgumentDoingLast2
-  };
+  void BindArguments() override;
+  void CheckArguments(std::vector<std::string> const& keywords) override;
+  cmCTestGenericHandler* InitializeHandler() override;
 
   bool LabelsMentioned;
-  std::set<std::string> Labels;
+  std::vector<std::string> Labels;
 };
 
 #endif

@@ -3,37 +3,43 @@
 #ifndef cmCPackIFWGenerator_h
 #define cmCPackIFWGenerator_h
 
-#include <cmConfigure.h>
-
-#include "CPack/cmCPackComponentGroup.h"
-#include "CPack/cmCPackGenerator.h"
-#include "cmCPackIFWInstaller.h"
-#include "cmCPackIFWPackage.h"
-#include "cmCPackIFWRepository.h"
+#include "cmConfigure.h" // IWYU pragma: keep
 
 #include <map>
 #include <set>
 #include <string>
 #include <vector>
 
-class cmXMLWriter;
+#include "cmCPackComponentGroup.h"
+#include "cmCPackGenerator.h"
+#include "cmCPackIFWCommon.h"
+#include "cmCPackIFWInstaller.h"
+#include "cmCPackIFWPackage.h"
+#include "cmCPackIFWRepository.h"
 
 /** \class cmCPackIFWGenerator
  * \brief A generator for Qt Installer Framework tools
  *
  * http://qt-project.org/doc/qtinstallerframework/index.html
  */
-class cmCPackIFWGenerator : public cmCPackGenerator
+class cmCPackIFWGenerator
+  : public cmCPackGenerator
+  , public cmCPackIFWCommon
 {
 public:
   cmCPackTypeMacro(cmCPackIFWGenerator, cmCPackGenerator);
 
-  typedef std::map<std::string, cmCPackIFWPackage> PackagesMap;
-  typedef std::map<std::string, cmCPackIFWRepository> RepositoriesMap;
-  typedef std::map<std::string, cmCPackComponent> ComponentsMap;
-  typedef std::map<std::string, cmCPackComponentGroup> ComponentGoupsMap;
-  typedef std::map<std::string, cmCPackIFWPackage::DependenceStruct>
-    DependenceMap;
+  using PackagesMap = std::map<std::string, cmCPackIFWPackage>;
+  using RepositoriesMap = std::map<std::string, cmCPackIFWRepository>;
+  using ComponentsMap = std::map<std::string, cmCPackComponent>;
+  using ComponentGoupsMap = std::map<std::string, cmCPackComponentGroup>;
+  using DependenceMap =
+    std::map<std::string, cmCPackIFWPackage::DependenceStruct>;
+
+  using cmCPackIFWCommon::GetOption;
+  using cmCPackIFWCommon::IsOn;
+  using cmCPackIFWCommon::IsSetToOff;
+  using cmCPackIFWCommon::IsSetToEmpty;
 
   /**
    * Construct IFW generator
@@ -43,22 +49,7 @@ public:
   /**
    * Destruct IFW generator
    */
-  ~cmCPackIFWGenerator() CM_OVERRIDE;
-
-  /**
-   * Compare \a version with QtIFW framework version
-   */
-  bool IsVersionLess(const char* version);
-
-  /**
-   * Compare \a version with QtIFW framework version
-   */
-  bool IsVersionGreater(const char* version);
-
-  /**
-   * Compare \a version with QtIFW framework version
-   */
-  bool IsVersionEqual(const char* version);
+  ~cmCPackIFWGenerator() override;
 
 protected:
   // cmCPackGenerator reimplementation
@@ -67,18 +58,18 @@ protected:
    * @brief Initialize generator
    * @return 0 on failure
    */
-  int InitializeInternal() CM_OVERRIDE;
-  int PackageFiles() CM_OVERRIDE;
-  const char* GetPackagingInstallPrefix() CM_OVERRIDE;
+  int InitializeInternal() override;
+  int PackageFiles() override;
+  const char* GetPackagingInstallPrefix() override;
 
   /**
-   * @brief Extension of binary installer
-   * @return Executable suffix or value from default implementation
+   * @brief Target binary extension
+   * @return Executable suffix or disk image format
    */
-  const char* GetOutputExtension() CM_OVERRIDE;
+  const char* GetOutputExtension() override;
 
   std::string GetComponentInstallDirNameSuffix(
-    const std::string& componentName) CM_OVERRIDE;
+    const std::string& componentName) override;
 
   /**
    * @brief Get Component
@@ -90,7 +81,7 @@ protected:
    * @return Pointer to component
    */
   cmCPackComponent* GetComponent(const std::string& projectName,
-                                 const std::string& componentName) CM_OVERRIDE;
+                                 const std::string& componentName) override;
 
   /**
    * @brief Get group of component
@@ -102,12 +93,12 @@ protected:
    * @return Pointer to component group
    */
   cmCPackComponentGroup* GetComponentGroup(
-    const std::string& projectName, const std::string& groupName) CM_OVERRIDE;
+    const std::string& projectName, const std::string& groupName) override;
 
-  enum cmCPackGenerator::CPackSetDestdirSupport SupportsSetDestdir() const
-    CM_OVERRIDE;
-  bool SupportsAbsoluteDestination() const CM_OVERRIDE;
-  bool SupportsComponentInstallation() const CM_OVERRIDE;
+  enum cmCPackGenerator::CPackSetDestdirSupport SupportsSetDestdir()
+    const override;
+  bool SupportsAbsoluteDestination() const override;
+  bool SupportsComponentInstallation() const override;
 
 protected:
   // Methods
@@ -124,12 +115,11 @@ protected:
 
   cmCPackIFWRepository* GetRepository(const std::string& repositoryName);
 
-  void WriteGeneratedByToStrim(cmXMLWriter& xout);
-
 protected:
   // Data
 
   friend class cmCPackIFWPackage;
+  friend class cmCPackIFWCommon;
   friend class cmCPackIFWInstaller;
   friend class cmCPackIFWRepository;
 
@@ -155,10 +145,12 @@ private:
   std::string BinCreator;
   std::string FrameworkVersion;
   std::string ExecutableSuffix;
+  std::string OutputExtension;
 
   bool OnlineOnly;
   bool ResolveDuplicateNames;
   std::vector<std::string> PkgsDirsVector;
+  std::vector<std::string> RepoDirsVector;
 };
 
 #endif

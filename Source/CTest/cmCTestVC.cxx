@@ -2,15 +2,17 @@
    file Copyright.txt or https://cmake.org/licensing for details.  */
 #include "cmCTestVC.h"
 
+#include <cstdio>
+#include <ctime>
+#include <sstream>
+#include <vector>
+
+#include "cmsys/Process.h"
+
 #include "cmCTest.h"
+#include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 #include "cmXMLWriter.h"
-
-#include <cmsys/Process.h>
-#include <sstream>
-#include <stdio.h>
-#include <time.h>
-#include <vector>
 
 cmCTestVC::cmCTestVC(cmCTest* ct, std::ostream& log)
   : CTest(ct)
@@ -24,9 +26,7 @@ cmCTestVC::cmCTestVC(cmCTest* ct, std::ostream& log)
   this->Unknown.Rev = "Unknown";
 }
 
-cmCTestVC::~cmCTestVC()
-{
-}
+cmCTestVC::~cmCTestVC() = default;
 
 void cmCTestVC::SetCommandLineTool(std::string const& tool)
 {
@@ -47,7 +47,7 @@ bool cmCTestVC::InitialCheckout(const char* command)
   std::string parent = cmSystemTools::GetFilenamePath(this->SourceDirectory);
   cmCTestLog(this->CTest, HANDLER_OUTPUT,
              "   Perform checkout in directory: " << parent << "\n");
-  if (!cmSystemTools::MakeDirectory(parent.c_str())) {
+  if (!cmSystemTools::MakeDirectory(parent)) {
     cmCTestLog(this->CTest, ERROR_MESSAGE,
                "Cannot create directory: " << parent << std::endl);
     return false;
@@ -56,11 +56,11 @@ bool cmCTestVC::InitialCheckout(const char* command)
   // Construct the initial checkout command line.
   std::vector<std::string> args = cmSystemTools::ParseArguments(command);
   std::vector<char const*> vc_co;
-  for (std::vector<std::string>::const_iterator ai = args.begin();
-       ai != args.end(); ++ai) {
-    vc_co.push_back(ai->c_str());
+  vc_co.reserve(args.size() + 1);
+  for (std::string const& arg : args) {
+    vc_co.push_back(arg.c_str());
   }
-  vc_co.push_back(CM_NULLPTR);
+  vc_co.push_back(nullptr);
 
   // Run the initial checkout command and log its output.
   this->Log << "--- Begin Initial Checkout ---\n";
@@ -69,8 +69,8 @@ bool cmCTestVC::InitialCheckout(const char* command)
   bool result = this->RunChild(&vc_co[0], &out, &err, parent.c_str());
   this->Log << "--- End Initial Checkout ---\n";
   if (!result) {
-    cmCTestLog(this->CTest, ERROR_MESSAGE, "Initial checkout failed!"
-                 << std::endl);
+    cmCTestLog(this->CTest, ERROR_MESSAGE,
+               "Initial checkout failed!" << std::endl);
   }
   return result;
 }
@@ -79,13 +79,13 @@ bool cmCTestVC::RunChild(char const* const* cmd, OutputParser* out,
                          OutputParser* err, const char* workDir,
                          Encoding encoding)
 {
-  this->Log << this->ComputeCommandLine(cmd) << "\n";
+  this->Log << cmCTestVC::ComputeCommandLine(cmd) << "\n";
 
   cmsysProcess* cp = cmsysProcess_New();
   cmsysProcess_SetCommand(cp, cmd);
   workDir = workDir ? workDir : this->SourceDirectory.c_str();
   cmsysProcess_SetWorkingDirectory(cp, workDir);
-  this->RunProcess(cp, out, err, encoding);
+  cmCTestVC::RunProcess(cp, out, err, encoding);
   int result = cmsysProcess_GetExitValue(cp);
   cmsysProcess_Delete(cp);
   return result == 0;
@@ -113,7 +113,7 @@ bool cmCTestVC::RunUpdateCommand(char const* const* cmd, OutputParser* out,
   }
 
   // Run the command.
-  return this->RunChild(cmd, out, err, CM_NULLPTR, encoding);
+  return this->RunChild(cmd, out, err, nullptr, encoding);
 }
 
 std::string cmCTestVC::GetNightlyTime()
@@ -143,10 +143,18 @@ void cmCTestVC::CleanupImpl()
 bool cmCTestVC::Update()
 {
   bool result = true;
+
+  // Use the explicitly specified version.
+  std::string versionOverride =
+    this->CTest->GetCTestConfiguration("UpdateVersionOverride");
+  if (!versionOverride.empty()) {
+    this->SetNewRevision(versionOverride);
+    return true;
+  }
+
   // if update version only is on then do not actually update,
   // just note the current version and finish
-  if (!cmSystemTools::IsOn(
-        this->CTest->GetCTestConfiguration("UpdateVersionOnly").c_str())) {
+  if (!cmIsOn(this->CTest->GetCTestConfiguration("UpdateVersionOnly"))) {
     result = this->NoteOldRevision() && result;
     this->Log << "--- Begin Update ---\n";
     result = this->UpdateImpl() && result;
@@ -166,6 +174,11 @@ bool cmCTestVC::NoteNewRevision()
 {
   // We do nothing by default.
   return true;
+}
+
+void cmCTestVC::SetNewRevision(std::string const& /*unused*/)
+{
+  // We do nothing by default.
 }
 
 bool cmCTestVC::UpdateImpl()

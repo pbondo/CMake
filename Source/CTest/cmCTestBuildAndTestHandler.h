@@ -3,14 +3,16 @@
 #ifndef cmCTestBuildAndTestHandler_h
 #define cmCTestBuildAndTestHandler_h
 
-#include <cmConfigure.h>
-
-#include "cmCTestGenericHandler.h"
+#include "cmConfigure.h" // IWYU pragma: keep
 
 #include <sstream>
-#include <stddef.h>
 #include <string>
 #include <vector>
+
+#include <stddef.h>
+
+#include "cmCTestGenericHandler.h"
+#include "cmDuration.h"
 
 class cmake;
 
@@ -21,17 +23,17 @@ class cmake;
 class cmCTestBuildAndTestHandler : public cmCTestGenericHandler
 {
 public:
-  typedef cmCTestGenericHandler Superclass;
+  using Superclass = cmCTestGenericHandler;
 
   /*
    * The main entry point for this class
    */
-  int ProcessHandler() CM_OVERRIDE;
+  int ProcessHandler() override;
 
   //! Set all the build and test arguments
-  int ProcessCommandLineArguments(const std::string& currentArg, size_t& idx,
-                                  const std::vector<std::string>& allArgs)
-    CM_OVERRIDE;
+  int ProcessCommandLineArguments(
+    const std::string& currentArg, size_t& idx,
+    const std::vector<std::string>& allArgs) override;
 
   /*
    * Get the output variable
@@ -40,13 +42,13 @@ public:
 
   cmCTestBuildAndTestHandler();
 
-  void Initialize() CM_OVERRIDE;
+  void Initialize() override;
 
 protected:
-  ///! Run CMake and build a test and then run it as a single test.
+  //! Run CMake and build a test and then run it as a single test.
   int RunCMakeAndTest(std::string* output);
   int RunCMake(std::string* outstring, std::ostringstream& out,
-               std::string& cmakeOutString, std::string& cwd, cmake* cm);
+               std::string& cmakeOutString, cmake* cm);
 
   std::string Output;
 
@@ -67,7 +69,7 @@ protected:
   std::vector<std::string> TestCommandArgs;
   std::vector<std::string> BuildTargets;
   bool BuildNoCMake;
-  double Timeout;
+  cmDuration Timeout;
 };
 
 #endif

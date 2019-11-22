@@ -3,12 +3,12 @@
 #ifndef cmParseCacheCoverage_h
 #define cmParseCacheCoverage_h
 
-#include <cmConfigure.h>
-
-#include "cmParseMumpsCoverage.h"
+#include "cmConfigure.h" // IWYU pragma: keep
 
 #include <string>
 #include <vector>
+
+#include "cmParseMumpsCoverage.h"
 
 class cmCTest;
 class cmCTestCoverageHandlerContainer;
@@ -26,7 +26,7 @@ public:
 
 protected:
   // implement virtual from parent
-  bool LoadCoverageData(const char* dir) CM_OVERRIDE;
+  bool LoadCoverageData(const char* dir) override;
   // remove files with no coverage
   void RemoveUnCoveredFiles();
   // Read a single mcov file

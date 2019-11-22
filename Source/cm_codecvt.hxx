@@ -3,11 +3,10 @@
 #ifndef cm_codecvt_hxx
 #define cm_codecvt_hxx
 
-#include <cmConfigure.h>
+#include "cmConfigure.h" // IWYU pragma: keep
 
+#include <cwchar>
 #include <locale>
-#include <vector>
-#include <wchar.h>
 
 class codecvt : public std::codecvt<char, char, mbstate_t>
 {
@@ -19,38 +18,47 @@ public:
     ANSI
   };
 
-#ifdef CMAKE_BUILD_WITH_CMAKE
+#ifndef CMAKE_BOOTSTRAP
 
   codecvt(Encoding e);
 
 protected:
-  ~codecvt() CM_OVERRIDE;
-  bool do_always_noconv() const throw() CM_OVERRIDE;
+  ~codecvt() override;
+  bool do_always_noconv() const throw() override;
   result do_out(mbstate_t& state, const char* from, const char* from_end,
                 const char*& from_next, char* to, char* to_end,
-                char*& to_next) const CM_OVERRIDE;
+                char*& to_next) const override;
   result do_unshift(mbstate_t& state, char* to, char*,
-                    char*& to_next) const CM_OVERRIDE;
-  int do_max_length() const throw() CM_OVERRIDE;
-  int do_encoding() const throw() CM_OVERRIDE;
+                    char*& to_next) const override;
+  int do_max_length() const throw() override;
+  int do_encoding() const throw() override;
 
 private:
-  typedef struct
+  // The mbstate_t argument to do_out and do_unshift is responsible
+  // for storing state between calls.  We cannot control the type
+  // since we want to imbue on standard streams.  However, we do
+  // know that it is a trivial type.  Define our own type to overlay
+  // on it safely with no alignment requirements.
+  struct State
   {
-    bool used;
-    unsigned char totalBytes;
-    unsigned char bytesLeft;
-    char bytes[4];
-  } State;
+    // Buffer bytes we have consumed from a partial codepoint.
+    char partial[3];
 
-  unsigned int findStateId() const;
+    // Number of bytes we have buffered from a partial codepoint.
+    unsigned char buffered : 4;
+
+    // Size of the current codepoint in bytes.
+    unsigned char size : 4;
+  };
 
   bool m_noconv;
-  mutable std::vector<State> m_states;
-  mutable unsigned int m_lastState;
-#if defined(_WIN32)
+#  if defined(_WIN32)
   unsigned int m_codepage;
-#endif
+  result Decode(mbstate_t& state, int need, const char*& from_next,
+                char*& to_next, char* to_end) const;
+  result DecodePartial(mbstate_t& state, char*& to_next, char* to_end) const;
+  void BufferPartial(mbstate_t& state, int need, const char*& from_next) const;
+#  endif
 
 #endif
 };

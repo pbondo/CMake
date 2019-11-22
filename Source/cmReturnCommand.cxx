@@ -5,9 +5,9 @@
 #include "cmExecutionStatus.h"
 
 // cmReturnCommand
-bool cmReturnCommand::InitialPass(std::vector<std::string> const&,
-                                  cmExecutionStatus& status)
+bool cmReturnCommand(std::vector<std::string> const&,
+                     cmExecutionStatus& status)
 {
-  status.SetReturnInvoked(true);
+  status.SetReturnInvoked();
   return true;
 }

@@ -3,14 +3,17 @@
 #ifndef cmCTestReadCustomFilesCommand_h
 #define cmCTestReadCustomFilesCommand_h
 
-#include <cmConfigure.h>
-
-#include "cmCTestCommand.h"
+#include "cmConfigure.h" // IWYU pragma: keep
 
 #include <string>
+#include <utility>
 #include <vector>
 
-class cmCommand;
+#include <cm/memory>
+
+#include "cmCTestCommand.h"
+#include "cmCommand.h"
+
 class cmExecutionStatus;
 
 /** \class cmCTestReadCustomFiles
@@ -27,11 +30,11 @@ public:
   /**
    * This is a virtual constructor for the command.
    */
-  cmCommand* Clone() CM_OVERRIDE
+  std::unique_ptr<cmCommand> Clone() override
   {
-    cmCTestReadCustomFilesCommand* ni = new cmCTestReadCustomFilesCommand;
+    auto ni = cm::make_unique<cmCTestReadCustomFilesCommand>();
     ni->CTest = this->CTest;
-    return ni;
+    return std::unique_ptr<cmCommand>(std::move(ni));
   }
 
   /**
@@ -39,12 +42,7 @@ public:
    * the CMakeLists.txt file.
    */
   bool InitialPass(std::vector<std::string> const& args,
-                   cmExecutionStatus& status) CM_OVERRIDE;
-
-  /**
-   * The name of the command as specified in CMakeList.txt.
-   */
-  std::string GetName() const CM_OVERRIDE { return "ctest_read_custom_files"; }
+                   cmExecutionStatus& status) override;
 };
 
 #endif

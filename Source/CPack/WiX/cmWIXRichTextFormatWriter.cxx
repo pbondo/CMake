@@ -2,7 +2,7 @@
    file Copyright.txt or https://cmake.org/licensing for details.  */
 #include "cmWIXRichTextFormatWriter.h"
 
-#include <cmVersion.h>
+#include "cmVersion.h"
 
 cmWIXRichTextFormatWriter::cmWIXRichTextFormatWriter(
   std::string const& filename)
@@ -25,7 +25,7 @@ cmWIXRichTextFormatWriter::~cmWIXRichTextFormatWriter()
 
 void cmWIXRichTextFormatWriter::AddText(std::string const& text)
 {
-  typedef unsigned char rtf_byte_t;
+  using rtf_byte_t = unsigned char;
 
   for (size_t i = 0; i < text.size(); ++i) {
     rtf_byte_t c = rtf_byte_t(text[i]);

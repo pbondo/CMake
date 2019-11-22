@@ -1,10 +1,4 @@
-# Preserve indentation style in generated code.
-cmCommandArgumentLexer.cxx      whitespace=-tab-in-indent,-indent-with-non-tab
-cmCommandArgumentLexer.h        whitespace=-tab-in-indent,-indent-with-non-tab
-cmDependsJavaLexer.cxx          whitespace=-tab-in-indent,-indent-with-non-tab
-cmDependsJavaLexer.h            whitespace=-tab-in-indent,-indent-with-non-tab
-cmExprLexer.cxx                 whitespace=-tab-in-indent,-indent-with-non-tab
-cmExprLexer.h                   whitespace=-tab-in-indent,-indent-with-non-tab
-cmFortranLexer.cxx              whitespace=-tab-in-indent,-indent-with-non-tab
-cmFortranLexer.h                whitespace=-tab-in-indent,-indent-with-non-tab
-cmListFileLexer.c               whitespace=-tab-in-indent,-indent-with-non-tab
+CMakeVersion.cmake    export-subst
+
+# Do not format third-party sources.
+/kwsys/**                                  -format.clang-format-6.0

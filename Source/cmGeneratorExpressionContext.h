@@ -3,30 +3,30 @@
 #ifndef cmGeneratorExpressionContext_h
 #define cmGeneratorExpressionContext_h
 
-#include "cmListFileCache.h"
-
 #include <map>
 #include <set>
 #include <string>
+
+#include "cmListFileCache.h"
 
 class cmGeneratorTarget;
 class cmLocalGenerator;
 
 struct cmGeneratorExpressionContext
 {
-  cmGeneratorExpressionContext(cmLocalGenerator* lg, std::string const& config,
+  cmGeneratorExpressionContext(cmLocalGenerator* lg, std::string config,
                                bool quiet, const cmGeneratorTarget* headTarget,
                                cmGeneratorTarget const* currentTarget,
                                bool evaluateForBuildsystem,
-                               cmListFileBacktrace const& backtrace,
-                               std::string const& language);
+                               cmListFileBacktrace backtrace,
+                               std::string language);
 
   cmListFileBacktrace Backtrace;
   std::set<cmGeneratorTarget*> DependTargets;
   std::set<cmGeneratorTarget const*> AllTargets;
   std::set<std::string> SeenTargetProperties;
   std::set<cmGeneratorTarget const*> SourceSensitiveTargets;
-  std::map<cmGeneratorTarget const*, std::map<std::string, std::string> >
+  std::map<cmGeneratorTarget const*, std::map<std::string, std::string>>
     MaxLanguageStandard;
   cmLocalGenerator* LG;
   std::string Config;

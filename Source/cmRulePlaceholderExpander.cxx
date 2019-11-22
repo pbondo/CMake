@@ -2,20 +2,21 @@
    file Copyright.txt or https://cmake.org/licensing for details.  */
 #include "cmRulePlaceholderExpander.h"
 
-#include <ctype.h>
-#include <string.h>
+#include <cctype>
+#include <cstring>
 #include <utility>
 
 #include "cmOutputConverter.h"
 #include "cmSystemTools.h"
 
 cmRulePlaceholderExpander::cmRulePlaceholderExpander(
-  std::map<std::string, std::string> const& compilers,
-  std::map<std::string, std::string> const& variableMappings,
-  std::string const& compilerSysroot)
-  : Compilers(compilers)
-  , VariableMappings(variableMappings)
-  , CompilerSysroot(compilerSysroot)
+  std::map<std::string, std::string> compilers,
+  std::map<std::string, std::string> variableMappings,
+  std::string compilerSysroot, std::string linkerSysroot)
+  : Compilers(std::move(compilers))
+  , VariableMappings(std::move(variableMappings))
+  , CompilerSysroot(std::move(compilerSysroot))
+  , LinkerSysroot(std::move(linkerSysroot))
 {
 }
 
@@ -90,6 +91,31 @@ std::string cmRulePlaceholderExpander::ExpandRuleVariable(
   if (replaceValues.Includes && variable == "INCLUDES") {
     return replaceValues.Includes;
   }
+  if (replaceValues.SwiftLibraryName) {
+    if (variable == "SWIFT_LIBRARY_NAME") {
+      return replaceValues.SwiftLibraryName;
+    }
+  }
+  if (replaceValues.SwiftModule) {
+    if (variable == "SWIFT_MODULE") {
+      return replaceValues.SwiftModule;
+    }
+  }
+  if (replaceValues.SwiftModuleName) {
+    if (variable == "SWIFT_MODULE_NAME") {
+      return replaceValues.SwiftModuleName;
+    }
+  }
+  if (replaceValues.SwiftOutputFileMap) {
+    if (variable == "SWIFT_OUTPUT_FILE_MAP") {
+      return replaceValues.SwiftOutputFileMap;
+    }
+  }
+  if (replaceValues.SwiftSources) {
+    if (variable == "SWIFT_SOURCES") {
+      return replaceValues.SwiftSources;
+    }
+  }
   if (replaceValues.TargetPDB) {
     if (variable == "TARGET_PDB") {
       return replaceValues.TargetPDB;
@@ -109,7 +135,7 @@ std::string cmRulePlaceholderExpander::ExpandRuleVariable(
   if (replaceValues.Target) {
     if (variable == "TARGET_QUOTED") {
       std::string targetQuoted = replaceValues.Target;
-      if (!targetQuoted.empty() && targetQuoted[0] != '\"') {
+      if (!targetQuoted.empty() && targetQuoted.front() != '\"') {
         targetQuoted = '\"';
         targetQuoted += replaceValues.Target;
         targetQuoted += '\"';
@@ -119,7 +145,7 @@ std::string cmRulePlaceholderExpander::ExpandRuleVariable(
     if (variable == "TARGET_UNQUOTED") {
       std::string unquoted = replaceValues.Target;
       std::string::size_type sz = unquoted.size();
-      if (sz > 2 && unquoted[0] == '\"' && unquoted[sz - 1] == '\"') {
+      if (sz > 2 && unquoted.front() == '\"' && unquoted.back() == '\"') {
         unquoted = unquoted.substr(1, sz - 2);
       }
       return unquoted;
@@ -154,7 +180,7 @@ std::string cmRulePlaceholderExpander::ExpandRuleVariable(
         // Strip the last extension off the target name.
         std::string targetBase = replaceValues.Target;
         std::string::size_type pos = targetBase.rfind('.');
-        if (pos != targetBase.npos) {
+        if (pos != std::string::npos) {
           return targetBase.substr(0, pos);
         }
         return targetBase;
@@ -209,8 +235,7 @@ std::string cmRulePlaceholderExpander::ExpandRuleVariable(
       cmOutputConverter::SHELL);
   }
 
-  std::map<std::string, std::string>::iterator compIt =
-    this->Compilers.find(variable);
+  auto compIt = this->Compilers.find(variable);
 
   if (compIt != this->Compilers.end()) {
     std::string ret = outputConverter->ConvertToOutputForExisting(
@@ -249,18 +274,26 @@ std::string cmRulePlaceholderExpander::ExpandRuleVariable(
       ret += compilerOptionExternalToolchain;
       ret += outputConverter->EscapeForShell(compilerExternalToolchain, true);
     }
-    if (!this->CompilerSysroot.empty() && !compilerOptionSysroot.empty()) {
+    std::string sysroot;
+    // Some platforms may use separate sysroots for compiling and linking.
+    // If we detect link flags, then we pass the link sysroot instead.
+    // FIXME: Use a more robust way to detect link line expansion.
+    if (replaceValues.LinkFlags) {
+      sysroot = this->LinkerSysroot;
+    } else {
+      sysroot = this->CompilerSysroot;
+    }
+    if (!sysroot.empty() && !compilerOptionSysroot.empty()) {
       ret += " ";
       ret += compilerOptionSysroot;
-      ret += outputConverter->EscapeForShell(this->CompilerSysroot, true);
+      ret += outputConverter->EscapeForShell(sysroot, true);
     }
     return ret;
   }
 
-  std::map<std::string, std::string>::iterator mapIt =
-    this->VariableMappings.find(variable);
+  auto mapIt = this->VariableMappings.find(variable);
   if (mapIt != this->VariableMappings.end()) {
-    if (variable.find("_FLAG") == variable.npos) {
+    if (variable.find("_FLAG") == std::string::npos) {
       return outputConverter->ConvertToOutputForExisting(mapIt->second);
     }
     return mapIt->second;
@@ -274,15 +307,15 @@ void cmRulePlaceholderExpander::ExpandRuleVariables(
 {
   std::string::size_type start = s.find('<');
   // no variables to expand
-  if (start == s.npos) {
+  if (start == std::string::npos) {
     return;
   }
   std::string::size_type pos = 0;
   std::string expandedInput;
-  while (start != s.npos && start < s.size() - 2) {
+  while (start != std::string::npos && start < s.size() - 2) {
     std::string::size_type end = s.find('>', start);
     // if we find a < with no > we are done
-    if (end == s.npos) {
+    if (end == std::string::npos) {
       return;
     }
     char c = s[start + 1];

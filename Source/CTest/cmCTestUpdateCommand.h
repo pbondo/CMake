@@ -3,14 +3,17 @@
 #ifndef cmCTestUpdateCommand_h
 #define cmCTestUpdateCommand_h
 
-#include <cmConfigure.h>
-
-#include "cmCTestHandlerCommand.h"
+#include "cmConfigure.h" // IWYU pragma: keep
 
 #include <string>
+#include <utility>
+
+#include <cm/memory>
+
+#include "cmCTestHandlerCommand.h"
+#include "cmCommand.h"
 
 class cmCTestGenericHandler;
-class cmCommand;
 
 /** \class cmCTestUpdate
  * \brief Run a ctest script
@@ -20,26 +23,24 @@ class cmCommand;
 class cmCTestUpdateCommand : public cmCTestHandlerCommand
 {
 public:
-  cmCTestUpdateCommand() {}
-
   /**
    * This is a virtual constructor for the command.
    */
-  cmCommand* Clone() CM_OVERRIDE
+  std::unique_ptr<cmCommand> Clone() override
   {
-    cmCTestUpdateCommand* ni = new cmCTestUpdateCommand;
+    auto ni = cm::make_unique<cmCTestUpdateCommand>();
     ni->CTest = this->CTest;
     ni->CTestScriptHandler = this->CTestScriptHandler;
-    return ni;
+    return std::unique_ptr<cmCommand>(std::move(ni));
   }
 
   /**
    * The name of the command as specified in CMakeList.txt.
    */
-  std::string GetName() const CM_OVERRIDE { return "ctest_update"; }
+  std::string GetName() const override { return "ctest_update"; }
 
 protected:
-  cmCTestGenericHandler* InitializeHandler() CM_OVERRIDE;
+  cmCTestGenericHandler* InitializeHandler() override;
 };
 
 #endif

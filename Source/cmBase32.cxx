@@ -34,13 +34,9 @@ void Base32Encode5(const unsigned char src[5], char dst[8])
 
 // -- Class methods
 
-cmBase32Encoder::cmBase32Encoder()
-{
-}
+cmBase32Encoder::cmBase32Encoder() = default;
 
-cmBase32Encoder::~cmBase32Encoder()
-{
-}
+cmBase32Encoder::~cmBase32Encoder() = default;
 
 std::string cmBase32Encoder::encodeString(const unsigned char* input,
                                           size_t len, bool padding)
@@ -58,7 +54,7 @@ std::string cmBase32Encoder::encodeString(const unsigned char* input,
     input += blockSize;
   }
 
-  size_t remain(end - input);
+  size_t remain = static_cast<size_t>(end - input);
   if (remain != 0) {
     // Temporary source buffer filled up with 0s
     unsigned char extended[blockSize];

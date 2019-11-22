@@ -2,29 +2,22 @@
    file Copyright.txt or https://cmake.org/licensing for details.  */
 #include "cmInstalledFile.h"
 
-#include "cmAlgorithms.h"
-#include "cmListFileCache.h"
-#include "cmMakefile.h"
-#include "cmSystemTools.h"
-
-#include <cmConfigure.h>
 #include <utility>
 
-cmInstalledFile::cmInstalledFile()
-  : NameExpression(CM_NULLPTR)
-{
-}
+#include "cmAlgorithms.h"
+#include "cmGeneratorExpression.h"
+#include "cmListFileCache.h"
+#include "cmMakefile.h"
+#include "cmStringAlgorithms.h"
+
+cmInstalledFile::cmInstalledFile() = default;
 
 cmInstalledFile::~cmInstalledFile()
 {
-  if (NameExpression) {
-    delete NameExpression;
-  }
+  delete NameExpression;
 }
 
-cmInstalledFile::Property::Property()
-{
-}
+cmInstalledFile::Property::Property() = default;
 
 cmInstalledFile::Property::~Property()
 {
@@ -81,7 +74,7 @@ bool cmInstalledFile::HasProperty(const std::string& prop) const
 bool cmInstalledFile::GetProperty(const std::string& prop,
                                   std::string& value) const
 {
-  PropertyMapType::const_iterator i = this->Properties.find(prop);
+  auto i = this->Properties.find(prop);
   if (i == this->Properties.end()) {
     return false;
   }
@@ -91,11 +84,9 @@ bool cmInstalledFile::GetProperty(const std::string& prop,
   std::string output;
   std::string separator;
 
-  for (ExpressionVectorType::const_iterator j =
-         property.ValueExpressions.begin();
-       j != property.ValueExpressions.end(); ++j) {
+  for (auto ve : property.ValueExpressions) {
     output += separator;
-    output += (*j)->GetInput();
+    output += ve->GetInput();
     separator = ";";
   }
 
@@ -107,7 +98,7 @@ bool cmInstalledFile::GetPropertyAsBool(const std::string& prop) const
 {
   std::string value;
   bool isSet = this->GetProperty(prop, value);
-  return isSet && cmSystemTools::IsOn(value.c_str());
+  return isSet && cmIsOn(value);
 }
 
 void cmInstalledFile::GetPropertyAsList(const std::string& prop,
@@ -117,5 +108,5 @@ void cmInstalledFile::GetPropertyAsList(const std::string& prop,
   this->GetProperty(prop, value);
 
   list.clear();
-  cmSystemTools::ExpandListArgument(value, list);
+  cmExpandList(value, list);
 }

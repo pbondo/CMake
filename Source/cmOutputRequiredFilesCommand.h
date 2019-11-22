@@ -3,31 +3,14 @@
 #ifndef cmOutputRequiredFilesCommand_h
 #define cmOutputRequiredFilesCommand_h
 
-#include <cmConfigure.h>
-#include <set>
-#include <stdio.h>
+#include "cmConfigure.h" // IWYU pragma: keep
+
 #include <string>
 #include <vector>
 
-#include "cmCommand.h"
-
-class cmDependInformation;
 class cmExecutionStatus;
 
-class cmOutputRequiredFilesCommand : public cmCommand
-{
-public:
-  cmCommand* Clone() CM_OVERRIDE { return new cmOutputRequiredFilesCommand; }
-  bool InitialPass(std::vector<std::string> const& args,
-                   cmExecutionStatus& status) CM_OVERRIDE;
-  std::string GetName() const CM_OVERRIDE { return "output_required_files"; }
-
-  void ListDependencies(cmDependInformation const* info, FILE* fout,
-                        std::set<cmDependInformation const*>* visited);
-
-private:
-  std::string File;
-  std::string OutputFile;
-};
+bool cmOutputRequiredFilesCommand(std::vector<std::string> const& args,
+                                  cmExecutionStatus& status);
 
 #endif

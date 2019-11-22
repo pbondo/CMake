@@ -3,9 +3,12 @@
 #ifndef cmGraphAdjacencyList_h
 #define cmGraphAdjacencyList_h
 
-#include <cmConfigure.h> // IWYU pragma: keep
+#include "cmConfigure.h" // IWYU pragma: keep
 
+#include <utility>
 #include <vector>
+
+#include "cmListFileCache.h"
 
 /**
  * Graph edge representation.  Most use cases just need the
@@ -15,32 +18,22 @@
 class cmGraphEdge
 {
 public:
-  cmGraphEdge()
-    : Dest(0)
-    , Strong(true)
-  {
-  }
-  cmGraphEdge(int n)
-    : Dest(n)
-    , Strong(true)
-  {
-  }
-  cmGraphEdge(int n, bool s)
+  cmGraphEdge(int n, bool s, cmListFileBacktrace bt)
     : Dest(n)
     , Strong(s)
-  {
-  }
-  cmGraphEdge(cmGraphEdge const& r)
-    : Dest(r.Dest)
-    , Strong(r.Strong)
+    , Backtrace(std::move(bt))
   {
   }
   operator int() const { return this->Dest; }
 
   bool IsStrong() const { return this->Strong; }
+
+  cmListFileBacktrace const& GetBacktrace() const { return this->Backtrace; }
+
 private:
   int Dest;
   bool Strong;
+  cmListFileBacktrace Backtrace;
 };
 struct cmGraphEdgeList : public std::vector<cmGraphEdge>
 {

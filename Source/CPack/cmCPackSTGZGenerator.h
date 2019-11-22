@@ -3,33 +3,32 @@
 #ifndef cmCPackSTGZGenerator_h
 #define cmCPackSTGZGenerator_h
 
-#include <cmConfigure.h>
-
-#include "cmCPackGenerator.h"
-#include "cmCPackTGZGenerator.h"
+#include "cmConfigure.h" // IWYU pragma: keep
 
 #include <iosfwd>
+
+#include "cmCPackArchiveGenerator.h"
+#include "cmCPackGenerator.h"
 
 /** \class cmCPackSTGZGenerator
  * \brief A generator for Self extractable TGZ files
  *
  */
-class cmCPackSTGZGenerator : public cmCPackTGZGenerator
+class cmCPackSTGZGenerator : public cmCPackArchiveGenerator
 {
 public:
-  cmCPackTypeMacro(cmCPackSTGZGenerator, cmCPackTGZGenerator);
+  cmCPackTypeMacro(cmCPackSTGZGenerator, cmCPackArchiveGenerator);
 
   /**
    * Construct generator
    */
   cmCPackSTGZGenerator();
-  ~cmCPackSTGZGenerator() CM_OVERRIDE;
+  ~cmCPackSTGZGenerator() override;
 
 protected:
-  int PackageFiles() CM_OVERRIDE;
-  int InitializeInternal() CM_OVERRIDE;
-  int GenerateHeader(std::ostream* os) CM_OVERRIDE;
-  const char* GetOutputExtension() CM_OVERRIDE { return ".sh"; }
+  int PackageFiles() override;
+  int InitializeInternal() override;
+  int GenerateHeader(std::ostream* os) override;
 };
 
 #endif

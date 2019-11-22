@@ -3,12 +3,12 @@
 #ifndef cmCursesStringWidget_h
 #define cmCursesStringWidget_h
 
-#include <cmConfigure.h>
+#include "cmConfigure.h" // IWYU pragma: keep
+
+#include <string>
 
 #include "cmCursesStandardIncludes.h"
 #include "cmCursesWidget.h"
-
-#include <string>
 
 class cmCursesMainForm;
 
@@ -28,14 +28,14 @@ public:
    * when this widget has focus. Returns true if the input was
    * handled.
    */
-  bool HandleInput(int& key, cmCursesMainForm* fm, WINDOW* w) CM_OVERRIDE;
+  bool HandleInput(int& key, cmCursesMainForm* fm, WINDOW* w) override;
 
   /**
    * Set/Get the string.
    */
   void SetString(const std::string& value);
   const char* GetString();
-  const char* GetValue() CM_OVERRIDE;
+  const char* GetValue() override;
 
   /**
    * Set/Get InEdit flag. Can be used to tell the widget to leave
@@ -57,15 +57,12 @@ public:
    * in the toolbar and return true. Otherwise, return false
    * and the parent widget will print.
    */
-  bool PrintKeys() CM_OVERRIDE;
+  bool PrintKeys() override;
 
 protected:
-  cmCursesStringWidget(const cmCursesStringWidget& from);
-  void operator=(const cmCursesStringWidget&);
-
   // true if the widget is in edit mode
   bool InEdit;
-  char* OriginalString;
+  std::string OriginalString;
   bool Done;
 };
 

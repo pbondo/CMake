@@ -1,1 +1,1 @@
-.*/Framework: current ar archive random library.*
+/Framework( \(for architecture [^\)]+\))?:[ 	]+current ar archive random library

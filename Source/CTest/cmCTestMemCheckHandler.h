@@ -3,12 +3,12 @@
 #ifndef cmCTestMemCheckHandler_h
 #define cmCTestMemCheckHandler_h
 
-#include <cmConfigure.h>
-
-#include "cmCTestTestHandler.h"
+#include "cmConfigure.h" // IWYU pragma: keep
 
 #include <string>
 #include <vector>
+
+#include "cmCTestTestHandler.h"
 
 class cmMakefile;
 class cmXMLWriter;
@@ -22,21 +22,20 @@ class cmCTestMemCheckHandler : public cmCTestTestHandler
   friend class cmCTestRunTest;
 
 public:
-  typedef cmCTestTestHandler Superclass;
+  using Superclass = cmCTestTestHandler;
 
-  void PopulateCustomVectors(cmMakefile* mf) CM_OVERRIDE;
+  void PopulateCustomVectors(cmMakefile* mf) override;
 
   cmCTestMemCheckHandler();
 
-  void Initialize() CM_OVERRIDE;
+  void Initialize() override;
 
   int GetDefectCount();
 
 protected:
-  int PreProcessHandler() CM_OVERRIDE;
-  int PostProcessHandler() CM_OVERRIDE;
-  void GenerateTestCommand(std::vector<std::string>& args,
-                           int test) CM_OVERRIDE;
+  int PreProcessHandler() override;
+  int PostProcessHandler() override;
+  void GenerateTestCommand(std::vector<std::string>& args, int test) override;
 
 private:
   enum
@@ -115,20 +114,20 @@ private:
   // this type of checker
   void InitializeResultsVectors();
 
-  ///! Initialize memory checking subsystem.
+  //! Initialize memory checking subsystem.
   bool InitializeMemoryChecking();
 
   /**
    * Generate the Dart compatible output
    */
-  void GenerateDartOutput(cmXMLWriter& xml) CM_OVERRIDE;
+  void GenerateDartOutput(cmXMLWriter& xml) override;
 
   std::vector<std::string> CustomPreMemCheck;
   std::vector<std::string> CustomPostMemCheck;
 
   //! Parse Valgrind/Purify/Bounds Checker result out of the output
   // string. After running, log holds the output and results hold the
-  // different memmory errors.
+  // different memory errors.
   bool ProcessMemCheckOutput(const std::string& str, std::string& log,
                              std::vector<int>& results);
   bool ProcessMemCheckValgrindOutput(const std::string& str, std::string& log,
@@ -144,11 +143,11 @@ private:
   void PostProcessTest(cmCTestTestResult& res, int test);
   void PostProcessBoundsCheckerTest(cmCTestTestResult& res, int test);
 
-  ///! append MemoryTesterOutputFile to the test log
+  //! append MemoryTesterOutputFile to the test log
   void AppendMemTesterOutput(cmCTestTestHandler::cmCTestTestResult& res,
                              std::string const& filename);
 
-  ///! generate the output filename for the given test index
+  //! generate the output filename for the given test index
   void TestOutputFileNames(int test, std::vector<std::string>& files);
 };
 

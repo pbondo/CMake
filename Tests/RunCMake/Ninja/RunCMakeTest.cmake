@@ -21,6 +21,24 @@ function(run_NinjaToolMissing)
 endfunction()
 run_NinjaToolMissing()
 
+function(run_NoWorkToDo)
+  run_cmake(NoWorkToDo)
+  set(RunCMake_TEST_NO_CLEAN 1)
+  set(RunCMake_TEST_BINARY_DIR ${RunCMake_BINARY_DIR}/NoWorkToDo-build)
+  run_cmake_command(NoWorkToDo-build ${CMAKE_COMMAND} --build .)
+  run_cmake_command(NoWorkToDo-nowork ${CMAKE_COMMAND} --build . -- -d explain)
+endfunction()
+run_NoWorkToDo()
+
+function(run_VerboseBuild)
+  run_cmake(VerboseBuild)
+  set(RunCMake_TEST_NO_CLEAN 1)
+  set(RunCMake_TEST_BINARY_DIR ${RunCMake_BINARY_DIR}/VerboseBuild-build)
+  run_cmake_command(VerboseBuild-build ${CMAKE_COMMAND} --build . -v --clean-first)
+  run_cmake_command(VerboseBuild-nowork ${CMAKE_COMMAND} --build . --verbose)
+endfunction()
+run_VerboseBuild()
+
 function(run_CMP0058 case)
   # Use a single build tree for a few tests without cleaning.
   set(RunCMake_TEST_BINARY_DIR ${RunCMake_BINARY_DIR}/CMP0058-${case}-build)
@@ -39,6 +57,24 @@ run_CMP0058(NEW-no)
 run_CMP0058(NEW-by)
 
 run_cmake(CustomCommandDepfile)
+run_cmake(CustomCommandJobPool)
+run_cmake(JobPoolUsesTerminal)
+
+run_cmake(RspFileC)
+run_cmake(RspFileCXX)
+if(TEST_Fortran)
+  run_cmake(RspFileFortran)
+endif()
+
+function(run_CommandConcat)
+  set(RunCMake_TEST_BINARY_DIR ${RunCMake_BINARY_DIR}/CommandConcat-build)
+  set(RunCMake_TEST_NO_CLEAN 1)
+  file(REMOVE_RECURSE "${RunCMake_TEST_BINARY_DIR}")
+  file(MAKE_DIRECTORY "${RunCMake_TEST_BINARY_DIR}")
+  run_cmake(CommandConcat)
+  run_cmake_command(CommandConcat-build ${CMAKE_COMMAND} --build .)
+endfunction()
+run_CommandConcat()
 
 function(run_SubDir)
   # Use a single build tree for a few tests without cleaning.
@@ -73,7 +109,7 @@ run_SubDir()
 
 function(run_ninja dir)
   execute_process(
-    COMMAND "${RunCMake_MAKE_PROGRAM}"
+    COMMAND "${RunCMake_MAKE_PROGRAM}" ${ARGN}
     WORKING_DIRECTORY "${dir}"
     OUTPUT_VARIABLE ninja_stdout
     ERROR_VARIABLE ninja_stderr
@@ -94,6 +130,39 @@ ${ninja_stderr}
       "top ninja build failed exited with status ${ninja_result}")
   endif()
 endfunction(run_ninja)
+
+function (run_LooseObjectDepends)
+  set(RunCMake_TEST_BINARY_DIR ${RunCMake_BINARY_DIR}/LooseObjectDepends-build)
+  run_cmake(LooseObjectDepends)
+  run_ninja("${RunCMake_TEST_BINARY_DIR}" "CMakeFiles/top.dir/top.c${CMAKE_C_OUTPUT_EXTENSION}")
+  if (EXISTS "${RunCMake_TEST_BINARY_DIR}/${CMAKE_SHARED_LIBRARY_PREFIX}dep${CMAKE_SHARED_LIBRARY_SUFFIX}")
+    message(FATAL_ERROR
+      "The `dep` library was created when requesting an object file to be "
+      "built; this should no longer be necessary.")
+  endif ()
+  if (EXISTS "${RunCMake_TEST_BINARY_DIR}/CMakeFiles/dep.dir/dep.c${CMAKE_C_OUTPUT_EXTENSION}")
+    message(FATAL_ERROR
+      "The `dep.c` object file was created when requesting an object file to "
+      "be built; this should no longer be necessary.")
+  endif ()
+endfunction ()
+run_LooseObjectDepends()
+
+function (run_AssumedSources)
+  set(RunCMake_TEST_BINARY_DIR ${RunCMake_BINARY_DIR}/AssumedSources-build)
+  run_cmake(AssumedSources)
+  run_ninja("${RunCMake_TEST_BINARY_DIR}" "target.c")
+  if (NOT EXISTS "${RunCMake_TEST_BINARY_DIR}/target.c")
+    message(FATAL_ERROR
+      "Dependencies for an assumed source did not hook up properly for 'target.c'.")
+  endif ()
+  run_ninja("${RunCMake_TEST_BINARY_DIR}" "target-no-depends.c")
+  if (EXISTS "${RunCMake_TEST_BINARY_DIR}/target-no-depends.c")
+    message(FATAL_ERROR
+      "Dependencies for an assumed source were magically hooked up for 'target-no-depends.c'.")
+  endif ()
+endfunction ()
+run_AssumedSources()
 
 function(sleep delay)
   execute_process(
@@ -147,15 +216,16 @@ function(run_sub_cmake test ninja_output_path_prefix)
     set(cmd_prefix "")
     set(cmd_suffix "")
   endif()
+  set(fs_delay 3) # We assume the system as 1 sec timestamp resolution.
   file(WRITE "${top_build_ninja}" "\
 subninja ${escaped_ninja_output_path_prefix}/build.ninja
 default ${escaped_ninja_output_path_prefix}/all
 
-# Sleep for 1 second before to regenerate to make sure the timestamp of
+# Sleep for long enough before regenerating to make sure the timestamp of
 # the top build.ninja will be strictly greater than the timestamp of the
-# sub/build.ninja file. We assume the system as 1 sec timestamp resolution.
+# sub/build.ninja file.
 rule RERUN
-  command = ${cmd_prefix}\"${escaped_CMAKE_COMMAND}\" -E sleep 1 && \"${escaped_CMAKE_COMMAND}\" -E touch \"${escaped_top_build_ninja}\"${cmd_suffix}
+  command = ${cmd_prefix}\"${escaped_CMAKE_COMMAND}\" -E sleep ${fs_delay} && \"${escaped_CMAKE_COMMAND}\" -E touch \"${escaped_top_build_ninja}\"${cmd_suffix}
   description = Testing regeneration
   generator = 1
 
@@ -181,7 +251,7 @@ build build.ninja: RERUN ${escaped_build_ninja_dep} || ${escaped_ninja_output_pa
 
   # Test regeneration rules run in order.
   set(main_cmakelists "${RunCMake_SOURCE_DIR}/CMakeLists.txt")
-  sleep(1) # Assume the system as 1 sec timestamp resolution.
+  sleep(${fs_delay})
   touch("${main_cmakelists}")
   touch("${build_ninja_dep}")
   run_ninja("${top_build_dir}")
@@ -220,3 +290,17 @@ foreach(ninja_output_path_prefix "sub space" "sub")
   run_sub_cmake(SubDirPrefix "${ninja_output_path_prefix}")
   run_sub_cmake(CustomCommandWorkingDirectory "${ninja_output_path_prefix}")
 endforeach(ninja_output_path_prefix)
+
+function (run_PreventTargetAliasesDupBuildRule)
+  set(RunCMake_TEST_BINARY_DIR ${RunCMake_BINARY_DIR}/PreventTargetAliasesDupBuildRule-build)
+  run_cmake(PreventTargetAliasesDupBuildRule)
+  run_ninja("${RunCMake_TEST_BINARY_DIR}" -w dupbuild=err)
+endfunction ()
+run_PreventTargetAliasesDupBuildRule()
+
+function (run_PreventConfigureFileDupBuildRule)
+  set(RunCMake_TEST_BINARY_DIR ${RunCMake_BINARY_DIR}/PreventConfigureFileDupBuildRule-build)
+  run_cmake(PreventConfigureFileDupBuildRule)
+  run_ninja("${RunCMake_TEST_BINARY_DIR}" -w dupbuild=err)
+endfunction()
+run_PreventConfigureFileDupBuildRule()

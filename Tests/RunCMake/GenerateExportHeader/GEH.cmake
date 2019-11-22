@@ -45,13 +45,6 @@ include(GenerateExportHeader)
 
 set(CMAKE_CXX_STANDARD 98)
 
-# Those versions of the HP compiler that need a flag to get proper C++98
-# template support also need a flag to use the newer C++ library.
-if (CMAKE_CXX_COMPILER_ID STREQUAL HP AND
-    CMAKE_CXX98_STANDARD_COMPILE_OPTION STREQUAL "+hpxstd98")
-  string(APPEND CMAKE_CXX_FLAGS " -AA")
-endif ()
-
 # Clang/C2 in C++98 mode cannot properly handle some of MSVC headers
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND
     CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
@@ -60,7 +53,16 @@ endif()
 
 add_subdirectory(lib_shared_and_static)
 
-add_compiler_export_flags()
+if(CMAKE_SYSTEM_NAME MATCHES "AIX" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU"
+   AND CMAKE_CXX_COMPILE_OPTIONS_VISIBILITY)
+  # With GNU 7 on AIX, passing -fvisibility=hidden when driving the
+  # linker for a shared library drops the so init/destruct symbols.
+  # Just use the modern approach instead of testing the macro.
+  set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+  set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
+else()
+  add_compiler_export_flags()
+endif()
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR})
@@ -83,6 +85,7 @@ macro_add_test_library(libshared)
 macro_add_test_library(libstatic)
 
 add_subdirectory(nodeprecated)
+add_subdirectory(includeguard)
 if(NOT BORLAND)
   add_subdirectory(c_identifier)
 endif()
@@ -110,7 +113,7 @@ if (WIN32 OR CYGWIN)
   else()
     set(_platform WinEmpty)
   endif()
-elseif(COMPILER_HAS_HIDDEN_VISIBILITY AND USE_COMPILER_HIDDEN_VISIBILITY)
+elseif(COMPILER_HAS_HIDDEN_VISIBILITY)
   set(_platform UNIX)
 elseif(COMPILER_HAS_DEPRECATED)
   set(_platform UNIX_DeprecatedOnly)

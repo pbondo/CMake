@@ -36,7 +36,7 @@ public:
   std::string CreateProjectFooter(const std::string& projectType, const std::string& make_cmd,
     const std::string& generalTag, const std::string& projectName);
 
-  void Generate() CM_OVERRIDE;
+  void Generate() override;
 
   bool CreateProjectFile(const cmGeneratorTarget &_genTarget,
     const cmLocalGenerator& _local, std::string &_projectname, std::string &_projectfilename);

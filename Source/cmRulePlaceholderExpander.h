@@ -4,7 +4,7 @@
 #ifndef cmRulePlaceholderExpander_h
 #define cmRulePlaceholderExpander_h
 
-#include <cmConfigure.h> // IWYU pragma: keep
+#include "cmConfigure.h" // IWYU pragma: keep
 
 #include <map>
 #include <string>
@@ -15,16 +15,16 @@ class cmRulePlaceholderExpander
 {
 public:
   cmRulePlaceholderExpander(
-    std::map<std::string, std::string> const& compilers,
-    std::map<std::string, std::string> const& variableMappings,
-    std::string const& compilerSysroot);
+    std::map<std::string, std::string> compilers,
+    std::map<std::string, std::string> variableMappings,
+    std::string compilerSysroot, std::string linkerSysroot);
 
   void SetTargetImpLib(std::string const& targetImpLib)
   {
     this->TargetImpLib = targetImpLib;
   }
 
-  // Create a struct to hold the varibles passed into
+  // Create a struct to hold the variables passed into
   // ExpandRuleVariables
   struct RuleVariables
   {
@@ -58,6 +58,11 @@ public:
     const char* Includes;
     const char* DependencyFile;
     const char* FilterPrefix;
+    const char* SwiftLibraryName;
+    const char* SwiftModule;
+    const char* SwiftModuleName;
+    const char* SwiftOutputFileMap;
+    const char* SwiftSources;
   };
 
   // Expand rule variables in CMake of the type found in language rules
@@ -76,6 +81,7 @@ private:
   std::map<std::string, std::string> Compilers;
   std::map<std::string, std::string> VariableMappings;
   std::string CompilerSysroot;
+  std::string LinkerSysroot;
 };
 
 #endif

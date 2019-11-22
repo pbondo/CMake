@@ -3,17 +3,19 @@
 #ifndef cmDependsC_h
 #define cmDependsC_h
 
-#include <cmConfigure.h>
+#include "cmConfigure.h" // IWYU pragma: keep
 
-#include "cmDepends.h"
-
-#include <cmsys/RegularExpression.hxx>
 #include <iosfwd>
 #include <map>
-#include <queue>
 #include <set>
 #include <string>
 #include <vector>
+
+#include <queue>
+
+#include "cmsys/RegularExpression.hxx"
+
+#include "cmDepends.h"
 
 class cmLocalGenerator;
 
@@ -26,21 +28,23 @@ public:
   /** Checking instances need to know the build directory name and the
       relative path from the build directory to the target file.  */
   cmDependsC();
-  cmDependsC(cmLocalGenerator* lg, const char* targetDir,
-             const std::string& lang,
-             const std::map<std::string, DependencyVector>* validDeps);
+  cmDependsC(cmLocalGenerator* lg, const std::string& targetDir,
+             const std::string& lang, const DependencyMap* validDeps);
 
   /** Virtual destructor to cleanup subclasses properly.  */
-  ~cmDependsC() CM_OVERRIDE;
+  ~cmDependsC() override;
+
+  cmDependsC(cmDependsC const&) = delete;
+  cmDependsC& operator=(cmDependsC const&) = delete;
 
 protected:
   // Implement writing/checking methods required by superclass.
   bool WriteDependencies(const std::set<std::string>& sources,
                          const std::string& obj, std::ostream& makeDepends,
-                         std::ostream& internalDepends) CM_OVERRIDE;
+                         std::ostream& internalDepends) override;
 
   // Method to scan a single file.
-  void Scan(std::istream& is, const char* directory,
+  void Scan(std::istream& is, const std::string& directory,
             const std::string& fullName);
 
   // Regular expression to identify C preprocessor include directives.
@@ -57,7 +61,7 @@ protected:
   // Regex to transform #include lines.
   std::string IncludeRegexTransformString;
   cmsys::RegularExpression IncludeRegexTransform;
-  typedef std::map<std::string, std::string> TransformRulesType;
+  using TransformRulesType = std::map<std::string, std::string>;
   TransformRulesType TransformRules;
   void SetupTransforms();
   void ParseTransform(std::string const& xform);
@@ -73,30 +77,22 @@ public:
 
   struct cmIncludeLines
   {
-    cmIncludeLines()
-      : Used(false)
-    {
-    }
     std::vector<UnscannedEntry> UnscannedEntries;
-    bool Used;
+    bool Used = false;
   };
 
 protected:
-  const std::map<std::string, DependencyVector>* ValidDeps;
+  const DependencyMap* ValidDeps = nullptr;
   std::set<std::string> Encountered;
   std::queue<UnscannedEntry> Unscanned;
 
-  std::map<std::string, cmIncludeLines*> FileCache;
+  std::map<std::string, cmIncludeLines> FileCache;
   std::map<std::string, std::string> HeaderLocationCache;
 
   std::string CacheFileName;
 
   void WriteCacheFile() const;
   void ReadCacheFile();
-
-private:
-  cmDependsC(cmDependsC const&);     // Purposely not implemented.
-  void operator=(cmDependsC const&); // Purposely not implemented.
 };
 
 #endif

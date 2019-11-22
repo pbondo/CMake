@@ -3,7 +3,7 @@
 #ifndef _cmDocumentationFormatter_h
 #define _cmDocumentationFormatter_h
 
-#include <cmConfigure.h> // IWYU pragma: keep
+#include "cmConfigure.h" // IWYU pragma: keep
 
 #include <iosfwd>
 
@@ -59,8 +59,8 @@ public:
   void SetIndent(const char* indent);
 
 private:
-  int TextWidth;
-  const char* TextIndent;
+  int TextWidth = 77;
+  const char* TextIndent = "";
 };
 
 #endif

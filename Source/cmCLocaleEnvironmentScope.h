@@ -3,7 +3,7 @@
 #ifndef cmCLocaleEnvironmentScope_h
 #define cmCLocaleEnvironmentScope_h
 
-#include <cmConfigure.h> // IWYU pragma: keep
+#include "cmConfigure.h" // IWYU pragma: keep
 
 #include <map>
 #include <string>
@@ -14,11 +14,15 @@ public:
   cmCLocaleEnvironmentScope();
   ~cmCLocaleEnvironmentScope();
 
+  cmCLocaleEnvironmentScope(cmCLocaleEnvironmentScope const&) = delete;
+  cmCLocaleEnvironmentScope& operator=(cmCLocaleEnvironmentScope const&) =
+    delete;
+
 private:
   std::string GetEnv(std::string const& key);
   void SetEnv(std::string const& key, std::string const& value);
 
-  typedef std::map<std::string, std::string> backup_map_t;
+  using backup_map_t = std::map<std::string, std::string>;
   backup_map_t EnvironmentBackup;
 };
 

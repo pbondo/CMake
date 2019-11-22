@@ -1,9 +1,10 @@
-#include "hello.h"
 #include <stdio.h>
+
+#include "hello.h"
 #ifdef _MSC_VER
-#include "windows.h"
+#  include "windows.h"
 #else
-#define WINAPI
+#  define WINAPI
 #endif
 
 extern "C" {
@@ -12,6 +13,7 @@ int WINAPI foo();
 // test regular C
 int bar();
 int objlib();
+void justnop();
 }
 
 // test c++ functions
@@ -42,5 +44,8 @@ int main()
   bar();
   objlib();
   printf("\n");
+#ifdef HAS_JUSTNOP
+  justnop();
+#endif
   return 0;
 }

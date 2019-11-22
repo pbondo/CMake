@@ -16,12 +16,12 @@ include(CMakeTestCompilerCommon)
 unset(CMAKE_Fortran_COMPILER_WORKS CACHE)
 
 # This file is used by EnableLanguage in cmGlobalGenerator to
-# determine that that selected Fortran compiler can actually compile
+# determine that the selected Fortran compiler can actually compile
 # and link the most basic of programs.   If not, a fatal error
 # is set and cmake stops processing commands and will not generate
 # any makefiles or projects.
 if(NOT CMAKE_Fortran_COMPILER_WORKS)
-  PrintTestCompilerStatus("Fortran" "")
+  PrintTestCompilerStatus("Fortran")
   file(WRITE ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/testFortranCompiler.f "
         PROGRAM TESTFortran
         PRINT *, 'Hello'
@@ -37,17 +37,18 @@ if(NOT CMAKE_Fortran_COMPILER_WORKS)
 endif()
 
 if(NOT CMAKE_Fortran_COMPILER_WORKS)
-  PrintTestCompilerStatus("Fortran" "  -- broken")
+  PrintTestCompilerResult(CHECK_FAIL "broken")
   file(APPEND ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeError.log
     "Determining if the Fortran compiler works failed with "
     "the following output:\n${OUTPUT}\n\n")
-  message(FATAL_ERROR "The Fortran compiler \"${CMAKE_Fortran_COMPILER}\" "
+  string(REPLACE "\n" "\n  " _output "${OUTPUT}")
+  message(FATAL_ERROR "The Fortran compiler\n  \"${CMAKE_Fortran_COMPILER}\"\n"
     "is not able to compile a simple test program.\nIt fails "
-    "with the following output:\n ${OUTPUT}\n\n"
+    "with the following output:\n  ${_output}\n\n"
     "CMake will not be able to correctly generate this project.")
 else()
   if(FORTRAN_TEST_WAS_RUN)
-    PrintTestCompilerStatus("Fortran" "  -- works")
+    PrintTestCompilerResult(CHECK_PASS "works")
     file(APPEND ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeOutput.log
       "Determining if the Fortran compiler works passed with "
       "the following output:\n${OUTPUT}\n\n")
@@ -59,7 +60,7 @@ else()
 
   # Test for Fortran 90 support by using an f90-specific construct.
   if(NOT DEFINED CMAKE_Fortran_COMPILER_SUPPORTS_F90)
-    message(STATUS "Checking whether ${CMAKE_Fortran_COMPILER} supports Fortran 90")
+    message(CHECK_START "Checking whether ${CMAKE_Fortran_COMPILER} supports Fortran 90")
     file(WRITE ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/testFortranCompilerF90.f90 "
       PROGRAM TESTFortran90
       integer stop ; stop = 1 ; do while ( stop .eq. 0 ) ; end do
@@ -69,13 +70,13 @@ else()
       ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/testFortranCompilerF90.f90
       OUTPUT_VARIABLE OUTPUT)
     if(CMAKE_Fortran_COMPILER_SUPPORTS_F90)
-      message(STATUS "Checking whether ${CMAKE_Fortran_COMPILER} supports Fortran 90 -- yes")
+      message(CHECK_PASS "yes")
       file(APPEND ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeOutput.log
         "Determining if the Fortran compiler supports Fortran 90 passed with "
         "the following output:\n${OUTPUT}\n\n")
       set(CMAKE_Fortran_COMPILER_SUPPORTS_F90 1)
     else()
-      message(STATUS "Checking whether ${CMAKE_Fortran_COMPILER} supports Fortran 90 -- no")
+      message(CHECK_FAIL "no")
       file(APPEND ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeError.log
         "Determining if the Fortran compiler supports Fortran 90 failed with "
         "the following output:\n${OUTPUT}\n\n")

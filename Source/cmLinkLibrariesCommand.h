@@ -3,40 +3,14 @@
 #ifndef cmLinkLibrariesCommand_h
 #define cmLinkLibrariesCommand_h
 
-#include <cmConfigure.h>
+#include "cmConfigure.h" // IWYU pragma: keep
+
 #include <string>
 #include <vector>
 
-#include "cmCommand.h"
-
 class cmExecutionStatus;
 
-/** \class cmLinkLibrariesCommand
- * \brief Specify a list of libraries to link into executables.
- *
- * cmLinkLibrariesCommand is used to specify a list of libraries to link
- * into executable(s) or shared objects. The names of the libraries
- * should be those defined by the LIBRARY(library) command(s).
- */
-class cmLinkLibrariesCommand : public cmCommand
-{
-public:
-  /**
-   * This is a virtual constructor for the command.
-   */
-  cmCommand* Clone() CM_OVERRIDE { return new cmLinkLibrariesCommand; }
-
-  /**
-   * This is called when the command is first encountered in
-   * the CMakeLists.txt file.
-   */
-  bool InitialPass(std::vector<std::string> const& args,
-                   cmExecutionStatus& status) CM_OVERRIDE;
-
-  /**
-   * The name of the command as specified in CMakeList.txt.
-   */
-  std::string GetName() const CM_OVERRIDE { return "link_libraries"; }
-};
+bool cmLinkLibrariesCommand(std::vector<std::string> const& args,
+                            cmExecutionStatus& status);
 
 #endif

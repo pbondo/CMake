@@ -3,12 +3,12 @@
 #ifndef cmCursesLabelWidget_h
 #define cmCursesLabelWidget_h
 
-#include <cmConfigure.h>
+#include "cmConfigure.h" // IWYU pragma: keep
+
+#include <string>
 
 #include "cmCursesStandardIncludes.h"
 #include "cmCursesWidget.h"
-
-#include <string>
 
 class cmCursesMainForm;
 
@@ -17,17 +17,16 @@ class cmCursesLabelWidget : public cmCursesWidget
 public:
   cmCursesLabelWidget(int width, int height, int left, int top,
                       const std::string& name);
-  ~cmCursesLabelWidget() CM_OVERRIDE;
+  ~cmCursesLabelWidget() override;
+
+  cmCursesLabelWidget(cmCursesLabelWidget const&) = delete;
+  cmCursesLabelWidget& operator=(cmCursesLabelWidget const&) = delete;
 
   // Description:
   // Handle user input. Called by the container of this widget
   // when this widget has focus. Returns true if the input was
   // handled
-  bool HandleInput(int& key, cmCursesMainForm* fm, WINDOW* w) CM_OVERRIDE;
-
-protected:
-  cmCursesLabelWidget(const cmCursesLabelWidget& from);
-  void operator=(const cmCursesLabelWidget&);
+  bool HandleInput(int& key, cmCursesMainForm* fm, WINDOW* w) override;
 };
 
 #endif // cmCursesLabelWidget_h

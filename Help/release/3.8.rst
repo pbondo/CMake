@@ -34,15 +34,6 @@ C#
   Visual Studio (``VS_*``) are worth a look (for setting toolset
   versions, root namespaces, assembly icons, ...).
 
-* Auto-linking in ``.csproj`` files: In C#/.NET development with
-  Visual Studio there are a number of visual editors used which
-  generate code.  Both the generated files and the ones edited
-  with the UI are connected in the ``.csproj`` file using
-  ``<DependentUpon>`` tags.  If CMake finds within a C# project
-  any source file with extension ``.Designer.cs`` or ``.xaml.cs``,
-  it checks sibling files with extension ``.xaml``, ``.settings``,
-  ``.resx`` or ``.cs`` and establishes the dependency connection.
-
 CUDA
 ^^^^
 
@@ -229,6 +220,11 @@ Properties
 Modules
 -------
 
+* A :module:`CSharpUtilities` module was added to aid parameterization of
+  Visual Studio C# targets.  It provides functions to allow automated
+  setting of source file properties to support Windows Forms, WPF/XAML or
+  other technologies as needed.
+
 * The :module:`ExternalData` module learned to support multiple
   content links for one data file using different hashes, e.g.
   ``img.png.sha256`` and ``img.png.sha1``.  This allows objects
@@ -311,7 +307,7 @@ CPack
   option now is deprecated and will be removed in a future version of CMake.
   Please use new ``SORTING_PRIORITY`` option instead.
 
-* The :module:`CPackIFW` module gained new
+* The :cpack_gen:`CPack IFW Generator` gained new
   :variable:`CPACK_IFW_PACKAGE_WATERMARK`,
   :variable:`CPACK_IFW_PACKAGE_BANNER`,
   :variable:`CPACK_IFW_PACKAGE_BACKGROUND`,
@@ -321,26 +317,26 @@ CPack
   :variable:`CPACK_IFW_PACKAGE_TITLE_COLOR`
   variables to customize a QtIFW installer look.
 
-* The :module:`CPackProductBuild` module gained options to sign packages.
+* The :cpack_gen:`CPack productbuild Generator` gained options to sign packages.
   See the variables :variable:`CPACK_PRODUCTBUILD_IDENTITY_NAME`,
   :variable:`CPACK_PRODUCTBUILD_KEYCHAIN_PATH`,
   :variable:`CPACK_PKGBUILD_IDENTITY_NAME`, and
   :variable:`CPACK_PKGBUILD_KEYCHAIN_PATH`.
 
-* The :module:`CPackRPM` module learned to omit tags that are not supported by
-  provided ``rpmbuild`` tool. If unsupported tags are set they are ignored
-  and a developer warning is printed out.
+* The :cpack_gen:`CPack RPM Generator` learned to omit tags that are not
+  supported by provided ``rpmbuild`` tool. If unsupported tags are set they
+  are ignored and a developer warning is printed out.
 
-* The :module:`CPackRPM` module learned to generate main component package
-  which forces generation of a rpm for defined component without component
-  suffix in filename and package name.
+* The :cpack_gen:`CPack RPM Generator` learned to generate main component
+  package which forces generation of a rpm for defined component without
+  component suffix in filename and package name.
   See :variable:`CPACK_RPM_MAIN_COMPONENT` variable.
 
-* The :module:`CPackRPM` module learned to generate a single ``debuginfo``
-  package on demand even if components packaging is used.
+* The :cpack_gen:`CPack RPM Generator` learned to generate a single
+  ``debuginfo`` package on demand even if components packaging is used.
   See :variable:`CPACK_RPM_DEBUGINFO_SINGLE_PACKAGE` variable.
 
-* The :module:`CPackRPM` module learned to support
+* The :cpack_gen:`CPack RPM Generator` learned to support
   multiple directives per file when using
   :variable:`CPACK_RPM_USER_FILELIST` variable.
 

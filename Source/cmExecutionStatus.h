@@ -3,6 +3,12 @@
 #ifndef cmExecutionStatus_h
 #define cmExecutionStatus_h
 
+#include <cmConfigure.h> // IWYU pragma: keep
+
+#include <string>
+
+class cmMakefile;
+
 /** \class cmExecutionStatus
  * \brief Superclass for all command status classes
  *
@@ -11,32 +17,36 @@
 class cmExecutionStatus
 {
 public:
-  cmExecutionStatus() { this->Clear(); }
-
-  void SetReturnInvoked(bool val) { this->ReturnInvoked = val; }
-  bool GetReturnInvoked() { return this->ReturnInvoked; }
-
-  void SetBreakInvoked(bool val) { this->BreakInvoked = val; }
-  bool GetBreakInvoked() { return this->BreakInvoked; }
-
-  void SetContinueInvoked(bool val) { this->ContinueInvoked = val; }
-  bool GetContinueInvoked() { return this->ContinueInvoked; }
-
-  void Clear()
+  cmExecutionStatus(cmMakefile& makefile)
+    : Makefile(makefile)
+    , Error("unknown error.")
   {
-    this->ReturnInvoked = false;
-    this->BreakInvoked = false;
-    this->ContinueInvoked = false;
-    this->NestedError = false;
   }
-  void SetNestedError(bool val) { this->NestedError = val; }
-  bool GetNestedError() { return this->NestedError; }
+
+  cmMakefile& GetMakefile() { return this->Makefile; }
+
+  void SetError(std::string const& e) { this->Error = e; }
+  std::string const& GetError() const { return this->Error; }
+
+  void SetReturnInvoked() { this->ReturnInvoked = true; }
+  bool GetReturnInvoked() const { return this->ReturnInvoked; }
+
+  void SetBreakInvoked() { this->BreakInvoked = true; }
+  bool GetBreakInvoked() const { return this->BreakInvoked; }
+
+  void SetContinueInvoked() { this->ContinueInvoked = true; }
+  bool GetContinueInvoked() const { return this->ContinueInvoked; }
+
+  void SetNestedError() { this->NestedError = true; }
+  bool GetNestedError() const { return this->NestedError; }
 
 private:
-  bool ReturnInvoked;
-  bool BreakInvoked;
-  bool ContinueInvoked;
-  bool NestedError;
+  cmMakefile& Makefile;
+  std::string Error;
+  bool ReturnInvoked = false;
+  bool BreakInvoked = false;
+  bool ContinueInvoked = false;
+  bool NestedError = false;
 };
 
 #endif

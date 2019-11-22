@@ -2,23 +2,24 @@
    file Copyright.txt or https://cmake.org/licensing for details.  */
 #include "cmFindPathCommand.h"
 
-#include <cmsys/Glob.hxx>
+#include "cmsys/Glob.hxx"
 
 #include "cmMakefile.h"
 #include "cmStateTypes.h"
+#include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 
 class cmExecutionStatus;
 
-cmFindPathCommand::cmFindPathCommand()
+cmFindPathCommand::cmFindPathCommand(cmExecutionStatus& status)
+  : cmFindBase(status)
 {
   this->EnvironmentPath = "INCLUDE";
   this->IncludeFileInPath = false;
 }
 
 // cmFindPathCommand
-bool cmFindPathCommand::InitialPass(std::vector<std::string> const& argsIn,
-                                    cmExecutionStatus&)
+bool cmFindPathCommand::InitialPass(std::vector<std::string> const& argsIn)
 {
   this->VariableDocumentation = "Path to a file.";
   this->CMakePathName = "INCLUDE";
@@ -76,25 +77,21 @@ std::string cmFindPathCommand::FindHeaderInFramework(std::string const& file,
   // if there is a / in the name try to find the header as a framework
   // For example bar/foo.h would look for:
   // bar.framework/Headers/foo.h
-  if (pos != fileName.npos) {
+  if (pos != std::string::npos) {
     // remove the name from the slash;
     fileName = fileName.substr(pos + 1);
     frameWorkName = file;
     frameWorkName =
       frameWorkName.substr(0, frameWorkName.size() - fileName.size() - 1);
     // if the framework has a path in it then just use the filename
-    if (frameWorkName.find('/') != frameWorkName.npos) {
+    if (frameWorkName.find('/') != std::string::npos) {
       fileName = file;
-      frameWorkName = "";
+      frameWorkName.clear();
     }
     if (!frameWorkName.empty()) {
-      std::string fpath = dir;
-      fpath += frameWorkName;
-      fpath += ".framework";
-      std::string intPath = fpath;
-      intPath += "/Headers/";
-      intPath += fileName;
-      if (cmSystemTools::FileExists(intPath.c_str())) {
+      std::string fpath = cmStrCat(dir, frameWorkName, ".framework");
+      std::string intPath = cmStrCat(fpath, "/Headers/", fileName);
+      if (cmSystemTools::FileExists(intPath)) {
         if (this->IncludeFileInPath) {
           return intPath;
         }
@@ -104,9 +101,7 @@ std::string cmFindPathCommand::FindHeaderInFramework(std::string const& file,
   }
   // if it is not found yet or not a framework header, then do a glob search
   // for all frameworks in the directory: dir/*.framework/Headers/<file>
-  std::string glob = dir;
-  glob += "*.framework/Headers/";
-  glob += file;
+  std::string glob = cmStrCat(dir, "*.framework/Headers/", file);
   cmsys::Glob globIt;
   globIt.FindFiles(glob);
   std::vector<std::string> files = globIt.GetFiles();
@@ -124,18 +119,14 @@ std::string cmFindPathCommand::FindHeaderInFramework(std::string const& file,
 std::string cmFindPathCommand::FindNormalHeader()
 {
   std::string tryPath;
-  for (std::vector<std::string>::const_iterator ni = this->Names.begin();
-       ni != this->Names.end(); ++ni) {
-    for (std::vector<std::string>::const_iterator p =
-           this->SearchPaths.begin();
-         p != this->SearchPaths.end(); ++p) {
-      tryPath = *p;
-      tryPath += *ni;
-      if (cmSystemTools::FileExists(tryPath.c_str())) {
+  for (std::string const& n : this->Names) {
+    for (std::string const& sp : this->SearchPaths) {
+      tryPath = cmStrCat(sp, n);
+      if (cmSystemTools::FileExists(tryPath)) {
         if (this->IncludeFileInPath) {
           return tryPath;
         }
-        return *p;
+        return sp;
       }
     }
   }
@@ -144,16 +135,19 @@ std::string cmFindPathCommand::FindNormalHeader()
 
 std::string cmFindPathCommand::FindFrameworkHeader()
 {
-  for (std::vector<std::string>::const_iterator ni = this->Names.begin();
-       ni != this->Names.end(); ++ni) {
-    for (std::vector<std::string>::const_iterator p =
-           this->SearchPaths.begin();
-         p != this->SearchPaths.end(); ++p) {
-      std::string fwPath = this->FindHeaderInFramework(*ni, *p);
+  for (std::string const& n : this->Names) {
+    for (std::string const& sp : this->SearchPaths) {
+      std::string fwPath = this->FindHeaderInFramework(n, sp);
       if (!fwPath.empty()) {
         return fwPath;
       }
     }
   }
   return "";
+}
+
+bool cmFindPath(std::vector<std::string> const& args,
+                cmExecutionStatus& status)
+{
+  return cmFindPathCommand(status).InitialPass(args);
 }

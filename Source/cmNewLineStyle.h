@@ -3,7 +3,7 @@
 #ifndef cmNewLineStyle_h
 #define cmNewLineStyle_h
 
-#include <cmConfigure.h> // IWYU pragma: keep
+#include "cmConfigure.h" // IWYU pragma: keep
 
 #include <string>
 #include <vector>
@@ -30,10 +30,10 @@ public:
   bool ReadFromArguments(const std::vector<std::string>& args,
                          std::string& errorString);
 
-  const std::string GetCharacters() const;
+  std::string GetCharacters() const;
 
 private:
-  Style NewLineStyle;
+  Style NewLineStyle = Invalid;
 };
 
 #endif

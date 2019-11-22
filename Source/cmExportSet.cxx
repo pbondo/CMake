@@ -2,29 +2,43 @@
    file Copyright.txt or https://cmake.org/licensing for details.  */
 #include "cmExportSet.h"
 
-#include "cmAlgorithms.h"
+#include <tuple>
+#include <utility>
+
 #include "cmLocalGenerator.h"
 #include "cmTargetExport.h"
 
-cmExportSet::~cmExportSet()
+cmExportSet::cmExportSet(std::string name)
+  : Name(std::move(name))
 {
-  cmDeleteAll(this->TargetExports);
 }
+
+cmExportSet::~cmExportSet() = default;
 
 void cmExportSet::Compute(cmLocalGenerator* lg)
 {
-  for (std::vector<cmTargetExport*>::iterator it = this->TargetExports.begin();
-       it != this->TargetExports.end(); ++it) {
-    (*it)->Target = lg->FindGeneratorTargetToUse((*it)->TargetName);
+  for (std::unique_ptr<cmTargetExport>& tgtExport : this->TargetExports) {
+    tgtExport->Target = lg->FindGeneratorTargetToUse(tgtExport->TargetName);
   }
 }
 
-void cmExportSet::AddTargetExport(cmTargetExport* te)
+void cmExportSet::AddTargetExport(std::unique_ptr<cmTargetExport> te)
 {
-  this->TargetExports.push_back(te);
+  this->TargetExports.emplace_back(std::move(te));
 }
 
 void cmExportSet::AddInstallation(cmInstallExportGenerator const* installation)
 {
   this->Installations.push_back(installation);
+}
+
+cmExportSet& cmExportSetMap::operator[](const std::string& name)
+{
+  auto it = this->find(name);
+  if (it == this->end()) // Export set not found
+  {
+    auto tup_name = std::make_tuple(name);
+    it = this->emplace(std::piecewise_construct, tup_name, tup_name).first;
+  }
+  return it->second;
 }

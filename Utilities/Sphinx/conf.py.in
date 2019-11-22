@@ -15,10 +15,14 @@ project = 'CMake'
 copyright = '@conf_copyright@'
 version = '@conf_version@' # feature version
 release = '@conf_release@' # full version string
+pygments_style = 'colors.CMakeTemplateStyle'
 
 primary_domain = 'cmake'
+highlight_language = 'none'
 
-exclude_patterns = []
+exclude_patterns = [
+    'dev', # ignore developer-only documentation
+    ]
 
 extensions = ['cmake']
 templates_path = ['@conf_path@/templates']
@@ -52,10 +56,30 @@ html_show_sourcelink = True
 html_static_path = ['@conf_path@/static']
 html_style = 'cmake.css'
 html_theme = 'default'
+html_theme_options = {
+    'footerbgcolor':    '#00182d',
+    'footertextcolor':  '#ffffff',
+    'sidebarbgcolor':   '#e4ece8',
+    'sidebarbtncolor':  '#00a94f',
+    'sidebartextcolor': '#333333',
+    'sidebarlinkcolor': '#00a94f',
+    'relbarbgcolor':    '#00529b',
+    'relbartextcolor':  '#ffffff',
+    'relbarlinkcolor':  '#ffffff',
+    'bgcolor':          '#ffffff',
+    'textcolor':        '#444444',
+    'headbgcolor':      '#f2f2f2',
+    'headtextcolor':    '#003564',
+    'headlinkcolor':    '#3d8ff2',
+    'linkcolor':        '#2b63a8',
+    'visitedlinkcolor': '#2b63a8',
+    'codebgcolor':      '#eeeeee',
+    'codetextcolor':    '#333333',
+}
 html_title = 'CMake %s Documentation' % release
 html_short_title = '%s Documentation' % release
 html_favicon = '@conf_path@/static/cmake-favicon.ico'
 # Not supported yet by sphinx:
 # https://bitbucket.org/birkenfeld/sphinx/issue/1448/make-qthelp-more-configurable
 # qthelp_namespace = "org.cmake"
-# qthelp_qch_name = "CMake-300.qch"
+# qthelp_qch_name = "CMake.qch"

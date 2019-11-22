@@ -153,7 +153,7 @@ aes_ctr_encrypt_counter(archive_crypto_ctx *ctx)
 	CCCryptorStatus r;
 
 	r = CCCryptorReset(ref, NULL);
-	if (r != kCCSuccess)
+	if (r != kCCSuccess && r != kCCUnimplemented)
 		return -1;
 	r = CCCryptorUpdate(ref, ctx->nonce, AES_BLOCK_SIZE, ctx->encr_buf,
 	    AES_BLOCK_SIZE, NULL);
@@ -302,7 +302,8 @@ aes_ctr_release(archive_crypto_ctx *ctx)
 static int
 aes_ctr_init(archive_crypto_ctx *ctx, const uint8_t *key, size_t key_len)
 {
-	ctx->ctx = EVP_CIPHER_CTX_new();
+	if ((ctx->ctx = EVP_CIPHER_CTX_new()) == NULL)
+		return -1;
 
 	switch (key_len) {
 	case 16: ctx->type = EVP_aes_128_ecb(); break;

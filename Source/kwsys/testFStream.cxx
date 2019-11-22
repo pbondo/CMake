@@ -3,24 +3,23 @@
 #include "kwsysPrivate.h"
 
 #if defined(_MSC_VER)
-#pragma warning(disable : 4786)
+#  pragma warning(disable : 4786)
 #endif
 
 #include KWSYS_HEADER(FStream.hxx)
 #include <string.h>
 #ifdef __BORLANDC__
-#include <mem.h> /* memcmp */
+#  include <mem.h> /* memcmp */
 #endif
 
 // Work-around CMake dependency scanning limitation.  This must
 // duplicate the above list of headers.
 #if 0
-#include "FStream.hxx.in"
+#  include "FStream.hxx.in"
 #endif
 
 #include <iostream>
 
-//----------------------------------------------------------------------------
 static int testNoFile()
 {
   kwsys::ifstream in_file("NoSuchFile.txt");
@@ -69,7 +68,6 @@ static unsigned char file_data[num_test_files][max_test_file_size] = {
     0x72, 0x00, 0x00, 0x00, 0x6C, 0x00, 0x00, 0x00, 0x64 },
 };
 
-//----------------------------------------------------------------------------
 static int testBOM()
 {
   // test various encodings in binary mode
@@ -104,7 +102,6 @@ static int testBOM()
   return 0;
 }
 
-//----------------------------------------------------------------------------
 int testFStream(int, char* [])
 {
   int ret = 0;

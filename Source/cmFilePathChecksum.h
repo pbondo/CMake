@@ -3,9 +3,10 @@
 #ifndef cmFilePathChecksum_h
 #define cmFilePathChecksum_h
 
-#include <cmConfigure.h> // IWYU pragma: keep
+#include "cmConfigure.h" // IWYU pragma: keep
 
-#include <stddef.h>
+#include <array>
+#include <cstddef>
 #include <string>
 #include <utility>
 
@@ -28,38 +29,36 @@ public:
   /// @brief Parent directories are empty
   cmFilePathChecksum();
 
-  /// @brief Initilizes the parent directories manually
-  cmFilePathChecksum(const std::string& currentSrcDir,
-                     const std::string& currentBinDir,
-                     const std::string& projectSrcDir,
-                     const std::string& projectBinDir);
+  /// @brief Initializes the parent directories manually
+  cmFilePathChecksum(std::string const& currentSrcDir,
+                     std::string const& currentBinDir,
+                     std::string const& projectSrcDir,
+                     std::string const& projectBinDir);
 
-  /// @brief Initilizes the parent directories from a makefile
+  /// @brief Initializes the parent directories from a makefile
   cmFilePathChecksum(cmMakefile* makefile);
 
   /// @brief Allows parent directories setup after construction
   ///
-  void setupParentDirs(const std::string& currentSrcDir,
-                       const std::string& currentBinDir,
-                       const std::string& projectSrcDir,
-                       const std::string& projectBinDir);
+  void setupParentDirs(std::string const& currentSrcDir,
+                       std::string const& currentBinDir,
+                       std::string const& projectSrcDir,
+                       std::string const& projectBinDir);
 
   /* @brief Calculates the path checksum for the parent directory of a file
    *
    */
-  std::string get(const std::string& filePath);
+  std::string get(std::string const& filePath) const;
 
   /* @brief Same as get() but returns only the first length characters
    *
    */
-  std::string getPart(const std::string& filePath,
-                      size_t length = partLengthDefault);
+  std::string getPart(std::string const& filePath,
+                      size_t length = partLengthDefault) const;
 
 private:
-  /// Size of the parent directory list
-  static const size_t numParentDirs = 4;
   /// List of (directory name, seed name) pairs
-  std::pair<std::string, std::string> parentDirs[numParentDirs];
+  std::array<std::pair<std::string, std::string>, 4> parentDirs;
 };
 
 #endif

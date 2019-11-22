@@ -2,42 +2,56 @@
    file Copyright.txt or https://cmake.org/licensing for details.  */
 #include "cmLoadCacheCommand.h"
 
-#include <cmsys/FStream.hxx>
+#include <set>
 
+#include "cmsys/FStream.hxx"
+
+#include "cmExecutionStatus.h"
 #include "cmMakefile.h"
 #include "cmStateTypes.h"
 #include "cmSystemTools.h"
 #include "cmake.h"
 
-class cmExecutionStatus;
+static bool ReadWithPrefix(std::vector<std::string> const& args,
+                           cmExecutionStatus& status);
 
-// cmLoadCacheCommand
-bool cmLoadCacheCommand::InitialPass(std::vector<std::string> const& args,
-                                     cmExecutionStatus&)
+static void CheckLine(cmMakefile& mf, std::string const& prefix,
+                      std::set<std::string> const& variablesToRead,
+                      const char* line);
+
+bool cmLoadCacheCommand(std::vector<std::string> const& args,
+                        cmExecutionStatus& status)
 {
   if (args.empty()) {
-    this->SetError("called with wrong number of arguments.");
+    status.SetError("called with wrong number of arguments.");
+    return false;
   }
 
   if (args.size() >= 2 && args[1] == "READ_WITH_PREFIX") {
-    return this->ReadWithPrefix(args);
+    return ReadWithPrefix(args, status);
+  }
+
+  if (status.GetMakefile().GetCMakeInstance()->GetWorkingMode() ==
+      cmake::SCRIPT_MODE) {
+    status.SetError(
+      "Only load_cache(READ_WITH_PREFIX) may be used in script mode");
+    return false;
   }
 
   // Cache entries to be excluded from the import list.
   // If this set is empty, all cache entries are brought in
   // and they can not be overridden.
   bool excludeFiles = false;
-  unsigned int i;
   std::set<std::string> excludes;
 
-  for (i = 0; i < args.size(); i++) {
+  for (std::string const& arg : args) {
     if (excludeFiles) {
-      excludes.insert(args[i]);
+      excludes.insert(arg);
     }
-    if (args[i] == "EXCLUDE") {
+    if (arg == "EXCLUDE") {
       excludeFiles = true;
     }
-    if (excludeFiles && (args[i] == "INCLUDE_INTERNALS")) {
+    if (excludeFiles && (arg == "INCLUDE_INTERNALS")) {
       break;
     }
   }
@@ -48,53 +62,57 @@ bool cmLoadCacheCommand::InitialPass(std::vector<std::string> const& args,
   bool includeFiles = false;
   std::set<std::string> includes;
 
-  for (i = 0; i < args.size(); i++) {
+  for (std::string const& arg : args) {
     if (includeFiles) {
-      includes.insert(args[i]);
+      includes.insert(arg);
     }
-    if (args[i] == "INCLUDE_INTERNALS") {
+    if (arg == "INCLUDE_INTERNALS") {
       includeFiles = true;
     }
-    if (includeFiles && (args[i] == "EXCLUDE")) {
+    if (includeFiles && (arg == "EXCLUDE")) {
       break;
     }
   }
 
+  cmMakefile& mf = status.GetMakefile();
+
   // Loop over each build directory listed in the arguments.  Each
   // directory has a cache file.
-  for (i = 0; i < args.size(); i++) {
-    if ((args[i] == "EXCLUDE") || (args[i] == "INCLUDE_INTERNALS")) {
+  for (std::string const& arg : args) {
+    if ((arg == "EXCLUDE") || (arg == "INCLUDE_INTERNALS")) {
       break;
     }
-    this->Makefile->GetCMakeInstance()->LoadCache(args[i], false, excludes,
-                                                  includes);
+    mf.GetCMakeInstance()->LoadCache(arg, false, excludes, includes);
   }
 
   return true;
 }
 
-bool cmLoadCacheCommand::ReadWithPrefix(std::vector<std::string> const& args)
+static bool ReadWithPrefix(std::vector<std::string> const& args,
+                           cmExecutionStatus& status)
 {
   // Make sure we have a prefix.
   if (args.size() < 3) {
-    this->SetError("READ_WITH_PREFIX form must specify a prefix.");
+    status.SetError("READ_WITH_PREFIX form must specify a prefix.");
     return false;
   }
 
   // Make sure the cache file exists.
   std::string cacheFile = args[0] + "/CMakeCache.txt";
-  if (!cmSystemTools::FileExists(cacheFile.c_str())) {
+  if (!cmSystemTools::FileExists(cacheFile)) {
     std::string e = "Cannot load cache file from " + cacheFile;
-    this->SetError(e);
+    status.SetError(e);
     return false;
   }
 
   // Prepare the table of variables to read.
-  this->Prefix = args[2];
-  this->VariablesToRead.insert(args.begin() + 3, args.end());
+  std::string const prefix = args[2];
+  std::set<std::string> const variablesToRead(args.begin() + 3, args.end());
 
   // Read the cache file.
   cmsys::ifstream fin(cacheFile.c_str());
+
+  cmMakefile& mf = status.GetMakefile();
 
   // This is a big hack read loop to overcome a buggy ifstream
   // implementation on HP-UX.  This should work on all platforms even
@@ -124,8 +142,8 @@ bool cmLoadCacheCommand::ReadWithPrefix(std::vector<std::string> const& args)
         }
         if (i != end) {
           // Completed a line.
-          this->CheckLine(line.c_str());
-          line = "";
+          CheckLine(mf, prefix, variablesToRead, line.c_str());
+          line.clear();
 
           // Skip the newline character.
           ++i;
@@ -135,13 +153,15 @@ bool cmLoadCacheCommand::ReadWithPrefix(std::vector<std::string> const& args)
   }
   if (!line.empty()) {
     // Partial last line.
-    this->CheckLine(line.c_str());
+    CheckLine(mf, prefix, variablesToRead, line.c_str());
   }
 
   return true;
 }
 
-void cmLoadCacheCommand::CheckLine(const char* line)
+static void CheckLine(cmMakefile& mf, std::string const& prefix,
+                      std::set<std::string> const& variablesToRead,
+                      const char* line)
 {
   // Check one line of the cache file.
   std::string var;
@@ -149,14 +169,14 @@ void cmLoadCacheCommand::CheckLine(const char* line)
   cmStateEnums::CacheEntryType type = cmStateEnums::UNINITIALIZED;
   if (cmake::ParseCacheEntry(line, var, value, type)) {
     // Found a real entry.  See if this one was requested.
-    if (this->VariablesToRead.find(var) != this->VariablesToRead.end()) {
+    if (variablesToRead.find(var) != variablesToRead.end()) {
       // This was requested.  Set this variable locally with the given
       // prefix.
-      var = this->Prefix + var;
+      var = prefix + var;
       if (!value.empty()) {
-        this->Makefile->AddDefinition(var, value.c_str());
+        mf.AddDefinition(var, value);
       } else {
-        this->Makefile->RemoveDefinition(var);
+        mf.RemoveDefinition(var);
       }
     }
   }

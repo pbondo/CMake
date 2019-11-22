@@ -3,12 +3,14 @@
 #ifndef cmFindFileCommand_h
 #define cmFindFileCommand_h
 
-#include <cmConfigure.h>
+#include "cmConfigure.h" // IWYU pragma: keep
+
 #include <string>
+#include <vector>
 
 #include "cmFindPathCommand.h"
 
-class cmCommand;
+class cmExecutionStatus;
 
 /** \class cmFindFileCommand
  * \brief Define a command to search for an executable program.
@@ -21,12 +23,10 @@ class cmCommand;
 class cmFindFileCommand : public cmFindPathCommand
 {
 public:
-  cmFindFileCommand();
-  /**
-   * This is a virtual constructor for the command.
-   */
-  cmCommand* Clone() CM_OVERRIDE { return new cmFindFileCommand; }
-  std::string GetName() const CM_OVERRIDE { return "find_file"; }
+  cmFindFileCommand(cmExecutionStatus& status);
 };
+
+bool cmFindFile(std::vector<std::string> const& args,
+                cmExecutionStatus& status);
 
 #endif

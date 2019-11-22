@@ -4,10 +4,12 @@
 #ifndef cmStateSnapshot_h
 #define cmStateSnapshot_h
 
-#include <cmConfigure.h> // IWYU pragma: keep
+#include "cmConfigure.h" // IWYU pragma: keep
 
 #include <string>
 #include <vector>
+
+#include <cm/string_view>
 
 #include "cmLinkedTree.h"
 #include "cmPolicies.h"
@@ -19,12 +21,12 @@ class cmStateDirectory;
 class cmStateSnapshot
 {
 public:
-  cmStateSnapshot(cmState* state = CM_NULLPTR);
+  cmStateSnapshot(cmState* state = nullptr);
   cmStateSnapshot(cmState* state, cmStateDetail::PositionType position);
 
-  const char* GetDefinition(std::string const& name) const;
+  std::string const* GetDefinition(std::string const& name) const;
   bool IsInitialized(std::string const& name) const;
-  void SetDefinition(std::string const& name, std::string const& value);
+  void SetDefinition(std::string const& name, cm::string_view value);
   void RemoveDefinition(std::string const& name);
   std::vector<std::string> UnusedKeys() const;
   std::vector<std::string> ClosureKeys() const;
@@ -37,15 +39,17 @@ public:
   std::vector<cmStateSnapshot> GetChildren();
 
   bool IsValid() const;
+  cmStateSnapshot GetBuildsystemDirectory() const;
   cmStateSnapshot GetBuildsystemDirectoryParent() const;
   cmStateSnapshot GetCallStackParent() const;
   cmStateSnapshot GetCallStackBottom() const;
   cmStateEnums::SnapshotType GetType() const;
 
   void SetPolicy(cmPolicies::PolicyID id, cmPolicies::PolicyStatus status);
-  cmPolicies::PolicyStatus GetPolicy(cmPolicies::PolicyID id) const;
+  cmPolicies::PolicyStatus GetPolicy(cmPolicies::PolicyID id,
+                                     bool parent_scope = false) const;
   bool HasDefinedPolicyCMP0011();
-  void PushPolicy(cmPolicies::PolicyMap entry, bool weak);
+  void PushPolicy(cmPolicies::PolicyMap const& entry, bool weak);
   bool PopPolicy();
   bool CanPopPolicyScope();
 

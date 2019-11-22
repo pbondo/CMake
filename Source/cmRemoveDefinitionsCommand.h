@@ -3,40 +3,14 @@
 #ifndef cmRemoveDefinitionsCommand_h
 #define cmRemoveDefinitionsCommand_h
 
-#include <cmConfigure.h>
+#include "cmConfigure.h" // IWYU pragma: keep
+
 #include <string>
 #include <vector>
 
-#include "cmCommand.h"
-
 class cmExecutionStatus;
 
-/** \class cmRemoveDefinitionsCommand
- * \brief Specify a list of compiler defines
- *
- * cmRemoveDefinitionsCommand specifies a list of compiler defines.
- * These defines will
- * be removed from the compile command.
- */
-class cmRemoveDefinitionsCommand : public cmCommand
-{
-public:
-  /**
-   * This is a virtual constructor for the command.
-   */
-  cmCommand* Clone() CM_OVERRIDE { return new cmRemoveDefinitionsCommand; }
-
-  /**
-   * This is called when the command is first encountered in
-   * the CMakeLists.txt file.
-   */
-  bool InitialPass(std::vector<std::string> const& args,
-                   cmExecutionStatus& status) CM_OVERRIDE;
-
-  /**
-   * The name of the command as specified in CMakeList.txt.
-   */
-  std::string GetName() const CM_OVERRIDE { return "remove_definitions"; }
-};
+bool cmRemoveDefinitionsCommand(std::vector<std::string> const& args,
+                                cmExecutionStatus& status);
 
 #endif

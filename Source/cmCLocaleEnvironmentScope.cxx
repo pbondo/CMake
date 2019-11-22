@@ -2,10 +2,10 @@
    file Copyright.txt or https://cmake.org/licensing for details.  */
 #include "cmCLocaleEnvironmentScope.h"
 
-#include "cmSystemTools.h"
-
 #include <sstream>
 #include <utility>
+
+#include "cmSystemTools.h"
 
 cmCLocaleEnvironmentScope::cmCLocaleEnvironmentScope()
 {
@@ -45,10 +45,9 @@ void cmCLocaleEnvironmentScope::SetEnv(std::string const& key,
 
 cmCLocaleEnvironmentScope::~cmCLocaleEnvironmentScope()
 {
-  for (backup_map_t::const_iterator i = this->EnvironmentBackup.begin();
-       i != this->EnvironmentBackup.end(); ++i) {
+  for (auto const& envb : this->EnvironmentBackup) {
     std::ostringstream tmp;
-    tmp << i->first << "=" << i->second;
+    tmp << envb.first << "=" << envb.second;
     cmSystemTools::PutEnv(tmp.str());
   }
 }

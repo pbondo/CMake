@@ -3,12 +3,12 @@
 #ifndef cmCursesWidget_h
 #define cmCursesWidget_h
 
-#include <cmConfigure.h> // IWYU pragma: keep
+#include "cmConfigure.h" // IWYU pragma: keep
+
+#include <string>
 
 #include "cmCursesStandardIncludes.h"
 #include "cmStateTypes.h"
-
-#include <string>
 
 class cmCursesMainForm;
 
@@ -17,6 +17,9 @@ class cmCursesWidget
 public:
   cmCursesWidget(int width, int height, int left, int top);
   virtual ~cmCursesWidget();
+
+  cmCursesWidget(cmCursesWidget const&) = delete;
+  cmCursesWidget& operator=(cmCursesWidget const&) = delete;
 
   /**
    * Handle user input. Called by the container of this widget
@@ -59,9 +62,6 @@ public:
   friend class cmCursesMainForm;
 
 protected:
-  cmCursesWidget(const cmCursesWidget& from);
-  void operator=(const cmCursesWidget&);
-
   cmStateEnums::CacheEntryType Type;
   std::string Value;
   FIELD* Field;

@@ -3,28 +3,20 @@
 #ifndef cmExprParserHelper_h
 #define cmExprParserHelper_h
 
-#include <cmConfigure.h> // IWYU pragma: keep
+#include "cmConfigure.h" // IWYU pragma: keep
 
 #include <string>
 #include <vector>
 
-#define YYSTYPE cmExprParserHelper::ParserType
-#define YYSTYPE_IS_DECLARED
-#define YY_EXTRA_TYPE cmExprParserHelper*
-#define YY_DECL int cmExpr_yylex(YYSTYPE* yylvalp, yyscan_t yyscanner)
+#include "cm_kwiml.h"
 
-/** \class cmExprParserHelper
- * \brief Helper class for parsing java source files
- *
- * Finds dependencies for java file and list of outputs
- */
 class cmExprParserHelper
 {
 public:
-  typedef struct
+  struct ParserType
   {
-    int Number;
-  } ParserType;
+    KWIML_INT_int64_t Number;
+  };
 
   cmExprParserHelper();
   ~cmExprParserHelper();
@@ -34,11 +26,15 @@ public:
   int LexInput(char* buf, int maxlen);
   void Error(const char* str);
 
-  void SetResult(int value);
+  void SetResult(KWIML_INT_int64_t value);
 
-  int GetResult() { return this->Result; }
+  KWIML_INT_int64_t GetResult() { return this->Result; }
 
   const char* GetError() { return this->ErrorString.c_str(); }
+
+  void UnexpectedChar(char c);
+
+  std::string const& GetWarning() const { return this->WarningString; }
 
 private:
   std::string::size_type InputBufferPos;
@@ -49,12 +45,18 @@ private:
 
   void Print(const char* place, const char* str);
 
-  void CleanupParser();
+  void SetError(std::string errorString);
 
-  int Result;
+  KWIML_INT_int64_t Result;
   const char* FileName;
   long FileLine;
   std::string ErrorString;
+  std::string WarningString;
 };
+
+#define YYSTYPE cmExprParserHelper::ParserType
+#define YYSTYPE_IS_DECLARED
+#define YY_EXTRA_TYPE cmExprParserHelper*
+#define YY_DECL int cmExpr_yylex(YYSTYPE* yylvalp, yyscan_t yyscanner)
 
 #endif

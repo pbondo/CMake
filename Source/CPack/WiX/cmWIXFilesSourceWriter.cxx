@@ -2,16 +2,13 @@
    file Copyright.txt or https://cmake.org/licensing for details.  */
 #include "cmWIXFilesSourceWriter.h"
 
+#include "cm_sys_stat.h"
+
+#include "cmCMakeToWixPath.h"
+#include "cmInstalledFile.h"
+#include "cmSystemTools.h"
+#include "cmUuid.h"
 #include "cmWIXAccessControlList.h"
-
-#include <cmInstalledFile.h>
-
-#include <cmSystemTools.h>
-#include <cmUuid.h>
-
-#include <sys/types.h>
-// include sys/stat.h after sys/types.h
-#include <sys/stat.h>
 
 cmWIXFilesSourceWriter::cmWIXFilesSourceWriter(cmCPackLog* logger,
                                                std::string const& filename,
@@ -138,9 +135,10 @@ std::string cmWIXFilesSourceWriter::EmitComponentFile(
     }
   }
 
+  patch.ApplyFragment(componentId, *this);
   BeginElement("File");
   AddAttribute("Id", fileId);
-  AddAttribute("Source", filePath);
+  AddAttribute("Source", CMakeToWixPath(filePath));
   AddAttribute("KeyPath", "yes");
 
   mode_t fileMode = 0;
@@ -149,16 +147,15 @@ std::string cmWIXFilesSourceWriter::EmitComponentFile(
   if (!(fileMode & S_IWRITE)) {
     AddAttribute("ReadOnly", "yes");
   }
+  patch.ApplyFragment(fileId, *this);
 
   if (installedFile) {
     cmWIXAccessControlList acl(Logger, *installedFile, *this);
     acl.Apply();
   }
 
-  patch.ApplyFragment(fileId, *this);
   EndElement("File");
 
-  patch.ApplyFragment(componentId, *this);
   EndElement("Component");
   EndElement("DirectoryRef");
 

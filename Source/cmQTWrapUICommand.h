@@ -3,38 +3,14 @@
 #ifndef cmQTWrapUICommand_h
 #define cmQTWrapUICommand_h
 
-#include <cmConfigure.h>
+#include "cmConfigure.h" // IWYU pragma: keep
+
 #include <string>
 #include <vector>
 
-#include "cmCommand.h"
-
 class cmExecutionStatus;
 
-/** \class cmQTWrapUICommand
- * \brief Create .h and .cxx files rules for Qt user interfaces files
- *
- * cmQTWrapUICommand is used to create wrappers for Qt classes into normal C++
- */
-class cmQTWrapUICommand : public cmCommand
-{
-public:
-  /**
-   * This is a virtual constructor for the command.
-   */
-  cmCommand* Clone() CM_OVERRIDE { return new cmQTWrapUICommand; }
-
-  /**
-   * This is called when the command is first encountered in
-   * the CMakeLists.txt file.
-   */
-  bool InitialPass(std::vector<std::string> const& args,
-                   cmExecutionStatus& status) CM_OVERRIDE;
-
-  /**
-   * The name of the command as specified in CMakeList.txt.
-   */
-  std::string GetName() const CM_OVERRIDE { return "qt_wrap_ui"; }
-};
+bool cmQTWrapUICommand(std::vector<std::string> const& args,
+                       cmExecutionStatus& status);
 
 #endif

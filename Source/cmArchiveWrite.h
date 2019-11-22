@@ -3,14 +3,14 @@
 #ifndef cmArchiveWrite_h
 #define cmArchiveWrite_h
 
-#include <cmConfigure.h> // IWYU pragma: keep
+#include "cmConfigure.h" // IWYU pragma: keep
 
+#include <cstddef>
 #include <iosfwd>
-#include <stddef.h>
 #include <string>
 
-#if !defined(CMAKE_BUILD_WITH_CMAKE)
-#error "cmArchiveWrite not allowed during bootstrap build!"
+#if defined(CMAKE_BOOTSTRAP)
+#  error "cmArchiveWrite not allowed during bootstrap build!"
 #endif
 
 template <typename T>
@@ -28,6 +28,7 @@ public:
   void Clear() { this->IsValueSet = false; }
   bool IsSet() const { return this->IsValueSet; }
   T Get() const { return Value; }
+
 private:
   T Value;
   bool IsValueSet;
@@ -39,8 +40,6 @@ private:
  */
 class cmArchiveWrite
 {
-  typedef void (cmArchiveWrite::*safe_bool)();
-  void safe_bool_true() {}
 public:
   /** Compression type.  */
   enum Compress
@@ -50,7 +49,8 @@ public:
     CompressGZip,
     CompressBZip2,
     CompressLZMA,
-    CompressXZ
+    CompressXZ,
+    CompressZstd
   };
 
   /** Construct with output stream to which to write archive.  */
@@ -58,6 +58,9 @@ public:
                  std::string const& format = "paxr");
 
   ~cmArchiveWrite();
+
+  cmArchiveWrite(const cmArchiveWrite&) = delete;
+  cmArchiveWrite& operator=(const cmArchiveWrite&) = delete;
 
   /**
    * Add a path (file or directory) to the archive.  Directories are
@@ -67,14 +70,11 @@ public:
    * skip.  The remaining part of the input path is appended to the
    * "prefix" value to construct the final name in the archive.
    */
-  bool Add(std::string path, size_t skip = 0, const char* prefix = CM_NULLPTR,
+  bool Add(std::string path, size_t skip = 0, const char* prefix = nullptr,
            bool recursive = true);
 
   /** Returns true if there has been no error.  */
-  operator safe_bool() const
-  {
-    return this->Okay() ? &cmArchiveWrite::safe_bool_true : CM_NULLPTR;
-  }
+  explicit operator bool() const { return this->Okay(); }
 
   /** Returns true if there has been an error.  */
   bool operator!() const { return !this->Okay(); }

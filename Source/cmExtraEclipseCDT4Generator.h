@@ -3,14 +3,14 @@
 #ifndef cmExtraEclipseCDT4Generator_h
 #define cmExtraEclipseCDT4Generator_h
 
-#include <cmConfigure.h>
-
-#include "cmExternalMakefileProjectGenerator.h"
+#include "cmConfigure.h" // IWYU pragma: keep
 
 #include <iosfwd>
 #include <set>
 #include <string>
 #include <vector>
+
+#include "cmExternalMakefileProjectGenerator.h"
 
 class cmLocalGenerator;
 class cmMakefile;
@@ -35,13 +35,16 @@ public:
   static cmExternalMakefileProjectGeneratorFactory* GetFactory();
 
   void EnableLanguage(std::vector<std::string> const& languages, cmMakefile*,
-                      bool optional) CM_OVERRIDE;
+                      bool optional) override;
 
-  void Generate() CM_OVERRIDE;
+  void Generate() override;
 
 private:
   // create .project file in the source tree
   void CreateSourceProjectFile();
+
+  // create .settings/org.eclipse.core.resources.prefs
+  void CreateSettingsResourcePrefsFile();
 
   // create .project file
   void CreateProjectFile();
@@ -67,7 +70,7 @@ private:
                            const std::string& make,
                            const std::string& makeArguments,
                            const std::string& path, const char* prefix = "",
-                           const char* makeTarget = CM_NULLPTR);
+                           const char* makeTarget = nullptr);
   static void AppendScannerProfile(
     cmXMLWriter& xml, const std::string& profileID, bool openActionEnabled,
     const std::string& openActionFilePath, bool pParserEnabled,

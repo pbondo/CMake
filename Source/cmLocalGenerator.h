@@ -3,20 +3,23 @@
 #ifndef cmLocalGenerator_h
 #define cmLocalGenerator_h
 
-#include <cmConfigure.h>
+#include "cmConfigure.h" // IWYU pragma: keep
 
-#include <cm_kwiml.h>
 #include <iosfwd>
 #include <map>
+#include <memory>
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
+#include "cm_kwiml.h"
+
 #include "cmListFileCache.h"
+#include "cmMessageType.h"
 #include "cmOutputConverter.h"
 #include "cmPolicies.h"
 #include "cmStateSnapshot.h"
-#include "cmake.h"
 
 class cmComputeLinkInformation;
 class cmCustomCommandGenerator;
@@ -27,6 +30,7 @@ class cmMakefile;
 class cmRulePlaceholderExpander;
 class cmSourceFile;
 class cmState;
+class cmake;
 
 /** \class cmLocalGenerator
  * \brief Create required build files for a directory.
@@ -70,15 +74,17 @@ public:
    */
   void ComputeTargetManifest();
 
+  bool ComputeTargetCompileFeatures();
+
   bool IsRootMakefile() const;
 
-  ///! Get the makefile for this generator
+  //! Get the makefile for this generator
   cmMakefile* GetMakefile() { return this->Makefile; }
 
-  ///! Get the makefile for this generator, const version
+  //! Get the makefile for this generator, const version
   const cmMakefile* GetMakefile() const { return this->Makefile; }
 
-  ///! Get the GlobalGenerator this is associated with
+  //! Get the GlobalGenerator this is associated with
   cmGlobalGenerator* GetGlobalGenerator() { return this->GlobalGenerator; }
   const cmGlobalGenerator* GetGlobalGenerator() const
   {
@@ -98,8 +104,12 @@ public:
                             const std::string& lang,
                             const std::string& config);
 
-  void AddLanguageFlags(std::string& flags, const std::string& lang,
-                        const std::string& config);
+  void AddLanguageFlags(std::string& flags, cmGeneratorTarget const* target,
+                        const std::string& lang, const std::string& config);
+  void AddLanguageFlagsForLinking(std::string& flags,
+                                  cmGeneratorTarget const* target,
+                                  const std::string& lang,
+                                  const std::string& config);
   void AddCMP0018Flags(std::string& flags, cmGeneratorTarget const* target,
                        std::string const& lang, const std::string& config);
   void AddVisibilityPresetFlags(std::string& flags,
@@ -110,12 +120,23 @@ public:
   void AddCompilerRequirementFlag(std::string& flags,
                                   cmGeneratorTarget const* target,
                                   const std::string& lang);
-  ///! Append flags to a string.
-  virtual void AppendFlags(std::string& flags, const std::string& newFlags);
-  virtual void AppendFlags(std::string& flags, const char* newFlags);
+  //! Append flags to a string.
+  virtual void AppendFlags(std::string& flags,
+                           const std::string& newFlags) const;
+  virtual void AppendFlags(std::string& flags,
+                           const std::vector<BT<std::string>>& newFlags) const;
   virtual void AppendFlagEscape(std::string& flags,
-                                const std::string& rawFlag);
-  ///! Get the include flags for the current makefile and language
+                                const std::string& rawFlag) const;
+  void AddPchDependencies(cmGeneratorTarget* target);
+  void AddUnityBuild(cmGeneratorTarget* target);
+  void AppendIPOLinkerFlags(std::string& flags, cmGeneratorTarget* target,
+                            const std::string& config,
+                            const std::string& lang);
+  void AppendPositionIndependentLinkerFlags(std::string& flags,
+                                            cmGeneratorTarget* target,
+                                            const std::string& config,
+                                            const std::string& lang);
+  //! Get the include flags for the current makefile and language
   std::string GetIncludeFlags(const std::vector<std::string>& includes,
                               cmGeneratorTarget* target,
                               const std::string& lang,
@@ -123,37 +144,67 @@ public:
                               bool forResponseFile = false,
                               const std::string& config = "");
 
-  const std::vector<cmGeneratorTarget*>& GetGeneratorTargets() const
+  using GeneratorTargetVector =
+    std::vector<std::unique_ptr<cmGeneratorTarget>>;
+  const GeneratorTargetVector& GetGeneratorTargets() const
   {
     return this->GeneratorTargets;
   }
 
-  const std::vector<cmGeneratorTarget*>& GetImportedGeneratorTargets() const
-  {
-    return this->ImportedGeneratorTargets;
-  }
-
-  void AddGeneratorTarget(cmGeneratorTarget* gt);
+  void AddGeneratorTarget(std::unique_ptr<cmGeneratorTarget> gt);
   void AddImportedGeneratorTarget(cmGeneratorTarget* gt);
-  void AddOwnedImportedGeneratorTarget(cmGeneratorTarget* gt);
+  void AddOwnedImportedGeneratorTarget(std::unique_ptr<cmGeneratorTarget> gt);
 
   cmGeneratorTarget* FindLocalNonAliasGeneratorTarget(
     const std::string& name) const;
   cmGeneratorTarget* FindGeneratorTargetToUse(const std::string& name) const;
 
   /**
+   * Process a list of include directories
+   */
+  void AppendIncludeDirectories(std::vector<std::string>& includes,
+                                const char* includes_list,
+                                const cmSourceFile& sourceFile) const;
+  void AppendIncludeDirectories(std::vector<std::string>& includes,
+                                std::string const& includes_list,
+                                const cmSourceFile& sourceFile) const
+  {
+    this->AppendIncludeDirectories(includes, includes_list.c_str(),
+                                   sourceFile);
+  }
+  void AppendIncludeDirectories(std::vector<std::string>& includes,
+                                const std::vector<std::string>& includes_vec,
+                                const cmSourceFile& sourceFile) const;
+
+  /**
    * Encode a list of preprocessor definitions for the compiler
    * command line.
    */
   void AppendDefines(std::set<std::string>& defines,
-                     const char* defines_list) const;
-  void AppendDefines(std::set<std::string>& defines,
-                     std::string const& defines_list) const
+                     std::string const& defines_list) const;
+  void AppendDefines(std::set<BT<std::string>>& defines,
+                     std::string const& defines_list) const;
+  void AppendDefines(std::set<BT<std::string>>& defines,
+                     const std::vector<BT<std::string>>& defines_vec) const;
+
+  /**
+   * Encode a list of compile options for the compiler
+   * command line.
+   */
+  void AppendCompileOptions(std::string& options, const char* options_list,
+                            const char* regex = nullptr) const;
+  void AppendCompileOptions(std::string& options,
+                            std::string const& options_list,
+                            const char* regex = nullptr) const
   {
-    this->AppendDefines(defines, defines_list.c_str());
+    this->AppendCompileOptions(options, options_list.c_str(), regex);
   }
-  void AppendDefines(std::set<std::string>& defines,
-                     const std::vector<std::string>& defines_vec) const;
+  void AppendCompileOptions(std::string& options,
+                            const std::vector<std::string>& options_vec,
+                            const char* regex = nullptr) const;
+  void AppendCompileOptions(std::vector<BT<std::string>>& options,
+                            const std::vector<BT<std::string>>& options_vec,
+                            const char* regex = nullptr) const;
 
   /**
    * Join a set of defines into a definesString with a space separator.
@@ -192,24 +243,57 @@ public:
   virtual void ClearDependencies(cmMakefile* /* mf */, bool /* verbose */) {}
 
   /** Called from command-line hook to update dependencies.  */
-  virtual bool UpdateDependencies(const char* /* tgtInfo */, bool /*verbose*/,
-                                  bool /*color*/)
+  virtual bool UpdateDependencies(const std::string& /* tgtInfo */,
+                                  bool /*verbose*/, bool /*color*/)
   {
     return true;
   }
 
-  /** Get the include flags for the current makefile and language.  */
+  /** @brief Get the include directories for the current makefile and language
+   * and optional the compiler implicit include directories.
+   *
+   * @arg stripImplicitDirs Strip all directories found in
+   *      CMAKE_<LANG>_IMPLICIT_INCLUDE_DIRECTORIES from the result.
+   * @arg appendAllImplicitDirs Append all directories found in
+   *      CMAKE_<LANG>_IMPLICIT_INCLUDE_DIRECTORIES to the result.
+   */
+  std::vector<BT<std::string>> GetIncludeDirectoriesImplicit(
+    cmGeneratorTarget const* target, std::string const& lang = "C",
+    std::string const& config = "", bool stripImplicitDirs = true,
+    bool appendAllImplicitDirs = false) const;
+
+  /** @brief Get the include directories for the current makefile and language
+   * and optional the compiler implicit include directories.
+   *
+   * @arg dirs Directories are appended to this list
+   */
+  void GetIncludeDirectoriesImplicit(std::vector<std::string>& dirs,
+                                     cmGeneratorTarget const* target,
+                                     const std::string& lang = "C",
+                                     const std::string& config = "",
+                                     bool stripImplicitDirs = true,
+                                     bool appendAllImplicitDirs = false) const;
+
+  /** @brief Get the include directories for the current makefile and language.
+   * @arg dirs Include directories are appended to this list
+   */
   void GetIncludeDirectories(std::vector<std::string>& dirs,
                              cmGeneratorTarget const* target,
                              const std::string& lang = "C",
-                             const std::string& config = "",
-                             bool stripImplicitInclDirs = true) const;
+                             const std::string& config = "") const;
+
+  /** @brief Get the include directories for the current makefile and language.
+   * @return The include directory list
+   */
+  std::vector<BT<std::string>> GetIncludeDirectories(
+    cmGeneratorTarget const* target, std::string const& lang = "C",
+    std::string const& config = "") const;
+
   void AddCompileOptions(std::string& flags, cmGeneratorTarget* target,
                          const std::string& lang, const std::string& config);
-  void AddCompileDefinitions(std::set<std::string>& defines,
-                             cmGeneratorTarget const* target,
-                             const std::string& config,
-                             const std::string& lang) const;
+  void AddCompileOptions(std::vector<BT<std::string>>& flags,
+                         cmGeneratorTarget* target, const std::string& lang,
+                         const std::string& config);
 
   std::string GetProjectName() const;
 
@@ -248,36 +332,51 @@ public:
 
   cmake* GetCMakeInstance() const;
 
-  const char* GetSourceDirectory() const;
-  const char* GetBinaryDirectory() const;
+  std::string const& GetSourceDirectory() const;
+  std::string const& GetBinaryDirectory() const;
 
-  const char* GetCurrentBinaryDirectory() const;
-  const char* GetCurrentSourceDirectory() const;
+  std::string const& GetCurrentBinaryDirectory() const;
+  std::string const& GetCurrentSourceDirectory() const;
 
   /**
-   * Generate a Mac OS X application bundle Info.plist file.
+   * Convert the given remote path to a relative path with respect to
+   * the given local path.  Both paths must use forward slashes and not
+   * already be escaped or quoted.
+   * The conversion is skipped if the paths are not both in the source
+   * or both in the binary tree.
+   */
+  std::string MaybeConvertToRelativePath(std::string const& local_path,
+                                         std::string const& remote_path) const;
+
+  /**
+   * Generate a macOS application bundle Info.plist file.
    */
   void GenerateAppleInfoPList(cmGeneratorTarget* target,
                               const std::string& targetName,
-                              const char* fname);
+                              const std::string& fname);
 
   /**
-   * Generate a Mac OS X framework Info.plist file.
+   * Generate a macOS framework Info.plist file.
    */
   void GenerateFrameworkInfoPList(cmGeneratorTarget* target,
                                   const std::string& targetName,
-                                  const char* fname);
+                                  const std::string& fname);
   /** Construct a comment for a custom command.  */
   std::string ConstructComment(cmCustomCommandGenerator const& ccg,
                                const char* default_comment = "");
   // Compute object file names.
   std::string GetObjectFileNameWithoutTarget(
     const cmSourceFile& source, std::string const& dir_max,
-    bool* hasSourceExtension = CM_NULLPTR);
+    bool* hasSourceExtension = nullptr,
+    char const* customOutputExtension = nullptr);
 
   /** Fill out the static linker flags for the given target.  */
   void GetStaticLibraryFlags(std::string& flags, std::string const& config,
+                             std::string const& linkLanguage,
                              cmGeneratorTarget* target);
+  std::vector<BT<std::string>> GetStaticLibraryFlags(
+    std::string const& config, std::string const& linkLanguage,
+    cmGeneratorTarget* target);
 
   /** Fill out these strings for the given target.  Libraries to link,
    *  flags, and linkflags. */
@@ -286,12 +385,23 @@ public:
                       std::string& flags, std::string& linkFlags,
                       std::string& frameworkPath, std::string& linkPath,
                       cmGeneratorTarget* target);
+  void GetTargetFlags(
+    cmLinkLineComputer* linkLineComputer, const std::string& config,
+    std::vector<BT<std::string>>& linkLibs, std::string& flags,
+    std::vector<BT<std::string>>& linkFlags, std::string& frameworkPath,
+    std::vector<BT<std::string>>& linkPath, cmGeneratorTarget* target);
   void GetTargetDefines(cmGeneratorTarget const* target,
                         std::string const& config, std::string const& lang,
                         std::set<std::string>& defines) const;
+  std::set<BT<std::string>> GetTargetDefines(cmGeneratorTarget const* target,
+                                             std::string const& config,
+                                             std::string const& lang) const;
   void GetTargetCompileFlags(cmGeneratorTarget* target,
                              std::string const& config,
                              std::string const& lang, std::string& flags);
+  std::vector<BT<std::string>> GetTargetCompileFlags(cmGeneratorTarget* target,
+                                                     std::string const& config,
+                                                     std::string const& lang);
 
   std::string GetFrameworkFlags(std::string const& l,
                                 std::string const& config,
@@ -301,15 +411,16 @@ public:
 
   virtual void ComputeObjectFilenames(
     std::map<cmSourceFile const*, std::string>& mapping,
-    cmGeneratorTarget const* gt = CM_NULLPTR);
+    cmGeneratorTarget const* gt = nullptr);
 
   bool IsWindowsShell() const;
   bool IsWatcomWMake() const;
   bool IsMinGWMake() const;
   bool IsNMake() const;
 
-  void IssueMessage(cmake::MessageType t, std::string const& text) const;
+  void IssueMessage(MessageType t, std::string const& text) const;
 
+  void CreateEvaluationFileOutputs();
   void CreateEvaluationFileOutputs(const std::string& config);
   void ProcessEvaluationFiles(std::vector<std::string>& generatedFiles);
 
@@ -317,11 +428,16 @@ public:
                               const std::string& prop);
 
 protected:
-  ///! put all the libraries for a target on into the given stream
+  //! put all the libraries for a target on into the given stream
   void OutputLinkLibraries(cmComputeLinkInformation* pcli,
                            cmLinkLineComputer* linkLineComputer,
                            std::string& linkLibraries,
                            std::string& frameworkPath, std::string& linkPath);
+  void OutputLinkLibraries(cmComputeLinkInformation* pcli,
+                           cmLinkLineComputer* linkLineComputer,
+                           std::vector<BT<std::string>>& linkLibraries,
+                           std::string& frameworkPath,
+                           std::vector<BT<std::string>>& linkPath);
 
   // Handle old-style install rules stored in the targets.
   void GenerateTargetInstallRules(
@@ -343,15 +459,22 @@ protected:
   std::string::size_type ObjectPathMax;
   std::set<std::string> ObjectMaxPathViolations;
 
+  std::set<std::string> EnvCPATH;
+
+  using GeneratorTargetMap =
+    std::unordered_map<std::string, cmGeneratorTarget*>;
+  GeneratorTargetMap GeneratorTargetSearchIndex;
+  GeneratorTargetVector GeneratorTargets;
+
   std::set<cmGeneratorTarget const*> WarnCMP0063;
-  std::vector<cmGeneratorTarget*> GeneratorTargets;
-  std::vector<cmGeneratorTarget*> ImportedGeneratorTargets;
-  std::vector<cmGeneratorTarget*> OwnedImportedGeneratorTargets;
+  GeneratorTargetMap ImportedGeneratorTargets;
+  GeneratorTargetVector OwnedImportedGeneratorTargets;
   std::map<std::string, std::string> AliasTargets;
 
   std::map<std::string, std::string> Compilers;
   std::map<std::string, std::string> VariableMappings;
   std::string CompilerSysroot;
+  std::string LinkerSysroot;
 
   bool EmitUniversalBinaryFlags;
 
@@ -368,7 +491,7 @@ private:
   void ComputeObjectMaxPath();
 };
 
-#if defined(CMAKE_BUILD_WITH_CMAKE)
+#if !defined(CMAKE_BOOTSTRAP)
 bool cmLocalGeneratorCheckObjectName(std::string& objName,
                                      std::string::size_type dir_len,
                                      std::string::size_type max_total_len);

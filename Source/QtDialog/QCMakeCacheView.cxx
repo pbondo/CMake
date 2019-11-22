@@ -2,6 +2,7 @@
    file Copyright.txt or https://cmake.org/licensing for details.  */
 #include "QCMakeCacheView.h"
 
+#include "QCMakeWidgets.h"
 #include <QApplication>
 #include <QEvent>
 #include <QHBoxLayout>
@@ -10,8 +11,6 @@
 #include <QMetaProperty>
 #include <QSortFilterProxyModel>
 #include <QStyle>
-
-#include "QCMakeWidgets.h"
 
 // filter for searches
 class QCMakeSearchFilter : public QSortFilterProxyModel
@@ -23,7 +22,7 @@ public:
   }
 
 protected:
-  bool filterAcceptsRow(int row, const QModelIndex& p) const CM_OVERRIDE
+  bool filterAcceptsRow(int row, const QModelIndex& p) const override
   {
     QStringList strs;
     const QAbstractItemModel* m = this->sourceModel();
@@ -47,7 +46,7 @@ protected:
     }
 
     // check all strings for a match
-    foreach (QString str, strs) {
+    foreach (QString const& str, strs) {
       if (str.contains(this->filterRegExp())) {
         return true;
       }
@@ -77,7 +76,7 @@ public:
 protected:
   bool ShowAdvanced;
 
-  bool filterAcceptsRow(int row, const QModelIndex& p) const CM_OVERRIDE
+  bool filterAcceptsRow(int row, const QModelIndex& p) const override
   {
     const QAbstractItemModel* m = this->sourceModel();
     QModelIndex idx = m->index(row, 0, p);
@@ -186,9 +185,7 @@ QCMakeCacheModel::QCMakeCacheModel(QObject* p)
   this->setHorizontalHeaderLabels(labels);
 }
 
-QCMakeCacheModel::~QCMakeCacheModel()
-{
-}
+QCMakeCacheModel::~QCMakeCacheModel() = default;
 
 static uint qHash(const QCMakeProperty& p)
 {
@@ -212,7 +209,8 @@ void QCMakeCacheModel::clear()
 
 void QCMakeCacheModel::setProperties(const QCMakePropertyList& props)
 {
-  QSet<QCMakeProperty> newProps, newProps2;
+  QSet<QCMakeProperty> newProps;
+  QSet<QCMakeProperty> newProps2;
 
   if (this->ShowNewProperties) {
     newProps = props.toSet();
@@ -236,26 +234,29 @@ void QCMakeCacheModel::setProperties(const QCMakePropertyList& props)
     qSort(newP);
     qSort(newP2);
     int row_count = 0;
-    foreach (QCMakeProperty p, newP) {
+    foreach (QCMakeProperty const& p, newP) {
       this->insertRow(row_count);
       this->setPropertyData(this->index(row_count, 0), p, true);
       row_count++;
     }
-    foreach (QCMakeProperty p, newP2) {
+    foreach (QCMakeProperty const& p, newP2) {
       this->insertRow(row_count);
       this->setPropertyData(this->index(row_count, 0), p, false);
       row_count++;
     }
   } else if (this->View == GroupView) {
     QMap<QString, QCMakePropertyList> newPropsTree;
-    this->breakProperties(newProps, newPropsTree);
+    QCMakeCacheModel::breakProperties(newProps, newPropsTree);
     QMap<QString, QCMakePropertyList> newPropsTree2;
-    this->breakProperties(newProps2, newPropsTree2);
+    QCMakeCacheModel::breakProperties(newProps2, newPropsTree2);
 
     QStandardItem* root = this->invisibleRootItem();
 
-    foreach (QString key, newPropsTree.keys()) {
-      QCMakePropertyList props2 = newPropsTree[key];
+    for (QMap<QString, QCMakePropertyList>::const_iterator iter =
+           newPropsTree.begin();
+         iter != newPropsTree.end(); ++iter) {
+      QString const& key = iter.key();
+      QCMakePropertyList const& props2 = iter.value();
 
       QList<QStandardItem*> parentItems;
       parentItems.append(
@@ -280,8 +281,11 @@ void QCMakeCacheModel::setProperties(const QCMakePropertyList& props)
       }
     }
 
-    foreach (QString key, newPropsTree2.keys()) {
-      QCMakePropertyList props2 = newPropsTree2[key];
+    for (QMap<QString, QCMakePropertyList>::const_iterator iter =
+           newPropsTree2.begin();
+         iter != newPropsTree2.end(); ++iter) {
+      QString const& key = iter.key();
+      QCMakePropertyList const& props2 = iter.value();
 
       QStandardItem* parentItem =
         new QStandardItem(key.isEmpty() ? tr("Ungrouped Entries") : key);
@@ -393,7 +397,7 @@ void QCMakeCacheModel::breakProperties(
 {
   QMap<QString, QCMakePropertyList> tmp;
   // return a map of properties grouped by prefixes, and sorted
-  foreach (QCMakeProperty p, props) {
+  foreach (QCMakeProperty const& p, props) {
     QString prefix = QCMakeCacheModel::prefix(p.Key);
     tmp[prefix].append(p);
   }
@@ -423,7 +427,7 @@ QCMakePropertyList QCMakeCacheModel::properties() const
     return props;
   }
 
-  QList<QModelIndex> idxs;
+  QVector<QModelIndex> idxs;
   idxs.append(this->index(0, 0));
 
   // walk the entire model for property entries
@@ -448,7 +452,7 @@ QCMakePropertyList QCMakeCacheModel::properties() const
                (idxs.last().row() + 1) >= rowCount(idxs.last().parent()) ||
 #endif
                !idxs.last().sibling(idxs.last().row() + 1, 0).isValid())) {
-        idxs.removeLast();
+        idxs.remove(idxs.size() - 1);
       }
       if (!idxs.isEmpty()) {
         idxs.last() = idxs.last().sibling(idxs.last().row() + 1, 0);
@@ -533,7 +537,7 @@ QWidget* QCMakeCacheModelDelegate::createEditor(
   QModelIndex var = idx.sibling(idx.row(), 0);
   int type = var.data(QCMakeCacheModel::TypeRole).toInt();
   if (type == QCMakeProperty::BOOL) {
-    return CM_NULLPTR;
+    return nullptr;
   }
   if (type == QCMakeProperty::PATH) {
     QCMakePathEditor* editor =
@@ -608,7 +612,7 @@ bool QCMakeCacheModelDelegate::editorEvent(QEvent* e,
 // Can remove this function and FileDialogFlag when minimum Qt version is 4.5
 bool QCMakeCacheModelDelegate::eventFilter(QObject* object, QEvent* evt)
 {
-  // workaround for what looks like a bug in Qt on Mac OS X
+  // workaround for what looks like a bug in Qt on macOS
   // where it doesn't create a QWidget wrapper for the native file dialog
   // so the Qt library ends up assuming the focus was lost to something else
 
@@ -636,7 +640,7 @@ QSize QCMakeCacheModelDelegate::sizeHint(const QStyleOptionViewItem& option,
   QStyleOptionButton opt;
   opt.QStyleOption::operator=(option);
   sz = sz.expandedTo(
-    style->subElementRect(QStyle::SE_ViewItemCheckIndicator, &opt, CM_NULLPTR)
+    style->subElementRect(QStyle::SE_ViewItemCheckIndicator, &opt, nullptr)
       .size());
 
   return sz;

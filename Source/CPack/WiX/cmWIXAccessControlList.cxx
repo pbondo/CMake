@@ -2,9 +2,9 @@
    file Copyright.txt or https://cmake.org/licensing for details.  */
 #include "cmWIXAccessControlList.h"
 
-#include <CPack/cmCPackGenerator.h>
-
-#include <cmSystemTools.h>
+#include "cmCPackGenerator.h"
+#include "cmStringAlgorithms.h"
+#include "cmSystemTools.h"
 
 cmWIXAccessControlList::cmWIXAccessControlList(
   cmCPackLog* logger, cmInstalledFile const& installedFile,
@@ -20,8 +20,8 @@ bool cmWIXAccessControlList::Apply()
   std::vector<std::string> entries;
   this->InstalledFile.GetPropertyAsList("CPACK_WIX_ACL", entries);
 
-  for (size_t i = 0; i < entries.size(); ++i) {
-    this->CreatePermissionElement(entries[i]);
+  for (std::string const& entry : entries) {
+    this->CreatePermissionElement(entry);
   }
 
   return true;
@@ -48,17 +48,15 @@ void cmWIXAccessControlList::CreatePermissionElement(std::string const& entry)
     user = user_and_domain;
   }
 
-  std::vector<std::string> permissions =
-    cmSystemTools::tokenize(permission_string, ",");
+  std::vector<std::string> permissions = cmTokenize(permission_string, ",");
 
   this->SourceWriter.BeginElement("Permission");
   this->SourceWriter.AddAttribute("User", user);
   if (!domain.empty()) {
     this->SourceWriter.AddAttribute("Domain", domain);
   }
-  for (size_t i = 0; i < permissions.size(); ++i) {
-    this->EmitBooleanAttribute(entry,
-                               cmSystemTools::TrimWhitespace(permissions[i]));
+  for (std::string const& permission : permissions) {
+    this->EmitBooleanAttribute(entry, cmTrimWhitespace(permission));
   }
   this->SourceWriter.EndElement("Permission");
 }
@@ -66,8 +64,9 @@ void cmWIXAccessControlList::CreatePermissionElement(std::string const& entry)
 void cmWIXAccessControlList::ReportError(std::string const& entry,
                                          std::string const& message)
 {
-  cmCPackLogger(cmCPackLog::LOG_ERROR, "Failed processing ACL entry '"
-                  << entry << "': " << message << std::endl);
+  cmCPackLogger(cmCPackLog::LOG_ERROR,
+                "Failed processing ACL entry '" << entry << "': " << message
+                                                << std::endl);
 }
 
 bool cmWIXAccessControlList::IsBooleanAttribute(std::string const& name)

@@ -3,20 +3,23 @@
 #ifndef cmExportInstallFileGenerator_h
 #define cmExportInstallFileGenerator_h
 
-#include <cmConfigure.h>
-
-#include "cmExportFileGenerator.h"
+#include "cmConfigure.h" // IWYU pragma: keep
 
 #include <iosfwd>
 #include <map>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
+
+#include "cmExportFileGenerator.h"
+#include "cmStateTypes.h"
 
 class cmGeneratorTarget;
 class cmGlobalGenerator;
 class cmInstallExportGenerator;
 class cmInstallTargetGenerator;
+class cmTargetExport;
 
 /** \class cmExportInstallFileGenerator
  * \brief Generate a file exporting targets from an install tree.
@@ -39,7 +42,7 @@ public:
       files.  */
   cmExportInstallFileGenerator(cmInstallExportGenerator* iegen);
 
-  /** Get the per-config file generated for each configuraiton.  This
+  /** Get the per-config file generated for each configuration.  This
       maps from the configuration name to the file temporary location
       for installation.  */
   std::map<std::string, std::string> const& GetConfigImportFiles()
@@ -53,23 +56,25 @@ public:
 
 protected:
   // Implement virtual methods from the superclass.
-  bool GenerateMainFile(std::ostream& os) CM_OVERRIDE;
+  bool GenerateMainFile(std::ostream& os) override;
   void GenerateImportTargetsConfig(
     std::ostream& os, const std::string& config, std::string const& suffix,
-    std::vector<std::string>& missingTargets) CM_OVERRIDE;
+    std::vector<std::string>& missingTargets) override;
+  cmStateEnums::TargetType GetExportTargetType(
+    cmTargetExport const* targetExport) const;
   void HandleMissingTarget(std::string& link_libs,
                            std::vector<std::string>& missingTargets,
                            cmGeneratorTarget* depender,
-                           cmGeneratorTarget* dependee) CM_OVERRIDE;
+                           cmGeneratorTarget* dependee) override;
 
-  void ReplaceInstallPrefix(std::string& input) CM_OVERRIDE;
+  void ReplaceInstallPrefix(std::string& input) override;
 
   void ComplainAboutMissingTarget(cmGeneratorTarget* depender,
                                   cmGeneratorTarget* dependee,
-                                  int occurrences);
+                                  std::vector<std::string> const& exportFiles);
 
-  std::vector<std::string> FindNamespaces(cmGlobalGenerator* gg,
-                                          const std::string& name);
+  std::pair<std::vector<std::string>, std::string> FindNamespaces(
+    cmGlobalGenerator* gg, const std::string& name);
 
   /** Generate the relative import prefix.  */
   virtual void GenerateImportPrefix(std::ostream&);
@@ -91,7 +96,7 @@ protected:
                                  std::set<std::string>& importedLocations);
 
   std::string InstallNameDir(cmGeneratorTarget* target,
-                             const std::string& config) CM_OVERRIDE;
+                             const std::string& config) override;
 
   cmInstallExportGenerator* IEGen;
 

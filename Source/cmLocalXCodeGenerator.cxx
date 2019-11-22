@@ -19,9 +19,7 @@ cmLocalXCodeGenerator::cmLocalXCodeGenerator(cmGlobalGenerator* gg,
   this->EmitUniversalBinaryFlags = false;
 }
 
-cmLocalXCodeGenerator::~cmLocalXCodeGenerator()
-{
-}
+cmLocalXCodeGenerator::~cmLocalXCodeGenerator() = default;
 
 std::string cmLocalXCodeGenerator::GetTargetDirectory(
   cmGeneratorTarget const*) const
@@ -31,10 +29,10 @@ std::string cmLocalXCodeGenerator::GetTargetDirectory(
 }
 
 void cmLocalXCodeGenerator::AppendFlagEscape(std::string& flags,
-                                             const std::string& rawFlag)
+                                             const std::string& rawFlag) const
 {
-  cmGlobalXCodeGenerator* gg =
-    static_cast<cmGlobalXCodeGenerator*>(this->GlobalGenerator);
+  const cmGlobalXCodeGenerator* gg =
+    static_cast<const cmGlobalXCodeGenerator*>(this->GlobalGenerator);
   gg->AppendFlag(flags, rawFlag);
 }
 
@@ -42,10 +40,8 @@ void cmLocalXCodeGenerator::Generate()
 {
   cmLocalGenerator::Generate();
 
-  std::vector<cmGeneratorTarget*> targets = this->GetGeneratorTargets();
-  for (std::vector<cmGeneratorTarget*>::iterator iter = targets.begin();
-       iter != targets.end(); ++iter) {
-    (*iter)->HasMacOSXRpathInstallNameDir("");
+  for (const auto& target : this->GetGeneratorTargets()) {
+    target->HasMacOSXRpathInstallNameDir("");
   }
 }
 
@@ -53,10 +49,8 @@ void cmLocalXCodeGenerator::GenerateInstallRules()
 {
   cmLocalGenerator::GenerateInstallRules();
 
-  std::vector<cmGeneratorTarget*> targets = this->GetGeneratorTargets();
-  for (std::vector<cmGeneratorTarget*>::iterator iter = targets.begin();
-       iter != targets.end(); ++iter) {
-    (*iter)->HasMacOSXRpathInstallNameDir("");
+  for (const auto& target : this->GetGeneratorTargets()) {
+    target->HasMacOSXRpathInstallNameDir("");
   }
 }
 
@@ -69,19 +63,16 @@ void cmLocalXCodeGenerator::ComputeObjectFilenames(
   // to avoid exact duplicate file names. Note that Mac file names are not
   // typically case sensitive, hence the LowerCase.
   std::map<std::string, int> counts;
-  for (std::map<cmSourceFile const*, std::string>::iterator si =
-         mapping.begin();
-       si != mapping.end(); ++si) {
-    cmSourceFile const* sf = si->first;
-    std::string objectName =
-      cmSystemTools::GetFilenameWithoutLastExtension(sf->GetFullPath());
-    objectName += ".o";
+  for (auto& si : mapping) {
+    cmSourceFile const* sf = si.first;
+    std::string objectName = cmStrCat(
+      cmSystemTools::GetFilenameWithoutLastExtension(sf->GetFullPath()), ".o");
 
     std::string objectNameLower = cmSystemTools::LowerCase(objectName);
     counts[objectNameLower] += 1;
     if (2 == counts[objectNameLower]) {
       // TODO: emit warning about duplicate name?
     }
-    si->second = objectName;
+    si.second = objectName;
   }
 }

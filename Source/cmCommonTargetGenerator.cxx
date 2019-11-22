@@ -2,12 +2,10 @@
    file Copyright.txt or https://cmake.org/licensing for details.  */
 #include "cmCommonTargetGenerator.h"
 
-#include <cmConfigure.h>
 #include <set>
 #include <sstream>
 #include <utility>
 
-#include "cmAlgorithms.h"
 #include "cmComputeLinkInformation.h"
 #include "cmGeneratorTarget.h"
 #include "cmGlobalCommonGenerator.h"
@@ -18,21 +16,20 @@
 #include "cmOutputConverter.h"
 #include "cmSourceFile.h"
 #include "cmStateTypes.h"
+#include "cmStringAlgorithms.h"
 
 cmCommonTargetGenerator::cmCommonTargetGenerator(cmGeneratorTarget* gt)
   : GeneratorTarget(gt)
   , Makefile(gt->Makefile)
-  , LocalGenerator(static_cast<cmLocalCommonGenerator*>(gt->LocalGenerator))
-  , GlobalGenerator(static_cast<cmGlobalCommonGenerator*>(
+  , LocalCommonGenerator(
+      static_cast<cmLocalCommonGenerator*>(gt->LocalGenerator))
+  , GlobalCommonGenerator(static_cast<cmGlobalCommonGenerator*>(
       gt->LocalGenerator->GetGlobalGenerator()))
-  , ConfigName(LocalGenerator->GetConfigName())
-  , ModuleDefinitionFile(GeneratorTarget->GetModuleDefinitionFile(ConfigName))
+  , ConfigName(LocalCommonGenerator->GetConfigName())
 {
 }
 
-cmCommonTargetGenerator::~cmCommonTargetGenerator()
-{
-}
+cmCommonTargetGenerator::~cmCommonTargetGenerator() = default;
 
 std::string const& cmCommonTargetGenerator::GetConfigName() const
 {
@@ -44,33 +41,12 @@ const char* cmCommonTargetGenerator::GetFeature(const std::string& feature)
   return this->GeneratorTarget->GetFeature(feature, this->ConfigName);
 }
 
-bool cmCommonTargetGenerator::GetFeatureAsBool(const std::string& feature)
-{
-  return this->GeneratorTarget->GetFeatureAsBool(feature, this->ConfigName);
-}
-
-void cmCommonTargetGenerator::AddFeatureFlags(std::string& flags,
-                                              const std::string& lang)
-{
-  // Add language-specific flags.
-  this->LocalGenerator->AddLanguageFlags(flags, lang, this->ConfigName);
-
-  if (this->GetFeatureAsBool("INTERPROCEDURAL_OPTIMIZATION")) {
-    this->LocalGenerator->AppendFeatureOptions(flags, lang, "IPO");
-  }
-}
-
 void cmCommonTargetGenerator::AddModuleDefinitionFlag(
   cmLinkLineComputer* linkLineComputer, std::string& flags)
 {
-  // A module definition file only makes sense on certain target types.
-  if (this->GeneratorTarget->GetType() != cmStateEnums::SHARED_LIBRARY &&
-      this->GeneratorTarget->GetType() != cmStateEnums::MODULE_LIBRARY &&
-      this->GeneratorTarget->GetType() != cmStateEnums::EXECUTABLE) {
-    return;
-  }
-
-  if (!this->ModuleDefinitionFile) {
+  cmGeneratorTarget::ModuleDefinitionInfo const* mdi =
+    this->GeneratorTarget->GetModuleDefinitionInfo(this->GetConfigName());
+  if (!mdi || mdi->DefFile.empty()) {
     return;
   }
 
@@ -83,12 +59,12 @@ void cmCommonTargetGenerator::AddModuleDefinitionFlag(
 
   // Append the flag and value.  Use ConvertToLinkReference to help
   // vs6's "cl -link" pass it to the linker.
-  std::string flag = defFileFlag;
-  flag += this->LocalGenerator->ConvertToOutputFormat(
-    linkLineComputer->ConvertToLinkReference(
-      this->ModuleDefinitionFile->GetFullPath()),
-    cmOutputConverter::SHELL);
-  this->LocalGenerator->AppendFlags(flags, flag);
+  std::string flag =
+    cmStrCat(defFileFlag,
+             this->LocalCommonGenerator->ConvertToOutputFormat(
+               linkLineComputer->ConvertToLinkReference(mdi->DefFile),
+               cmOutputConverter::SHELL));
+  this->LocalCommonGenerator->AppendFlags(flags, flag);
 }
 
 void cmCommonTargetGenerator::AppendFortranFormatFlags(
@@ -101,7 +77,7 @@ void cmCommonTargetGenerator::AppendFortranFormatFlags(
     const char* tgtfmt = this->GeneratorTarget->GetProperty("Fortran_FORMAT");
     format = cmOutputConverter::GetFortranFormat(tgtfmt);
   }
-  const char* var = CM_NULLPTR;
+  const char* var = nullptr;
   switch (format) {
     case cmOutputConverter::FortranFormatFixed:
       var = "CMAKE_Fortran_FORMAT_FIXED_FLAG";
@@ -113,19 +89,19 @@ void cmCommonTargetGenerator::AppendFortranFormatFlags(
       break;
   }
   if (var) {
-    this->LocalGenerator->AppendFlags(flags,
-                                      this->Makefile->GetDefinition(var));
+    this->LocalCommonGenerator->AppendFlags(
+      flags, this->Makefile->GetSafeDefinition(var));
   }
 }
 
 std::string cmCommonTargetGenerator::GetFlags(const std::string& l)
 {
-  ByLanguageMap::iterator i = this->FlagsByLanguage.find(l);
+  auto i = this->FlagsByLanguage.find(l);
   if (i == this->FlagsByLanguage.end()) {
     std::string flags;
 
-    this->LocalGenerator->GetTargetCompileFlags(this->GeneratorTarget,
-                                                this->ConfigName, l, flags);
+    this->LocalCommonGenerator->GetTargetCompileFlags(
+      this->GeneratorTarget, this->ConfigName, l, flags);
 
     ByLanguageMap::value_type entry(l, flags);
     i = this->FlagsByLanguage.insert(entry).first;
@@ -135,14 +111,14 @@ std::string cmCommonTargetGenerator::GetFlags(const std::string& l)
 
 std::string cmCommonTargetGenerator::GetDefines(const std::string& l)
 {
-  ByLanguageMap::iterator i = this->DefinesByLanguage.find(l);
+  auto i = this->DefinesByLanguage.find(l);
   if (i == this->DefinesByLanguage.end()) {
     std::set<std::string> defines;
-    this->LocalGenerator->GetTargetDefines(this->GeneratorTarget,
-                                           this->ConfigName, l, defines);
+    this->LocalCommonGenerator->GetTargetDefines(this->GeneratorTarget,
+                                                 this->ConfigName, l, defines);
 
     std::string definesString;
-    this->LocalGenerator->JoinDefines(defines, definesString, l);
+    this->LocalCommonGenerator->JoinDefines(defines, definesString, l);
 
     ByLanguageMap::value_type entry(l, definesString);
     i = this->DefinesByLanguage.insert(entry).first;
@@ -152,7 +128,7 @@ std::string cmCommonTargetGenerator::GetDefines(const std::string& l)
 
 std::string cmCommonTargetGenerator::GetIncludes(std::string const& l)
 {
-  ByLanguageMap::iterator i = this->IncludesByLanguage.find(l);
+  auto i = this->IncludesByLanguage.find(l);
   if (i == this->IncludesByLanguage.end()) {
     std::string includes;
     this->AddIncludeFlags(includes, l);
@@ -170,21 +146,19 @@ std::vector<std::string> cmCommonTargetGenerator::GetLinkedTargetDirectories()
   if (cmComputeLinkInformation* cli =
         this->GeneratorTarget->GetLinkInformation(this->ConfigName)) {
     cmComputeLinkInformation::ItemVector const& items = cli->GetItems();
-    for (cmComputeLinkInformation::ItemVector::const_iterator i =
-           items.begin();
-         i != items.end(); ++i) {
-      cmGeneratorTarget const* linkee = i->Target;
-      if (linkee && !linkee->IsImported()
+    for (auto const& item : items) {
+      cmGeneratorTarget const* linkee = item.Target;
+      if (linkee &&
+          !linkee->IsImported()
           // We can ignore the INTERFACE_LIBRARY items because
           // Target->GetLinkInformation already processed their
           // link interface and they don't have any output themselves.
           && linkee->GetType() != cmStateEnums::INTERFACE_LIBRARY &&
           emitted.insert(linkee).second) {
         cmLocalGenerator* lg = linkee->GetLocalGenerator();
-        std::string di = lg->GetCurrentBinaryDirectory();
-        di += "/";
-        di += lg->GetTargetDirectory(linkee);
-        dirs.push_back(di);
+        std::string di = cmStrCat(lg->GetCurrentBinaryDirectory(), '/',
+                                  lg->GetTargetDirectory(linkee));
+        dirs.push_back(std::move(di));
       }
     }
   }
@@ -197,6 +171,7 @@ std::string cmCommonTargetGenerator::ComputeTargetCompilePDB() const
   if (this->GeneratorTarget->GetType() > cmStateEnums::OBJECT_LIBRARY) {
     return compilePdbPath;
   }
+
   compilePdbPath =
     this->GeneratorTarget->GetCompilePDBPath(this->GetConfigName());
   if (compilePdbPath.empty()) {
@@ -219,11 +194,12 @@ std::string cmCommonTargetGenerator::GetManifests()
   this->GeneratorTarget->GetManifests(manifest_srcs, this->ConfigName);
 
   std::vector<std::string> manifests;
-  for (std::vector<cmSourceFile const*>::iterator mi = manifest_srcs.begin();
-       mi != manifest_srcs.end(); ++mi) {
-    manifests.push_back(this->LocalGenerator->ConvertToOutputFormat(
-      this->LocalGenerator->ConvertToRelativePath(
-        this->LocalGenerator->GetWorkingDirectory(), (*mi)->GetFullPath()),
+  manifests.reserve(manifest_srcs.size());
+  for (cmSourceFile const* manifest_src : manifest_srcs) {
+    manifests.push_back(this->LocalCommonGenerator->ConvertToOutputFormat(
+      this->LocalCommonGenerator->MaybeConvertToRelativePath(
+        this->LocalCommonGenerator->GetWorkingDirectory(),
+        manifest_src->GetFullPath()),
       cmOutputConverter::SHELL));
   }
 
@@ -235,11 +211,7 @@ void cmCommonTargetGenerator::AppendOSXVerFlag(std::string& flags,
                                                const char* name, bool so)
 {
   // Lookup the flag to specify the version.
-  std::string fvar = "CMAKE_";
-  fvar += lang;
-  fvar += "_OSX_";
-  fvar += name;
-  fvar += "_VERSION_FLAG";
+  std::string fvar = cmStrCat("CMAKE_", lang, "_OSX_", name, "_VERSION_FLAG");
   const char* flag = this->Makefile->GetDefinition(fvar);
 
   // Skip if no such flag.
@@ -256,6 +228,6 @@ void cmCommonTargetGenerator::AppendOSXVerFlag(std::string& flags,
     // Append the flag since a non-zero version is specified.
     std::ostringstream vflag;
     vflag << flag << major << "." << minor << "." << patch;
-    this->LocalGenerator->AppendFlags(flags, vflag.str());
+    this->LocalCommonGenerator->AppendFlags(flags, vflag.str());
   }
 }

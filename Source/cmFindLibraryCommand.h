@@ -3,13 +3,13 @@
 #ifndef cmFindLibraryCommand_h
 #define cmFindLibraryCommand_h
 
-#include <cmConfigure.h>
+#include "cmConfigure.h" // IWYU pragma: keep
+
 #include <string>
 #include <vector>
 
 #include "cmFindBase.h"
 
-class cmCommand;
 class cmExecutionStatus;
 
 /** \class cmFindLibraryCommand
@@ -22,28 +22,9 @@ class cmExecutionStatus;
 class cmFindLibraryCommand : public cmFindBase
 {
 public:
-  cmFindLibraryCommand();
-  /**
-   * This is a virtual constructor for the command.
-   */
-  cmCommand* Clone() CM_OVERRIDE { return new cmFindLibraryCommand; }
+  cmFindLibraryCommand(cmExecutionStatus& status);
 
-  /**
-   * This is called when the command is first encountered in
-   * the CMakeLists.txt file.
-   */
-  bool InitialPass(std::vector<std::string> const& args,
-                   cmExecutionStatus& status) CM_OVERRIDE;
-
-  /**
-   * This determines if the command is invoked when in script mode.
-   */
-  bool IsScriptable() const CM_OVERRIDE { return true; }
-
-  /**
-   * The name of the command as specified in CMakeList.txt.
-   */
-  std::string GetName() const CM_OVERRIDE { return "find_library"; }
+  bool InitialPass(std::vector<std::string> const& args);
 
 protected:
   void AddArchitecturePaths(const char* suffix);
@@ -60,5 +41,8 @@ private:
   std::string FindFrameworkLibraryNamesPerDir();
   std::string FindFrameworkLibraryDirsPerName();
 };
+
+bool cmFindLibrary(std::vector<std::string> const& args,
+                   cmExecutionStatus& status);
 
 #endif

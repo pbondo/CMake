@@ -47,13 +47,19 @@ but do not actually build anything.  To add a test:
    containing expected test results:
 
    ``<SubTest>-result.txt``
-    Process result expected if not "0"
+    Regex matching expected process result, if not ``0``
    ``<SubTest>-stdout.txt``
     Regex matching expected stdout content
    ``<SubTest>-stderr.txt``
-    Regex matching expected stderr content, if not "^$"
+    Regex matching expected stderr content, if not ``^$``
    ``<SubTest>-check.cmake``
     Custom result check.
+
+  Note that when a specific platform expects differing stdout or stderr that
+  can be done by adding a platform specific output file. These follow the
+  naming convention of:
+   ``<SubTest>-stdout-<platform_lower_case>.txt``
+   ``<SubTest>-stderr-<platform_lower_case>.txt``
 
    Note that trailing newlines will be stripped from actual and expected
    test output before matching against the stdout and stderr expressions.
@@ -65,3 +71,14 @@ but do not actually build anything.  To add a test:
     Top of test binary tree
 
    and an failure must store a message in ``RunCMake_TEST_FAILED``.
+
+To speed up local testing, you can choose to run only a subset of
+``run_cmake()`` tests in a ``RunCMakeTest.cmake`` script by using the
+``RunCMake_TEST_FILTER`` environment variable. If this variable is set,
+it is treated as a regular expression, and any tests whose names don't
+match the regular expression are not run. For example::
+
+  $ RunCMake_TEST_FILTER="^example" ctest -R '^RunCMake\.Example$'
+
+This will only run subtests in ``RunCMake.Example`` that start with
+``example``.

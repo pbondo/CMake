@@ -6,32 +6,59 @@
 # This is used internally by CMake and should not be included by user
 # code.
 
+include(${CMAKE_ROOT}/Modules/CMakeParseImplicitIncludeInfo.cmake)
 include(${CMAKE_ROOT}/Modules/CMakeParseImplicitLinkInfo.cmake)
+include(CMakeTestCompilerCommon)
 
 function(CMAKE_DETERMINE_COMPILER_ABI lang src)
   if(NOT DEFINED CMAKE_${lang}_ABI_COMPILED)
-    message(STATUS "Detecting ${lang} compiler ABI info")
+    message(CHECK_START "Detecting ${lang} compiler ABI info")
 
     # Compile the ABI identification source.
     set(BIN "${CMAKE_PLATFORM_INFO_DIR}/CMakeDetermineCompilerABI_${lang}.bin")
     set(CMAKE_FLAGS )
+    set(COMPILE_DEFINITIONS )
     if(DEFINED CMAKE_${lang}_VERBOSE_FLAG)
       set(CMAKE_FLAGS "-DEXE_LINKER_FLAGS=${CMAKE_${lang}_VERBOSE_FLAG}")
+      set(COMPILE_DEFINITIONS "${CMAKE_${lang}_VERBOSE_FLAG}")
+    endif()
+    if(DEFINED CMAKE_${lang}_VERBOSE_COMPILE_FLAG)
+      set(COMPILE_DEFINITIONS "${CMAKE_${lang}_VERBOSE_COMPILE_FLAG}")
     endif()
     if(NOT "x${CMAKE_${lang}_COMPILER_ID}" STREQUAL "xMSVC")
       # Avoid adding our own platform standard libraries for compilers
       # from which we might detect implicit link libraries.
       list(APPEND CMAKE_FLAGS "-DCMAKE_${lang}_STANDARD_LIBRARIES=")
     endif()
+    __TestCompiler_setTryCompileTargetType()
+
+    # Save the current LC_ALL, LC_MESSAGES, and LANG environment variables
+    # and set them to "C" that way GCC's "search starts here" text is in
+    # English and we can grok it.
+    set(_orig_lc_all      $ENV{LC_ALL})
+    set(_orig_lc_messages $ENV{LC_MESSAGES})
+    set(_orig_lang        $ENV{LANG})
+    set(ENV{LC_ALL}      C)
+    set(ENV{LC_MESSAGES} C)
+    set(ENV{LANG}        C)
+
     try_compile(CMAKE_${lang}_ABI_COMPILED
       ${CMAKE_BINARY_DIR} ${src}
       CMAKE_FLAGS ${CMAKE_FLAGS}
                   # Ignore unused flags when we are just determining the ABI.
                   "--no-warn-unused-cli"
+      COMPILE_DEFINITIONS ${COMPILE_DEFINITIONS}
       OUTPUT_VARIABLE OUTPUT
       COPY_FILE "${BIN}"
       COPY_FILE_ERROR _copy_error
+      __CMAKE_INTERNAL ABI
       )
+
+    # Restore original LC_ALL, LC_MESSAGES, and LANG
+    set(ENV{LC_ALL}      ${_orig_lc_all})
+    set(ENV{LC_MESSAGES} ${_orig_lc_messages})
+    set(ENV{LANG}        ${_orig_lang})
+
     # Move result from cache to normal variable.
     set(CMAKE_${lang}_ABI_COMPILED ${CMAKE_${lang}_ABI_COMPILED})
     unset(CMAKE_${lang}_ABI_COMPILED CACHE)
@@ -39,7 +66,7 @@ function(CMAKE_DETERMINE_COMPILER_ABI lang src)
 
     # Load the resulting information strings.
     if(CMAKE_${lang}_ABI_COMPILED AND NOT _copy_error)
-      message(STATUS "Detecting ${lang} compiler ABI info - done")
+      message(CHECK_PASS "done")
       file(APPEND ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeOutput.log
         "Detecting ${lang} compiler ABI info compiled with the following output:\n${OUTPUT}\n\n")
       file(STRINGS "${BIN}" ABI_STRINGS LIMIT_COUNT 2 REGEX "INFO:[A-Za-z0-9_]+\\[[^]]*\\]")
@@ -62,6 +89,26 @@ function(CMAKE_DETERMINE_COMPILER_ABI lang src)
         set(CMAKE_${lang}_COMPILER_ABI "${ABI_NAME}" PARENT_SCOPE)
       endif()
 
+      # Parse implicit include directory for this language, if available.
+      if(CMAKE_${lang}_VERBOSE_FLAG)
+        set (implicit_incdirs "")
+        cmake_parse_implicit_include_info("${OUTPUT}" "${lang}"
+          implicit_incdirs log rv)
+        file(APPEND ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeOutput.log
+          "Parsed ${lang} implicit include dir info from above output: rv=${rv}\n${log}\n\n")
+        if("${rv}" STREQUAL "done")
+          # Entries that we have been told to explicitly pass as standard include
+          # directories will not be implicitly added by the compiler.
+          if(CMAKE_${lang}_STANDARD_INCLUDE_DIRECTORIES)
+            list(REMOVE_ITEM implicit_incdirs ${CMAKE_${lang}_STANDARD_INCLUDE_DIRECTORIES})
+          endif()
+
+          # We parsed implicit include directories, so override the default initializer.
+          set(_CMAKE_${lang}_IMPLICIT_INCLUDE_DIRECTORIES_INIT "${implicit_incdirs}")
+        endif()
+      endif()
+      set(CMAKE_${lang}_IMPLICIT_INCLUDE_DIRECTORIES "${_CMAKE_${lang}_IMPLICIT_INCLUDE_DIRECTORIES_INIT}" PARENT_SCOPE)
+
       # Parse implicit linker information for this language, if available.
       set(implicit_dirs "")
       set(implicit_libs "")
@@ -77,8 +124,7 @@ function(CMAKE_DETERMINE_COMPILER_ABI lang src)
       # a try-compile
       if("${lang}" MATCHES "Fortran"
           AND "${CMAKE_GENERATOR}" MATCHES "Visual Studio")
-        set(_desc "Determine Intel Fortran Compiler Implicit Link Path")
-        message(STATUS "${_desc}")
+        message(CHECK_START "Determine Intel Fortran Compiler Implicit Link Path")
         # Build a sample project which reports symbols.
         try_compile(IFORT_LIB_PATH_COMPILED
           ${CMAKE_BINARY_DIR}/CMakeFiles/IntelVSImplicitPath
@@ -91,8 +137,7 @@ function(CMAKE_DETERMINE_COMPILER_ABI lang src)
           "${CMAKE_BINARY_DIR}/CMakeFiles/IntelVSImplicitPath/output.txt"
           "${_output}")
         include(${CMAKE_BINARY_DIR}/CMakeFiles/IntelVSImplicitPath/output.cmake OPTIONAL)
-        set(_desc "Determine Intel Fortran Compiler Implicit Link Path -- done")
-        message(STATUS "${_desc}")
+        message(CHECK_PASS "done")
       endif()
 
       # Implicit link libraries cannot be used explicitly for multiple
@@ -119,7 +164,7 @@ function(CMAKE_DETERMINE_COMPILER_ABI lang src)
       endif()
 
     else()
-      message(STATUS "Detecting ${lang} compiler ABI info - failed")
+      message(CHECK_FAIL "failed")
       file(APPEND ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeError.log
         "Detecting ${lang} compiler ABI info failed to compile with the following output:\n${OUTPUT}\n${_copy_error}\n\n")
     endif()

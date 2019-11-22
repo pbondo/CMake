@@ -3,14 +3,17 @@
 #ifndef cmCTestSleepCommand_h
 #define cmCTestSleepCommand_h
 
-#include <cmConfigure.h>
-
-#include "cmCTestCommand.h"
+#include "cmConfigure.h" // IWYU pragma: keep
 
 #include <string>
+#include <utility>
 #include <vector>
 
-class cmCommand;
+#include <cm/memory>
+
+#include "cmCTestCommand.h"
+#include "cmCommand.h"
+
 class cmExecutionStatus;
 
 /** \class cmCTestSleep
@@ -27,12 +30,12 @@ public:
   /**
    * This is a virtual constructor for the command.
    */
-  cmCommand* Clone() CM_OVERRIDE
+  std::unique_ptr<cmCommand> Clone() override
   {
-    cmCTestSleepCommand* ni = new cmCTestSleepCommand;
+    auto ni = cm::make_unique<cmCTestSleepCommand>();
     ni->CTest = this->CTest;
     ni->CTestScriptHandler = this->CTestScriptHandler;
-    return ni;
+    return std::unique_ptr<cmCommand>(std::move(ni));
   }
 
   /**
@@ -40,12 +43,7 @@ public:
    * the CMakeLists.txt file.
    */
   bool InitialPass(std::vector<std::string> const& args,
-                   cmExecutionStatus& status) CM_OVERRIDE;
-
-  /**
-   * The name of the command as specified in CMakeList.txt.
-   */
-  std::string GetName() const CM_OVERRIDE { return "ctest_sleep"; }
+                   cmExecutionStatus& status) override;
 };
 
 #endif

@@ -3,7 +3,7 @@
 #ifndef cmParseBlanketJSCoverage_h
 #define cmParseBlanketJSCoverage_h
 
-#include <cmConfigure.h> // IWYU pragma: keep
+#include "cmConfigure.h" // IWYU pragma: keep
 
 #include <string>
 #include <vector>
@@ -29,7 +29,7 @@ class cmParseBlanketJSCoverage
 public:
   cmParseBlanketJSCoverage(cmCTestCoverageHandlerContainer& cont,
                            cmCTest* ctest);
-  bool LoadCoverageData(std::vector<std::string> files);
+  bool LoadCoverageData(std::vector<std::string> const& files);
   //  Read the JSON output
   bool ReadJSONFile(std::string const& file);
 

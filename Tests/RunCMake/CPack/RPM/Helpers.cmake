@@ -23,6 +23,9 @@ function(getPackageNameGlobexpr NAME COMPONENT VERSION REVISION FILE_NO RESULT_V
   endif()
 
   if(GENERATOR_SPECIFIC_FORMAT)
+    if(NOT REVISION)
+      set(REVISION "1")
+    endif()
     set(${RESULT_VAR} "${NAME}${COMPONENT}-${VERSION}-${REVISION}.*.rpm" PARENT_SCOPE)
   else()
     set(${RESULT_VAR} "${NAME}-${VERSION}-*${COMPONENT}.rpm" PARENT_SCOPE)
@@ -36,18 +39,37 @@ function(getPackageContentList FILE RESULT_VAR)
           OUTPUT_STRIP_TRAILING_WHITESPACE)
   string(REGEX REPLACE "\n" ";" package_content_ "${package_content_}")
 
+  # never versions of rpmbuild (introduced in rpm 4.13.0.1) add build_id links
+  # to packages - tests should ignore them
+  list(FILTER package_content_ EXCLUDE REGEX ".*\.build-id.*")
+
   set(${RESULT_VAR} "${package_content_}" PARENT_SCOPE)
 endfunction()
 
 function(toExpectedContentList FILE_NO CONTENT_VAR)
-  if(NOT DEFINED TEST_INSTALL_PREFIX_PATHS)
-    set(TEST_INSTALL_PREFIX_PATHS "/usr")
+  # add install prefix to expected paths
+  if(DEFINED EXPECTED_FILE_${FILE_NO}_PACKAGING_PREFIX)
+    set(EXPECTED_FILE_PACKAGING_PREFIX
+      "${EXPECTED_FILE_${FILE_NO}_PACKAGING_PREFIX}")
+  elseif(NOT DEFINED EXPECTED_FILE_PACKAGING_PREFIX)
+    # default CPackRPM packaging install prefix
+    set(EXPECTED_FILE_PACKAGING_PREFIX "/usr")
   endif()
-
-  unset(filtered_)
+  set(prepared_ "${EXPECTED_FILE_PACKAGING_PREFIX}")
   foreach(part_ IN LISTS ${CONTENT_VAR})
+    list(APPEND prepared_ "${EXPECTED_FILE_PACKAGING_PREFIX}${part_}")
+  endforeach()
+
+  # remove paths that are excluded from auto packaging
+  if(NOT DEFINED CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST)
+    set(CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST
+      /etc /etc/init.d /usr /usr/bin /usr/include /usr/lib
+      /usr/libx32 /usr/lib64 /usr/share /usr/share/aclocal /usr/share/doc)
+  endif()
+  unset(filtered_)
+  foreach(part_ IN LISTS prepared_)
     unset(dont_add_)
-    foreach(for_removal_ IN LISTS TEST_INSTALL_PREFIX_PATHS)
+    foreach(for_removal_ IN LISTS CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST)
       if(part_ STREQUAL for_removal_)
         set(dont_add_ TRUE)
         break()

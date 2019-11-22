@@ -3,7 +3,7 @@
 #ifndef cmConfigure_h
 #define cmConfigure_h
 
-#include <cmsys/Configure.hxx> // IWYU pragma: keep
+#include "cmsys/Configure.hxx" // IWYU pragma: export
 
 #ifdef _MSC_VER
 #pragma warning(disable : 4786)
@@ -19,27 +19,15 @@
 #cmakedefine HAVE_UNSETENV
 #cmakedefine CMAKE_USE_ELF_PARSER
 #cmakedefine CMAKE_USE_MACH_PARSER
-#cmakedefine CMAKE_USE_LIBUV
-#cmakedefine CMake_HAVE_CXX_AUTO_PTR
 #cmakedefine CMake_HAVE_CXX_MAKE_UNIQUE
-#cmakedefine CMake_HAVE_CXX_NULLPTR
-#cmakedefine CMake_HAVE_CXX_OVERRIDE
-#cmakedefine CMake_HAVE_CXX_UNIQUE_PTR
-#cmakedefine CMake_HAVE_CXX_UNORDERED_MAP
-#cmakedefine CMake_HAVE_CXX_UNORDERED_SET
+#define CMake_DEFAULT_RECURSION_LIMIT @CMake_DEFAULT_RECURSION_LIMIT@
 #define CMAKE_BIN_DIR "/@CMAKE_BIN_DIR@"
 #define CMAKE_DATA_DIR "/@CMAKE_DATA_DIR@"
 
-#ifdef CMake_HAVE_CXX_NULLPTR
-#define CM_NULLPTR nullptr
-#else
-#define CM_NULLPTR 0
-#endif
+#define CM_FALLTHROUGH cmsys_FALLTHROUGH
 
-#ifdef CMake_HAVE_CXX_OVERRIDE
-#define CM_OVERRIDE override
-#else
-#define CM_OVERRIDE
+#if defined(_WIN32) && !defined(NOMINMAX)
+#  define NOMINMAX
 #endif
 
 #endif

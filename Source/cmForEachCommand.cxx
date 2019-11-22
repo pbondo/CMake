@@ -2,19 +2,53 @@
    file Copyright.txt or https://cmake.org/licensing for details.  */
 #include "cmForEachCommand.h"
 
-#include <sstream>
-#include <stdio.h>
-#include <stdlib.h>
+#include <algorithm>
+#include <cstddef>
+// NOTE The declaration of `std::abs` has moved to `cmath` since C++17
+// See https://en.cppreference.com/w/cpp/numeric/math/abs
+// ALERT But IWYU used to lint `#include`s do not "understand"
+// conditional compilation (i.e. `#if __cplusplus >= 201703L`)
+#include <cstdlib>
+#include <utility>
+
+#include <cm/memory>
+#include <cm/string_view>
+
+#include "cm_static_string_view.hxx"
 
 #include "cmExecutionStatus.h"
+#include "cmFunctionBlocker.h"
+#include "cmListFileCache.h"
 #include "cmMakefile.h"
+#include "cmMessageType.h"
+#include "cmRange.h"
+#include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
-#include "cm_auto_ptr.hxx"
-#include "cmake.h"
+
+namespace {
+class cmForEachFunctionBlocker : public cmFunctionBlocker
+{
+public:
+  cmForEachFunctionBlocker(cmMakefile* mf);
+  ~cmForEachFunctionBlocker() override;
+
+  cm::string_view StartCommandName() const override { return "foreach"_s; }
+  cm::string_view EndCommandName() const override { return "endforeach"_s; }
+
+  bool ArgumentsMatch(cmListFileFunction const& lff,
+                      cmMakefile& mf) const override;
+
+  bool Replay(std::vector<cmListFileFunction> functions,
+              cmExecutionStatus& inStatus) override;
+
+  std::vector<std::string> Args;
+
+private:
+  cmMakefile* Makefile;
+};
 
 cmForEachFunctionBlocker::cmForEachFunctionBlocker(cmMakefile* mf)
   : Makefile(mf)
-  , Depth(0)
 {
   this->Makefile->PushLoopBlock();
 }
@@ -24,119 +58,125 @@ cmForEachFunctionBlocker::~cmForEachFunctionBlocker()
   this->Makefile->PopLoopBlock();
 }
 
-bool cmForEachFunctionBlocker::IsFunctionBlocked(const cmListFileFunction& lff,
-                                                 cmMakefile& mf,
-                                                 cmExecutionStatus& inStatus)
+bool cmForEachFunctionBlocker::ArgumentsMatch(cmListFileFunction const& lff,
+                                              cmMakefile& mf) const
 {
-  if (!cmSystemTools::Strucmp(lff.Name.c_str(), "foreach")) {
-    // record the number of nested foreach commands
-    this->Depth++;
-  } else if (!cmSystemTools::Strucmp(lff.Name.c_str(), "endforeach")) {
-    // if this is the endofreach for this statement
-    if (!this->Depth) {
-      // Remove the function blocker for this scope or bail.
-      CM_AUTO_PTR<cmFunctionBlocker> fb(mf.RemoveFunctionBlocker(this, lff));
-      if (!fb.get()) {
-        return false;
-      }
+  std::vector<std::string> expandedArguments;
+  mf.ExpandArguments(lff.Arguments, expandedArguments);
+  return expandedArguments.empty() ||
+    expandedArguments.front() == this->Args.front();
+}
 
-      // at end of for each execute recorded commands
-      // store the old value
-      std::string oldDef;
-      if (mf.GetDefinition(this->Args[0])) {
-        oldDef = mf.GetDefinition(this->Args[0]);
-      }
-      std::vector<std::string>::const_iterator j = this->Args.begin();
-      ++j;
-
-      for (; j != this->Args.end(); ++j) {
-        // set the variable to the loop value
-        mf.AddDefinition(this->Args[0], j->c_str());
-        // Invoke all the functions that were collected in the block.
-        cmExecutionStatus status;
-        for (unsigned int c = 0; c < this->Functions.size(); ++c) {
-          status.Clear();
-          mf.ExecuteCommand(this->Functions[c], status);
-          if (status.GetReturnInvoked()) {
-            inStatus.SetReturnInvoked(true);
-            // restore the variable to its prior value
-            mf.AddDefinition(this->Args[0], oldDef.c_str());
-            return true;
-          }
-          if (status.GetBreakInvoked()) {
-            // restore the variable to its prior value
-            mf.AddDefinition(this->Args[0], oldDef.c_str());
-            return true;
-          }
-          if (status.GetContinueInvoked()) {
-            break;
-          }
-          if (cmSystemTools::GetFatalErrorOccured()) {
-            return true;
-          }
-        }
-      }
-
-      // restore the variable to its prior value
-      mf.AddDefinition(this->Args[0], oldDef.c_str());
-      return true;
-    }
-    // close out a nested foreach
-    this->Depth--;
+bool cmForEachFunctionBlocker::Replay(
+  std::vector<cmListFileFunction> functions, cmExecutionStatus& inStatus)
+{
+  cmMakefile& mf = inStatus.GetMakefile();
+  // at end of for each execute recorded commands
+  // store the old value
+  std::string oldDef;
+  if (mf.GetDefinition(this->Args.front())) {
+    oldDef = mf.GetDefinition(this->Args.front());
   }
 
-  // record the command
-  this->Functions.push_back(lff);
+  for (std::string const& arg : cmMakeRange(this->Args).advance(1)) {
+    // set the variable to the loop value
+    mf.AddDefinition(this->Args.front(), arg);
+    // Invoke all the functions that were collected in the block.
+    for (cmListFileFunction const& func : functions) {
+      cmExecutionStatus status(mf);
+      mf.ExecuteCommand(func, status);
+      if (status.GetReturnInvoked()) {
+        inStatus.SetReturnInvoked();
+        // restore the variable to its prior value
+        mf.AddDefinition(this->Args.front(), oldDef);
+        return true;
+      }
+      if (status.GetBreakInvoked()) {
+        // restore the variable to its prior value
+        mf.AddDefinition(this->Args.front(), oldDef);
+        return true;
+      }
+      if (status.GetContinueInvoked()) {
+        break;
+      }
+      if (cmSystemTools::GetFatalErrorOccured()) {
+        return true;
+      }
+    }
+  }
 
-  // always return true
+  // restore the variable to its prior value
+  mf.AddDefinition(this->Args.front(), oldDef);
   return true;
 }
 
-bool cmForEachFunctionBlocker::ShouldRemove(const cmListFileFunction& lff,
-                                            cmMakefile& mf)
+bool HandleInMode(std::vector<std::string> const& args, cmMakefile& makefile)
 {
-  if (!cmSystemTools::Strucmp(lff.Name.c_str(), "endforeach")) {
-    std::vector<std::string> expandedArguments;
-    mf.ExpandArguments(lff.Arguments, expandedArguments);
-    // if the endforeach has arguments then make sure
-    // they match the begin foreach arguments
-    if ((expandedArguments.empty() ||
-         (expandedArguments[0] == this->Args[0]))) {
+  auto fb = cm::make_unique<cmForEachFunctionBlocker>(&makefile);
+  fb->Args.push_back(args.front());
+
+  enum Doing
+  {
+    DoingNone,
+    DoingLists,
+    DoingItems
+  };
+  Doing doing = DoingNone;
+  for (std::string const& arg : cmMakeRange(args).advance(2)) {
+    if (arg == "LISTS") {
+      doing = DoingLists;
+    } else if (arg == "ITEMS") {
+      doing = DoingItems;
+    } else if (doing == DoingLists) {
+      auto const& value = makefile.GetSafeDefinition(arg);
+      if (!value.empty()) {
+        cmExpandList(value, fb->Args, true);
+      }
+    } else if (doing == DoingItems) {
+      fb->Args.push_back(arg);
+    } else {
+      makefile.IssueMessage(MessageType::FATAL_ERROR,
+                            cmStrCat("Unknown argument:\n", "  ", arg, "\n"));
       return true;
     }
   }
-  return false;
+
+  makefile.AddFunctionBlocker(std::move(fb));
+
+  return true;
 }
 
-bool cmForEachCommand::InitialPass(std::vector<std::string> const& args,
-                                   cmExecutionStatus&)
+} // anonymous namespace
+
+bool cmForEachCommand(std::vector<std::string> const& args,
+                      cmExecutionStatus& status)
 {
   if (args.empty()) {
-    this->SetError("called with incorrect number of arguments");
+    status.SetError("called with incorrect number of arguments");
     return false;
   }
   if (args.size() > 1 && args[1] == "IN") {
-    return this->HandleInMode(args);
+    return HandleInMode(args, status.GetMakefile());
   }
 
   // create a function blocker
-  cmForEachFunctionBlocker* f = new cmForEachFunctionBlocker(this->Makefile);
+  auto fb = cm::make_unique<cmForEachFunctionBlocker>(&status.GetMakefile());
   if (args.size() > 1) {
     if (args[1] == "RANGE") {
       int start = 0;
       int stop = 0;
       int step = 0;
       if (args.size() == 3) {
-        stop = atoi(args[2].c_str());
+        stop = std::stoi(args[2]);
       }
       if (args.size() == 4) {
-        start = atoi(args[2].c_str());
-        stop = atoi(args[3].c_str());
+        start = std::stoi(args[2]);
+        stop = std::stoi(args[3]);
       }
       if (args.size() == 5) {
-        start = atoi(args[2].c_str());
-        stop = atoi(args[3].c_str());
-        step = atoi(args[4].c_str());
+        start = std::stoi(args[2]);
+        stop = std::stoi(args[3]);
+        step = std::stoi(args[4]);
       }
       if (step == 0) {
         if (start > stop) {
@@ -147,73 +187,36 @@ bool cmForEachCommand::InitialPass(std::vector<std::string> const& args,
       }
       if ((start > stop && step > 0) || (start < stop && step < 0) ||
           step == 0) {
-        std::ostringstream str;
-        str << "called with incorrect range specification: start ";
-        str << start << ", stop " << stop << ", step " << step;
-        this->SetError(str.str());
+        status.SetError(
+          cmStrCat("called with incorrect range specification: start ", start,
+                   ", stop ", stop, ", step ", step));
         return false;
       }
-      std::vector<std::string> range;
-      char buffer[100];
-      range.push_back(args[0]);
-      int cc;
-      for (cc = start;; cc += step) {
-        if ((step > 0 && cc > stop) || (step < 0 && cc < stop)) {
-          break;
-        }
-        sprintf(buffer, "%d", cc);
-        range.push_back(buffer);
-        if (cc == stop) {
-          break;
-        }
-      }
-      f->Args = range;
+
+      // Calculate expected iterations count and reserve enough space
+      // in the `fb->Args` vector. The first item is the iteration variable
+      // name...
+      const std::size_t iter_cnt = 2u +
+        int(start < stop) * (stop - start) / std::abs(step) +
+        int(start > stop) * (start - stop) / std::abs(step);
+      fb->Args.resize(iter_cnt);
+      fb->Args.front() = args.front();
+      auto cc = start;
+      auto generator = [&cc, step]() -> std::string {
+        auto result = std::to_string(cc);
+        cc += step;
+        return result;
+      };
+      // Fill the `range` vector w/ generated string values
+      // (starting from 2nd position)
+      std::generate(++fb->Args.begin(), fb->Args.end(), generator);
     } else {
-      f->Args = args;
+      fb->Args = args;
     }
   } else {
-    f->Args = args;
+    fb->Args = args;
   }
-  this->Makefile->AddFunctionBlocker(f);
-
-  return true;
-}
-
-bool cmForEachCommand::HandleInMode(std::vector<std::string> const& args)
-{
-  CM_AUTO_PTR<cmForEachFunctionBlocker> f(
-    new cmForEachFunctionBlocker(this->Makefile));
-  f->Args.push_back(args[0]);
-
-  enum Doing
-  {
-    DoingNone,
-    DoingLists,
-    DoingItems
-  };
-  Doing doing = DoingNone;
-  for (unsigned int i = 2; i < args.size(); ++i) {
-    if (doing == DoingItems) {
-      f->Args.push_back(args[i]);
-    } else if (args[i] == "LISTS") {
-      doing = DoingLists;
-    } else if (args[i] == "ITEMS") {
-      doing = DoingItems;
-    } else if (doing == DoingLists) {
-      const char* value = this->Makefile->GetDefinition(args[i]);
-      if (value && *value) {
-        cmSystemTools::ExpandListArgument(value, f->Args, true);
-      }
-    } else {
-      std::ostringstream e;
-      e << "Unknown argument:\n"
-        << "  " << args[i] << "\n";
-      this->Makefile->IssueMessage(cmake::FATAL_ERROR, e.str());
-      return true;
-    }
-  }
-
-  this->Makefile->AddFunctionBlocker(f.release()); // TODO: pass auto_ptr
+  status.GetMakefile().AddFunctionBlocker(std::move(fb));
 
   return true;
 }

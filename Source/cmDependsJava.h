@@ -3,14 +3,13 @@
 #ifndef cmDependsJava_h
 #define cmDependsJava_h
 
-#include <cmConfigure.h>
-
-#include "cmDepends.h"
+#include "cmConfigure.h" // IWYU pragma: keep
 
 #include <iosfwd>
-#include <map>
 #include <set>
 #include <string>
+
+#include "cmDepends.h"
 
 /** \class cmDependsJava
  * \brief Dependency scanner for Java class files.
@@ -23,20 +22,19 @@ public:
   cmDependsJava();
 
   /** Virtual destructor to cleanup subclasses properly.  */
-  ~cmDependsJava() CM_OVERRIDE;
+  ~cmDependsJava() override;
+
+  cmDependsJava(cmDependsJava const&) = delete;
+  cmDependsJava& operator=(cmDependsJava const&) = delete;
 
 protected:
   // Implement writing/checking methods required by superclass.
   bool WriteDependencies(const std::set<std::string>& sources,
                          const std::string& file, std::ostream& makeDepends,
-                         std::ostream& internalDepends) CM_OVERRIDE;
-  bool CheckDependencies(
-    std::istream& internalDepends, const char* internalDependsFileName,
-    std::map<std::string, DependencyVector>& validDeps) CM_OVERRIDE;
-
-private:
-  cmDependsJava(cmDependsJava const&);  // Purposely not implemented.
-  void operator=(cmDependsJava const&); // Purposely not implemented.
+                         std::ostream& internalDepends) override;
+  bool CheckDependencies(std::istream& internalDepends,
+                         const std::string& internalDependsFileName,
+                         DependencyMap& validDeps) override;
 };
 
 #endif

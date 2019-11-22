@@ -3,12 +3,14 @@
 #ifndef cmFindBase_h
 #define cmFindBase_h
 
-#include <cmConfigure.h> // IWYU pragma: keep
+#include "cmConfigure.h" // IWYU pragma: keep
 
 #include <string>
 #include <vector>
 
 #include "cmFindCommon.h"
+
+class cmExecutionStatus;
 
 /** \class cmFindBase
  * \brief Base class for most FIND_XXX commands.
@@ -19,7 +21,9 @@
 class cmFindBase : public cmFindCommon
 {
 public:
-  cmFindBase();
+  cmFindBase(cmExecutionStatus& status);
+  virtual ~cmFindBase() = default;
+
   /**
    * This is called when the command is first encountered in
    * the CMakeLists.txt file.
@@ -50,6 +54,7 @@ protected:
 
 private:
   // Add pieces of the search.
+  void FillPackageRootPath();
   void FillCMakeVariablePath();
   void FillCMakeEnvironmentPath();
   void FillUserHintsPath();

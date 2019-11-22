@@ -7,6 +7,11 @@ cmake-server(7)
 
    .. contents::
 
+.. deprecated:: 3.15
+
+  This will be removed from a future version of CMake.
+  Clients should use the :manual:`cmake-file-api(7)` instead.
+
 Introduction
 ============
 
@@ -49,10 +54,12 @@ Operation
 Start :manual:`cmake(1)` in the server command mode, supplying the path to
 the build directory to process::
 
-  cmake -E server (--debug|--pipe <NAMED_PIPE>)
+  cmake -E server (--debug|--pipe=<NAMED_PIPE>)
 
 The server will communicate using stdin/stdout (with the ``--debug`` parameter)
-or using a named pipe (with the ``--pipe <NAMED_PIPE>`` parameter).
+or using a named pipe (with the ``--pipe=<NAMED_PIPE>`` parameter).  Note
+that "named pipe" refers to a local domain socket on Unix and to a named pipe
+on Windows.
 
 When connecting to the server (via named pipe or by starting it in ``--debug``
 mode), the server will reply with a hello message::
@@ -162,7 +169,7 @@ When the server is busy for a long time, it is polite to send back replies of
 type "progress" to the client. These will contain a "progressMessage" with a
 string describing the action currently taking place as well as
 "progressMinimum", "progressMaximum" and "progressCurrent" with integer values
-describing the range of progess.
+describing the range of progress.
 
 Messages of type "progress" will be followed by more "progress" messages or with
 a message of type "reply" or "error" that complete the request.
@@ -254,6 +261,11 @@ versions supported by the cmake server. These are JSON objects with "major" and
 as experimental. These will contain the "isExperimental" key set to true. Enabling
 these requires a special command line argument when starting the cmake server mode.
 
+Within a "major" version all "minor" versions are fully backwards compatible.
+New "minor" versions may introduce functionality in such a way that existing
+clients of the same "major" version will continue to work, provided they
+ignore keys in the output that they do not know about.
+
 Example::
 
   [== "CMake Server" ==[
@@ -268,8 +280,9 @@ The first request that the client may send to the server is of type "handshake".
 
 This request needs to pass one of the "supportedProtocolVersions" of the "hello"
 type response received earlier back to the server in the "protocolVersion" field.
-
-Each protocol version may request additional attributes to be present.
+Giving the "major" version of the requested protocol version will make the server
+use the latest minor version of that protocol. Use this if you do not explicitly
+need to depend on a specific minor version.
 
 Protocol version 1.0 requires the following attributes to be set:
 
@@ -279,6 +292,10 @@ Protocol version 1.0 requires the following attributes to be set:
   * "extraGenerator" (optional!) with the extra generator to be used
   * "platform" with the generator platform (if supported by the generator)
   * "toolset" with the generator toolset (if supported by the generator)
+
+Protocol version 1.2 makes all but the build directory optional, provided
+there is a valid cache in the build directory that contains all the other
+information already.
 
 Example::
 
@@ -448,6 +465,11 @@ Each project object can have the following keys:
 
 "name"
   contains the (sub-)projects name.
+"minimumCMakeVersion"
+  contains the minimum cmake version allowed for this project, null if the
+  project doesn't specify one.
+"hasInstallRule"
+  true if the project contains any install rules, false otherwise.
 "sourceDirectory"
   contains the current source directory
 "buildDirectory"
@@ -471,6 +493,12 @@ Each target object can have the following keys:
   contains the current source directory.
 "buildDirectory"
   contains the current build directory.
+"isGeneratorProvided"
+  true if the target is auto-created by a generator, false otherwise
+"hasInstallRule"
+  true if the target contains any install rules, false otherwise.
+"installPaths"
+  full path to the destination directories defined by target install rules.
 "artifacts"
   with a list of build artifacts. The list is sorted with the most
   important artifacts first (e.g. a .DLL file is listed before a
@@ -572,6 +600,51 @@ CMake will reply::
   ]== "CMake Server" ==]
 
 
+Type "ctestInfo"
+^^^^^^^^^^^^^^^^
+
+The "ctestInfo" request can be used after a project was "compute"d successfully.
+
+It will list the complete project test structure as it is known to cmake.
+
+The reply will contain a key "configurations", which will contain a list of
+configuration objects. Configuration objects are used to destinquish between
+different configurations the build directory might have enabled. While most
+generators only support one configuration, others might support several.
+
+Each configuration object can have the following keys:
+
+"name"
+  contains the name of the configuration. The name may be empty.
+"projects"
+  contains a list of project objects, one for each build project.
+
+Project objects define one (sub-)project defined in the cmake build system.
+
+Each project object can have the following keys:
+
+"name"
+  contains the (sub-)projects name.
+"ctestInfo"
+  contains a list of test objects.
+
+Each test object can have the following keys:
+
+"ctestName"
+  contains the name of the test.
+"ctestCommand"
+  contains the test command.
+"properties"
+  contains a list of test property objects.
+
+Each test property object can have the following keys:
+
+"key"
+  contains the test property key.
+"value"
+  contains the test property value.
+
+
 Type "cmakeInputs"
 ^^^^^^^^^^^^^^^^^^
 
@@ -616,8 +689,7 @@ and will not survive the build directory getting cleaned out.
 Type "cache"
 ^^^^^^^^^^^^
 
-The "cache" request can be used once a project is configured and will
-list the cached configuration values.
+The "cache" request will list the cached configuration values.
 
 Example::
 

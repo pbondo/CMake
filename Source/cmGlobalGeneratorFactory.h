@@ -3,7 +3,7 @@
 #ifndef cmGlobalGeneratorFactory_h
 #define cmGlobalGeneratorFactory_h
 
-#include <cmConfigure.h>
+#include "cmConfigure.h" // IWYU pragma: keep
 
 #include <string>
 #include <vector>
@@ -20,7 +20,7 @@ struct cmDocumentationEntry;
 class cmGlobalGeneratorFactory
 {
 public:
-  virtual ~cmGlobalGeneratorFactory() {}
+  virtual ~cmGlobalGeneratorFactory() = default;
 
   /** Create a GlobalGenerator */
   virtual cmGlobalGenerator* CreateGlobalGenerator(const std::string& n,
@@ -30,13 +30,20 @@ public:
   virtual void GetDocumentation(cmDocumentationEntry& entry) const = 0;
 
   /** Get the names of the current registered generators */
-  virtual void GetGenerators(std::vector<std::string>& names) const = 0;
+  virtual std::vector<std::string> GetGeneratorNames() const = 0;
+  virtual std::vector<std::string> GetGeneratorNamesWithPlatform() const = 0;
 
   /** Determine whether or not this generator supports toolsets */
   virtual bool SupportsToolset() const = 0;
 
   /** Determine whether or not this generator supports platforms */
   virtual bool SupportsPlatform() const = 0;
+
+  /** Get the list of supported platforms name for this generator */
+  virtual std::vector<std::string> GetKnownPlatforms() const = 0;
+
+  /** If the generator suports platforms, get its default.  */
+  virtual std::string GetDefaultPlatformName() const = 0;
 };
 
 template <class T>
@@ -45,31 +52,46 @@ class cmGlobalGeneratorSimpleFactory : public cmGlobalGeneratorFactory
 public:
   /** Create a GlobalGenerator */
   cmGlobalGenerator* CreateGlobalGenerator(const std::string& name,
-                                           cmake* cm) const CM_OVERRIDE
+                                           cmake* cm) const override
   {
     if (name != T::GetActualName()) {
-      return CM_NULLPTR;
+      return nullptr;
     }
     return new T(cm);
   }
 
   /** Get the documentation entry for this factory */
-  void GetDocumentation(cmDocumentationEntry& entry) const CM_OVERRIDE
+  void GetDocumentation(cmDocumentationEntry& entry) const override
   {
     T::GetDocumentation(entry);
   }
 
   /** Get the names of the current registered generators */
-  void GetGenerators(std::vector<std::string>& names) const CM_OVERRIDE
+  std::vector<std::string> GetGeneratorNames() const override
   {
+    std::vector<std::string> names;
     names.push_back(T::GetActualName());
+    return names;
+  }
+  std::vector<std::string> GetGeneratorNamesWithPlatform() const override
+  {
+    return std::vector<std::string>();
   }
 
   /** Determine whether or not this generator supports toolsets */
-  bool SupportsToolset() const CM_OVERRIDE { return T::SupportsToolset(); }
+  bool SupportsToolset() const override { return T::SupportsToolset(); }
 
   /** Determine whether or not this generator supports platforms */
-  bool SupportsPlatform() const CM_OVERRIDE { return T::SupportsPlatform(); }
+  bool SupportsPlatform() const override { return T::SupportsPlatform(); }
+
+  /** Get the list of supported platforms name for this generator */
+  std::vector<std::string> GetKnownPlatforms() const override
+  {
+    // default is no platform supported
+    return std::vector<std::string>();
+  }
+
+  std::string GetDefaultPlatformName() const override { return std::string(); }
 };
 
 #endif

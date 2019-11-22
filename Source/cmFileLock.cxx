@@ -2,10 +2,23 @@
    file Copyright.txt or https://cmake.org/licensing for details.  */
 #include "cmFileLock.h"
 
+#include <cassert>
+#include <utility>
+
 #include "cmFileLockResult.h"
-#include <assert.h>
 
 // Common implementation
+
+cmFileLock::cmFileLock(cmFileLock&& other) noexcept
+{
+  this->File = other.File;
+#if defined(_WIN32)
+  other.File = INVALID_HANDLE_VALUE;
+#else
+  other.File = -1;
+#endif
+  this->Filename = std::move(other.Filename);
+}
 
 cmFileLock::~cmFileLock()
 {
@@ -14,6 +27,19 @@ cmFileLock::~cmFileLock()
     static_cast<void>(result);
     assert(result.IsOk());
   }
+}
+
+cmFileLock& cmFileLock::operator=(cmFileLock&& other) noexcept
+{
+  this->File = other.File;
+#if defined(_WIN32)
+  other.File = INVALID_HANDLE_VALUE;
+#else
+  other.File = -1;
+#endif
+  this->Filename = std::move(other.Filename);
+
+  return *this;
 }
 
 cmFileLockResult cmFileLock::Lock(const std::string& filename,
@@ -42,7 +68,7 @@ cmFileLockResult cmFileLock::Lock(const std::string& filename,
   }
 
   if (!result.IsOk()) {
-    this->Filename = "";
+    this->Filename.clear();
   }
 
   return result;
@@ -54,7 +80,7 @@ bool cmFileLock::IsLocked(const std::string& filename) const
 }
 
 #if defined(_WIN32)
-#include "cmFileLockWin32.cxx"
+#  include "cmFileLockWin32.cxx"
 #else
-#include "cmFileLockUnix.cxx"
+#  include "cmFileLockUnix.cxx"
 #endif

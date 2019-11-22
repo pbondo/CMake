@@ -3,14 +3,15 @@
 #ifndef cmOrderDirectories_h
 #define cmOrderDirectories_h
 
-#include <cmConfigure.h>
+#include "cmConfigure.h" // IWYU pragma: keep
 
-#include <cmsys/RegularExpression.hxx>
 #include <map>
 #include <set>
 #include <string>
 #include <utility>
 #include <vector>
+
+#include "cmsys/RegularExpression.hxx"
 
 class cmGeneratorTarget;
 class cmGlobalGenerator;
@@ -25,8 +26,10 @@ public:
   cmOrderDirectories(cmGlobalGenerator* gg, cmGeneratorTarget const* target,
                      const char* purpose);
   ~cmOrderDirectories();
+  cmOrderDirectories(const cmOrderDirectories&) = delete;
+  cmOrderDirectories& operator=(const cmOrderDirectories&) = delete;
   void AddRuntimeLibrary(std::string const& fullPath,
-                         const char* soname = CM_NULLPTR);
+                         const char* soname = nullptr);
   void AddLinkLibrary(std::string const& fullPath);
   void AddUserDirectories(std::vector<std::string> const& extra);
   void AddLanguageDirectories(std::vector<std::string> const& dirs);
@@ -73,7 +76,7 @@ private:
   // the index of the directory that must come first.  The second
   // element is the index of the runtime library that added the
   // constraint.
-  typedef std::pair<int, int> ConflictPair;
+  using ConflictPair = std::pair<int, int>;
   struct ConflictList : public std::vector<ConflictPair>
   {
   };
@@ -81,6 +84,8 @@ private:
 
   // Compare directories after resolving symlinks.
   bool IsSameDirectory(std::string const& l, std::string const& r);
+
+  bool IsImplicitDirectory(std::string const& dir);
 
   std::string const& GetRealPath(std::string const& dir);
   std::map<std::string, std::string> RealPaths;

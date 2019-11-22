@@ -2,50 +2,121 @@
    file Copyright.txt or https://cmake.org/licensing for details.  */
 #include "cmLoadCommandCommand.h"
 
-#include "cmCPluginAPI.cxx"
+#include <csignal>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <utility>
+
+#include <cm/memory>
+
 #include "cmCPluginAPI.h"
+#include "cmCommand.h"
 #include "cmDynamicLoader.h"
+#include "cmExecutionStatus.h"
 #include "cmMakefile.h"
-#include "cmPolicies.h"
 #include "cmState.h"
+#include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 
-class cmExecutionStatus;
-
-#include <signal.h>
-#include <sstream>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include "cmCPluginAPI.cxx"
 
 #ifdef __QNX__
-#include <malloc.h> /* for malloc/free on QNX */
+#  include <malloc.h> /* for malloc/free on QNX */
 #endif
 
-extern "C" void TrapsForSignalsCFunction(int sig);
+namespace {
+
+const char* LastName = nullptr;
+
+extern "C" void TrapsForSignals(int sig)
+{
+  fprintf(stderr, "CMake loaded command %s crashed with signal: %d.\n",
+          LastName, sig);
+}
+
+struct SignalHandlerGuard
+{
+  explicit SignalHandlerGuard(const char* name)
+  {
+    LastName = name != nullptr ? name : "????";
+
+    signal(SIGSEGV, TrapsForSignals);
+#ifdef SIGBUS
+    signal(SIGBUS, TrapsForSignals);
+#endif
+    signal(SIGILL, TrapsForSignals);
+  }
+
+  ~SignalHandlerGuard()
+  {
+    signal(SIGSEGV, nullptr);
+#ifdef SIGBUS
+    signal(SIGBUS, nullptr);
+#endif
+    signal(SIGILL, nullptr);
+  }
+
+  SignalHandlerGuard(SignalHandlerGuard const&) = delete;
+  SignalHandlerGuard& operator=(SignalHandlerGuard const&) = delete;
+};
+
+struct LoadedCommandImpl : cmLoadedCommandInfo
+{
+  explicit LoadedCommandImpl(CM_INIT_FUNCTION init)
+    : cmLoadedCommandInfo{ 0,       0,       &cmStaticCAPI, 0,
+                           nullptr, nullptr, nullptr,       nullptr,
+                           nullptr, nullptr, nullptr,       nullptr }
+  {
+    init(this);
+  }
+
+  ~LoadedCommandImpl()
+  {
+    if (this->Destructor) {
+      SignalHandlerGuard guard(this->Name);
+      this->Destructor(this);
+    }
+    if (this->Error != nullptr) {
+      free(this->Error);
+    }
+  }
+
+  LoadedCommandImpl(LoadedCommandImpl const&) = delete;
+  LoadedCommandImpl& operator=(LoadedCommandImpl const&) = delete;
+
+  int DoInitialPass(cmMakefile* mf, int argc, char* argv[])
+  {
+    SignalHandlerGuard guard(this->Name);
+    return this->InitialPass(this, mf, argc, argv);
+  }
+
+  void DoFinalPass(cmMakefile* mf)
+  {
+    SignalHandlerGuard guard(this->Name);
+    this->FinalPass(this, mf);
+  }
+};
 
 // a class for loadabple commands
 class cmLoadedCommand : public cmCommand
 {
 public:
-  cmLoadedCommand()
+  cmLoadedCommand() = default;
+  explicit cmLoadedCommand(CM_INIT_FUNCTION init)
+    : Impl(std::make_shared<LoadedCommandImpl>(init))
   {
-    memset(&this->info, 0, sizeof(this->info));
-    this->info.CAPI = &cmStaticCAPI;
   }
-
-  ///! clean up any memory allocated by the plugin
-  ~cmLoadedCommand() CM_OVERRIDE;
 
   /**
    * This is a virtual constructor for the command.
    */
-  cmCommand* Clone() CM_OVERRIDE
+  std::unique_ptr<cmCommand> Clone() override
   {
-    cmLoadedCommand* newC = new cmLoadedCommand;
+    auto newC = cm::make_unique<cmLoadedCommand>();
     // we must copy when we clone
-    memcpy(&newC->info, &this->info, sizeof(info));
-    return newC;
+    newC->Impl = this->Impl;
+    return std::unique_ptr<cmCommand>(std::move(newC));
   }
 
   /**
@@ -53,126 +124,58 @@ public:
    * the CMakeLists.txt file.
    */
   bool InitialPass(std::vector<std::string> const& args,
-                   cmExecutionStatus&) CM_OVERRIDE;
+                   cmExecutionStatus&) override;
 
-  /**
-   * This is called at the end after all the information
-   * specified by the command is accumulated. Most commands do
-   * not implement this method.  At this point, reading and
-   * writing to the cache can be done.
-   */
-  void FinalPass() CM_OVERRIDE;
-  bool HasFinalPass() const CM_OVERRIDE
-  {
-    return this->info.FinalPass != CM_NULLPTR;
-  }
-
-  /**
-   * The name of the command as specified in CMakeList.txt.
-   */
-  std::string GetName() const CM_OVERRIDE { return info.Name; }
-
-  static const char* LastName;
-  static void TrapsForSignals(int sig)
-  {
-    fprintf(stderr, "CMake loaded command %s crashed with signal: %d.\n",
-            cmLoadedCommand::LastName, sig);
-  }
-  static void InstallSignalHandlers(const char* name, int remove = 0)
-  {
-    cmLoadedCommand::LastName = name;
-    if (!name) {
-      cmLoadedCommand::LastName = "????";
-    }
-
-    if (!remove) {
-      signal(SIGSEGV, TrapsForSignalsCFunction);
-#ifdef SIGBUS
-      signal(SIGBUS, TrapsForSignalsCFunction);
-#endif
-      signal(SIGILL, TrapsForSignalsCFunction);
-    } else {
-      signal(SIGSEGV, CM_NULLPTR);
-#ifdef SIGBUS
-      signal(SIGBUS, CM_NULLPTR);
-#endif
-      signal(SIGILL, CM_NULLPTR);
-    }
-  }
-
-  cmLoadedCommandInfo info;
+private:
+  std::shared_ptr<LoadedCommandImpl> Impl;
 };
-
-extern "C" void TrapsForSignalsCFunction(int sig)
-{
-  cmLoadedCommand::TrapsForSignals(sig);
-}
-
-const char* cmLoadedCommand::LastName = CM_NULLPTR;
 
 bool cmLoadedCommand::InitialPass(std::vector<std::string> const& args,
                                   cmExecutionStatus&)
 {
-  if (!info.InitialPass) {
+  if (!this->Impl->InitialPass) {
     return true;
   }
 
   // clear the error string
-  if (this->info.Error) {
-    free(this->info.Error);
+  if (this->Impl->Error) {
+    free(this->Impl->Error);
   }
 
   // create argc and argv and then invoke the command
   int argc = static_cast<int>(args.size());
-  char** argv = CM_NULLPTR;
+  char** argv = nullptr;
   if (argc) {
-    argv = (char**)malloc(argc * sizeof(char*));
+    argv = static_cast<char**>(malloc(argc * sizeof(char*)));
   }
   int i;
   for (i = 0; i < argc; ++i) {
     argv[i] = strdup(args[i].c_str());
   }
-  cmLoadedCommand::InstallSignalHandlers(info.Name);
-  int result =
-    info.InitialPass((void*)&info, (void*)this->Makefile, argc, argv);
-  cmLoadedCommand::InstallSignalHandlers(info.Name, 1);
+  int result = this->Impl->DoInitialPass(this->Makefile, argc, argv);
   cmFreeArguments(argc, argv);
 
   if (result) {
+    if (this->Impl->FinalPass) {
+      auto impl = this->Impl;
+      this->Makefile->AddFinalAction(
+        [impl](cmMakefile& makefile) { impl->DoFinalPass(&makefile); });
+    }
     return true;
   }
 
   /* Initial Pass must have failed so set the error string */
-  if (this->info.Error) {
-    this->SetError(this->info.Error);
+  if (this->Impl->Error) {
+    this->SetError(this->Impl->Error);
   }
   return false;
 }
 
-void cmLoadedCommand::FinalPass()
-{
-  if (this->info.FinalPass) {
-    cmLoadedCommand::InstallSignalHandlers(info.Name);
-    this->info.FinalPass((void*)&this->info, (void*)this->Makefile);
-    cmLoadedCommand::InstallSignalHandlers(info.Name, 1);
-  }
-}
-
-cmLoadedCommand::~cmLoadedCommand()
-{
-  if (this->info.Destructor) {
-    cmLoadedCommand::InstallSignalHandlers(info.Name);
-    this->info.Destructor((void*)&this->info);
-    cmLoadedCommand::InstallSignalHandlers(info.Name, 1);
-  }
-  if (this->info.Error) {
-    free(this->info.Error);
-  }
-}
+} // namespace
 
 // cmLoadCommandCommand
-bool cmLoadCommandCommand::InitialPass(std::vector<std::string> const& args,
-                                       cmExecutionStatus&)
+bool cmLoadCommandCommand(std::vector<std::string> const& args,
+                          cmExecutionStatus& status)
 {
   if (args.empty()) {
     return true;
@@ -180,16 +183,14 @@ bool cmLoadCommandCommand::InitialPass(std::vector<std::string> const& args,
 
   // Construct a variable to report what file was loaded, if any.
   // Start by removing the definition in case of failure.
-  std::string reportVar = "CMAKE_LOADED_COMMAND_";
-  reportVar += args[0];
-  this->Makefile->RemoveDefinition(reportVar);
+  std::string reportVar = cmStrCat("CMAKE_LOADED_COMMAND_", args[0]);
+  status.GetMakefile().RemoveDefinition(reportVar);
 
   // the file must exist
-  std::string moduleName =
-    this->Makefile->GetRequiredDefinition("CMAKE_SHARED_MODULE_PREFIX");
-  moduleName += "cm" + args[0];
-  moduleName +=
-    this->Makefile->GetRequiredDefinition("CMAKE_SHARED_MODULE_SUFFIX");
+  std::string moduleName = cmStrCat(
+    status.GetMakefile().GetRequiredDefinition("CMAKE_SHARED_MODULE_PREFIX"),
+    "cm", args[0],
+    status.GetMakefile().GetRequiredDefinition("CMAKE_SHARED_MODULE_SUFFIX"));
 
   // search for the file
   std::vector<std::string> path;
@@ -204,10 +205,9 @@ bool cmLoadCommandCommand::InitialPass(std::vector<std::string> const& args,
 
   // Try to find the program.
   std::string fullPath = cmSystemTools::FindFile(moduleName, path);
-  if (fullPath == "") {
-    std::ostringstream e;
-    e << "Attempt to load command failed from file \"" << moduleName << "\"";
-    this->SetError(e.str());
+  if (fullPath.empty()) {
+    status.SetError(cmStrCat("Attempt to load command failed from file \"",
+                             moduleName, "\""));
     return false;
   }
 
@@ -215,42 +215,38 @@ bool cmLoadCommandCommand::InitialPass(std::vector<std::string> const& args,
   cmsys::DynamicLoader::LibraryHandle lib =
     cmDynamicLoader::OpenLibrary(fullPath.c_str());
   if (!lib) {
-    std::string err = "Attempt to load the library ";
-    err += fullPath + " failed.";
+    std::string err =
+      cmStrCat("Attempt to load the library ", fullPath, " failed.");
     const char* error = cmsys::DynamicLoader::LastError();
     if (error) {
       err += " Additional error info is:\n";
       err += error;
     }
-    this->SetError(err);
+    status.SetError(err);
     return false;
   }
 
   // Report what file was loaded for this command.
-  this->Makefile->AddDefinition(reportVar, fullPath.c_str());
+  status.GetMakefile().AddDefinition(reportVar, fullPath);
 
   // find the init function
   std::string initFuncName = args[0] + "Init";
-  CM_INIT_FUNCTION initFunction =
-    (CM_INIT_FUNCTION)cmsys::DynamicLoader::GetSymbolAddress(lib,
-                                                             initFuncName);
+  CM_INIT_FUNCTION initFunction = reinterpret_cast<CM_INIT_FUNCTION>(
+    cmsys::DynamicLoader::GetSymbolAddress(lib, initFuncName));
   if (!initFunction) {
-    initFuncName = "_";
-    initFuncName += args[0];
-    initFuncName += "Init";
-    initFunction = (CM_INIT_FUNCTION)(
+    initFuncName = cmStrCat('_', args[0], "Init");
+    initFunction = reinterpret_cast<CM_INIT_FUNCTION>(
       cmsys::DynamicLoader::GetSymbolAddress(lib, initFuncName));
   }
   // if the symbol is found call it to set the name on the
   // function blocker
   if (initFunction) {
-    // create a function blocker and set it up
-    cmLoadedCommand* f = new cmLoadedCommand();
-    (*initFunction)(&f->info);
-    this->Makefile->GetState()->AddCommand(f);
+    status.GetMakefile().GetState()->AddScriptedCommand(
+      args[0],
+      cmLegacyCommandWrapper(cm::make_unique<cmLoadedCommand>(initFunction)));
     return true;
   }
-  this->SetError("Attempt to load command failed. "
-                 "No init function found.");
+  status.SetError("Attempt to load command failed. "
+                  "No init function found.");
   return false;
 }

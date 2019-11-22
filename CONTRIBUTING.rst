@@ -1,6 +1,11 @@
 Contributing to CMake
 *********************
 
+The following summarizes the process for contributing changes.
+See documentation on `CMake Development`_ for more information.
+
+.. _`CMake Development`: Help/dev/README.rst
+
 Community
 =========
 
@@ -19,25 +24,47 @@ CMake uses `Kitware's GitLab Instance`_ to manage development and code review.
 To contribute patches:
 
 #. Fork the upstream `CMake Repository`_ into a personal account.
-#. Base all new work on the upstream ``master`` branch.
-#. Create commits making incremental, distinct, logically complete changes.
-#. Push a topic branch to a personal repository fork on GitLab.
-#. Create a GitLab Merge Request targeting the upstream ``master`` branch.
+#. Run `Utilities/SetupForDevelopment.sh`_ for local git configuration.
+#. See `Building CMake`_ for building CMake locally.
+#. See the `CMake Source Code Guide`_ for coding guidelines.
+#. Create a topic branch named suitably for your work.
+   Base all new work on the upstream ``master`` branch.
+   Base work on the upstream ``release`` branch only if it fixes a
+   regression or bug in a feature new to that release.
+   If in doubt, prefer ``master``.  Reviewers may simply ask for
+   a rebase if deemed appropriate in particular cases.
+#. Create commits making incremental, distinct, logically complete changes
+   with appropriate `commit messages`_.
+#. Push the topic branch to a personal repository fork on GitLab.
+#. Create a GitLab Merge Request targeting the upstream ``master`` branch
+   (even if the change is intended for merge to the ``release`` branch).
+   Check the box labelled "Allow commits from members who can merge to the
+   target branch".  This will allow maintainers to make minor edits on your
+   behalf.
+
+The merge request will enter the `CMake Review Process`_ for consideration.
 
 .. _`Kitware's GitLab Instance`: https://gitlab.kitware.com
 .. _`CMake Repository`: https://gitlab.kitware.com/cmake/cmake
+.. _`Utilities/SetupForDevelopment.sh`: Utilities/SetupForDevelopment.sh
+.. _`Building CMake`: README.rst#building-cmake
+.. _`CMake Source Code Guide`: Help/dev/source.rst
+.. _`commit messages`: Help/dev/review.rst#commit-messages
+.. _`CMake Review Process`: Help/dev/review.rst
 
-Code Style
-==========
+CMake Dashboard Client
+======================
 
-We use `clang-format`_ to define our style for C++ code in the CMake source
-tree.  See the `.clang-format`_ configuration file for our style settings.
-Use ``clang-format`` version 3.8 or higher to format source files.
-See also the `Utilities/Scripts/clang-format.bash`_ script.
+The *integration testing* step of the `CMake Review Process`_ uses a set of
+testing machines that follow an integration branch on their own schedule to
+drive testing and submit results to the `CMake CDash Page`_.  Anyone is
+welcome to provide testing machines in order to help keep support for their
+platforms working.
 
-.. _`clang-format`: http://clang.llvm.org/docs/ClangFormat.html
-.. _`.clang-format`: .clang-format
-.. _`Utilities/Scripts/clang-format.bash`: Utilities/Scripts/clang-format.bash
+See documentation on `CMake Testing Process`_ for more information.
+
+.. _`CMake CDash Page`: https://open.cdash.org/index.php?project=CMake
+.. _`CMake Testing Process`: Help/dev/testing.rst
 
 License
 =======

@@ -1,34 +1,28 @@
 #include "cmParseCoberturaCoverage.h"
 
+#include <cstdlib>
+#include <cstring>
+
+#include "cmsys/FStream.hxx"
+
 #include "cmCTest.h"
 #include "cmCTestCoverageHandler.h"
+#include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 #include "cmXMLParser.h"
-
-#include <cmConfigure.h>
-#include <cmsys/FStream.hxx>
-#include <stdlib.h>
-#include <string.h>
 
 class cmParseCoberturaCoverage::XMLParser : public cmXMLParser
 {
 public:
   XMLParser(cmCTest* ctest, cmCTestCoverageHandlerContainer& cont)
-    : CTest(ctest)
+    : FilePaths{ cont.SourceDir, cont.BinaryDir }
+    , CTest(ctest)
     , Coverage(cont)
   {
-    this->InSources = false;
-    this->InSource = false;
-    this->SkipThisClass = false;
-    this->FilePaths.push_back(this->Coverage.SourceDir);
-    this->FilePaths.push_back(this->Coverage.BinaryDir);
-    this->CurFileName = "";
   }
 
-  ~XMLParser() CM_OVERRIDE {}
-
 protected:
-  void EndElement(const std::string& name) CM_OVERRIDE
+  void EndElement(const std::string& name) override
   {
     if (name == "source") {
       this->InSource = false;
@@ -39,7 +33,7 @@ protected:
     }
   }
 
-  void CharacterDataHandler(const char* data, int length) CM_OVERRIDE
+  void CharacterDataHandler(const char* data, int length) override
   {
     std::string tmp;
     tmp.insert(0, data, length);
@@ -51,7 +45,7 @@ protected:
     }
   }
 
-  void StartElement(const std::string& name, const char** atts) CM_OVERRIDE
+  void StartElement(const std::string& name, const char** atts) override
   {
     std::string FoundSource;
     std::string finalpath;
@@ -68,23 +62,23 @@ protected:
                                               << std::endl,
                              this->Coverage.Quiet);
           std::string filename = atts[tagCount + 1];
-          this->CurFileName = "";
+          this->CurFileName.clear();
 
           // Check if this is an absolute path that falls within our
           // source or binary directories.
-          for (size_t i = 0; i < FilePaths.size(); i++) {
-            if (filename.find(FilePaths[i]) == 0) {
+          for (std::string const& filePath : FilePaths) {
+            if (filename.find(filePath) == 0) {
               this->CurFileName = filename;
               break;
             }
           }
 
-          if (this->CurFileName == "") {
+          if (this->CurFileName.empty()) {
             // Check if this is a path that is relative to our source or
             // binary directories.
-            for (size_t i = 0; i < FilePaths.size(); i++) {
-              finalpath = FilePaths[i] + "/" + filename;
-              if (cmSystemTools::FileExists(finalpath.c_str())) {
+            for (std::string const& filePath : FilePaths) {
+              finalpath = cmStrCat(filePath, "/", filename);
+              if (cmSystemTools::FileExists(finalpath)) {
                 this->CurFileName = finalpath;
                 break;
               }
@@ -92,9 +86,9 @@ protected:
           }
 
           cmsys::ifstream fin(this->CurFileName.c_str());
-          if (this->CurFileName == "" || !fin) {
+          if (this->CurFileName.empty() || !fin) {
             this->CurFileName =
-              this->Coverage.BinaryDir + "/" + atts[tagCount + 1];
+              cmStrCat(this->Coverage.BinaryDir, "/", atts[tagCount + 1]);
             fin.open(this->CurFileName.c_str());
             if (!fin) {
               cmCTestOptionalLog(this->CTest, HANDLER_VERBOSE_OUTPUT,
@@ -145,12 +139,12 @@ protected:
   }
 
 private:
-  bool InSources;
-  bool InSource;
-  bool SkipThisClass;
+  bool InSources = false;
+  bool InSource = false;
+  bool SkipThisClass = false;
   std::vector<std::string> FilePaths;
-  typedef cmCTestCoverageHandlerContainer::SingleFileCoverageVector
-    FileLinesType;
+  using FileLinesType =
+    cmCTestCoverageHandlerContainer::SingleFileCoverageVector;
   cmCTest* CTest;
   cmCTestCoverageHandlerContainer& Coverage;
   std::string CurFileName;

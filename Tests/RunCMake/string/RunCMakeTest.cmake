@@ -3,8 +3,15 @@ include(RunCMake)
 run_cmake(Append)
 run_cmake(AppendNoArgs)
 
+run_cmake(Prepend)
+run_cmake(PrependNoArgs)
+
 run_cmake(Concat)
 run_cmake(ConcatNoArgs)
+
+run_cmake(Join)
+run_cmake(JoinNoArgs)
+run_cmake(JoinNoVar)
 
 run_cmake(Timestamp)
 run_cmake(TimestampEmpty)
@@ -20,8 +27,13 @@ run_cmake(UuidMissingTypeValue)
 run_cmake(UuidBadType)
 
 run_cmake(RegexClear)
+run_cmake(RegexMultiMatchClear)
 
 run_cmake(UTF-16BE)
 run_cmake(UTF-16LE)
 run_cmake(UTF-32BE)
 run_cmake(UTF-32LE)
+
+run_cmake(Repeat)
+run_cmake(RepeatNoArgs)
+run_cmake(RepeatNegativeCount)

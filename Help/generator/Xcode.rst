@@ -3,6 +3,8 @@ Xcode
 
 Generate Xcode project files.
 
+This supports Xcode 5.0 and above.
+
 Toolset Selection
 ^^^^^^^^^^^^^^^^^
 

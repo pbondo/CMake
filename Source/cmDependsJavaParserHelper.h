@@ -3,34 +3,30 @@
 #ifndef cmDependsJavaParserHelper_h
 #define cmDependsJavaParserHelper_h
 
-#include <cmConfigure.h> // IWYU pragma: keep
+#include "cmConfigure.h" // IWYU pragma: keep
 
 #include <string>
 #include <vector>
-
-class cmDependsJavaParserHelper;
-
-#define YYSTYPE cmDependsJavaParserHelper::ParserType
-#define YYSTYPE_IS_DECLARED
-#define YY_EXTRA_TYPE cmDependsJavaParserHelper*
-#define YY_DECL int cmDependsJava_yylex(YYSTYPE* yylvalp, yyscan_t yyscanner)
 
 /** \class cmDependsJavaParserHelper
  * \brief Helper class for parsing java source files
  *
  * Finds dependencies for java file and list of outputs
  */
-
 class cmDependsJavaParserHelper
 {
 public:
-  typedef struct
+  struct ParserType
   {
     char* str;
-  } ParserType;
+  };
 
   cmDependsJavaParserHelper();
   ~cmDependsJavaParserHelper();
+
+  cmDependsJavaParserHelper(const cmDependsJavaParserHelper&) = delete;
+  cmDependsJavaParserHelper& operator=(const cmDependsJavaParserHelper&) =
+    delete;
 
   int ParseString(const char* str, int verb);
   int ParseFile(const char* file);
@@ -95,5 +91,10 @@ private:
 
   void CleanupParser();
 };
+
+#define YYSTYPE cmDependsJavaParserHelper::ParserType
+#define YYSTYPE_IS_DECLARED
+#define YY_EXTRA_TYPE cmDependsJavaParserHelper*
+#define YY_DECL int cmDependsJava_yylex(YYSTYPE* yylvalp, yyscan_t yyscanner)
 
 #endif

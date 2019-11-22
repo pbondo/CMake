@@ -4,36 +4,43 @@
 #ifndef cmLinkLineDeviceComputer_h
 #define cmLinkLineDeviceComputer_h
 
+#include "cmConfigure.h" // IWYU pragma: keep
+
+#include <string>
+#include <vector>
+
 #include "cmLinkLineComputer.h"
-class cmGlobalNinjaGenerator;
+
+class cmComputeLinkInformation;
+class cmGeneratorTarget;
+class cmLocalGenerator;
+class cmOutputConverter;
+class cmStateDirectory;
+template <typename T>
+class BT;
 
 class cmLinkLineDeviceComputer : public cmLinkLineComputer
 {
 public:
   cmLinkLineDeviceComputer(cmOutputConverter* outputConverter,
-                           cmStateDirectory stateDir);
-  ~cmLinkLineDeviceComputer() CM_OVERRIDE;
+                           cmStateDirectory const& stateDir);
+  ~cmLinkLineDeviceComputer() override;
 
-  std::string ComputeLinkLibraries(cmComputeLinkInformation& cli,
-                                   std::string const& stdLibString)
-    CM_OVERRIDE;
+  cmLinkLineDeviceComputer(cmLinkLineDeviceComputer const&) = delete;
+  cmLinkLineDeviceComputer& operator=(cmLinkLineDeviceComputer const&) =
+    delete;
+
+  bool ComputeRequiresDeviceLinking(cmComputeLinkInformation& cli);
+
+  void ComputeLinkLibraries(
+    cmComputeLinkInformation& cli, std::string const& stdLibString,
+    std::vector<BT<std::string>>& linkLibraries) override;
 
   std::string GetLinkerLanguage(cmGeneratorTarget* target,
-                                std::string const& config) CM_OVERRIDE;
+                                std::string const& config) override;
 };
 
-class cmNinjaLinkLineDeviceComputer : public cmLinkLineDeviceComputer
-{
-public:
-  cmNinjaLinkLineDeviceComputer(cmOutputConverter* outputConverter,
-                                cmStateDirectory stateDir,
-                                cmGlobalNinjaGenerator const* gg);
-
-  std::string ConvertToLinkReference(std::string const& input) const
-    CM_OVERRIDE;
-
-private:
-  cmGlobalNinjaGenerator const* GG;
-};
+bool requireDeviceLinking(cmGeneratorTarget& target, cmLocalGenerator& lg,
+                          const std::string& config);
 
 #endif

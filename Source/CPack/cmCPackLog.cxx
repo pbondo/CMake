@@ -2,7 +2,6 @@
    file Copyright.txt or https://cmake.org/licensing for details.  */
 #include "cmCPackLog.h"
 
-#include <cmConfigure.h>
 #include <iostream>
 
 #include "cmGeneratedFileStream.h"
@@ -19,13 +18,13 @@ cmCPackLog::cmCPackLog()
   this->DefaultOutput = &std::cout;
   this->DefaultError = &std::cerr;
 
-  this->LogOutput = CM_NULLPTR;
+  this->LogOutput = nullptr;
   this->LogOutputCleanup = false;
 }
 
 cmCPackLog::~cmCPackLog()
 {
-  this->SetLogOutputStream(CM_NULLPTR);
+  this->SetLogOutputStream(nullptr);
 }
 
 void cmCPackLog::SetLogOutputStream(std::ostream* os)
@@ -39,13 +38,13 @@ void cmCPackLog::SetLogOutputStream(std::ostream* os)
 
 bool cmCPackLog::SetLogOutputFile(const char* fname)
 {
-  cmGeneratedFileStream* cg = CM_NULLPTR;
+  cmGeneratedFileStream* cg = nullptr;
   if (fname) {
     cg = new cmGeneratedFileStream(fname);
   }
   if (cg && !*cg) {
     delete cg;
-    cg = CM_NULLPTR;
+    cg = nullptr;
   }
   this->SetLogOutputStream(cg);
   if (!cg) {
@@ -84,7 +83,7 @@ void cmCPackLog::Log(int tag, const char* file, int line, const char* msg,
       if (!tagString.empty()) {
         tagString += ",";
       }
-      tagString = "VERBOSE";
+      tagString += "VERBOSE";
     }
   }
   if (tag & LOG_WARNING) {
@@ -94,7 +93,7 @@ void cmCPackLog::Log(int tag, const char* file, int line, const char* msg,
       if (!tagString.empty()) {
         tagString += ",";
       }
-      tagString = "WARNING";
+      tagString += "WARNING";
     }
   }
   if (tag & LOG_ERROR) {
@@ -104,7 +103,7 @@ void cmCPackLog::Log(int tag, const char* file, int line, const char* msg,
       if (!tagString.empty()) {
         tagString += ",";
       }
-      tagString = "ERROR";
+      tagString += "ERROR";
     }
   }
   if (tag & LOG_DEBUG && this->Debug) {
@@ -114,7 +113,7 @@ void cmCPackLog::Log(int tag, const char* file, int line, const char* msg,
       if (!tagString.empty()) {
         tagString += ",";
       }
-      tagString = "DEBUG";
+      tagString += "DEBUG";
     }
     useFileAndLine = true;
   }
@@ -125,7 +124,7 @@ void cmCPackLog::Log(int tag, const char* file, int line, const char* msg,
       if (!tagString.empty()) {
         tagString += ",";
       }
-      tagString = "VERBOSE";
+      tagString += "VERBOSE";
     }
   }
   if (this->Quiet) {

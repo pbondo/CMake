@@ -3,16 +3,19 @@
 #ifndef cmCTestBuildCommand_h
 #define cmCTestBuildCommand_h
 
-#include <cmConfigure.h>
-
-#include "cmCTestHandlerCommand.h"
+#include "cmConfigure.h" // IWYU pragma: keep
 
 #include <string>
+#include <utility>
 #include <vector>
+
+#include <cm/memory>
+
+#include "cmCTestHandlerCommand.h"
+#include "cmCommand.h"
 
 class cmCTestBuildHandler;
 class cmCTestGenericHandler;
-class cmCommand;
 class cmExecutionStatus;
 class cmGlobalGenerator;
 
@@ -24,45 +27,40 @@ class cmGlobalGenerator;
 class cmCTestBuildCommand : public cmCTestHandlerCommand
 {
 public:
-  cmCTestBuildCommand();
-  ~cmCTestBuildCommand() CM_OVERRIDE;
+  ~cmCTestBuildCommand() override;
 
   /**
    * This is a virtual constructor for the command.
    */
-  cmCommand* Clone() CM_OVERRIDE
+  std::unique_ptr<cmCommand> Clone() override
   {
-    cmCTestBuildCommand* ni = new cmCTestBuildCommand;
+    auto ni = cm::make_unique<cmCTestBuildCommand>();
     ni->CTest = this->CTest;
     ni->CTestScriptHandler = this->CTestScriptHandler;
-    return ni;
+    return std::unique_ptr<cmCommand>(std::move(ni));
   }
 
   /**
    * The name of the command as specified in CMakeList.txt.
    */
-  std::string GetName() const CM_OVERRIDE { return "ctest_build"; }
+  std::string GetName() const override { return "ctest_build"; }
 
   bool InitialPass(std::vector<std::string> const& args,
-                   cmExecutionStatus& status) CM_OVERRIDE;
+                   cmExecutionStatus& status) override;
 
-  cmGlobalGenerator* GlobalGenerator;
+  cmGlobalGenerator* GlobalGenerator = nullptr;
 
 protected:
   cmCTestBuildHandler* Handler;
-  enum
-  {
-    ctb_BUILD = ct_LAST,
-    ctb_NUMBER_ERRORS,
-    ctb_NUMBER_WARNINGS,
-    ctb_TARGET,
-    ctb_CONFIGURATION,
-    ctb_FLAGS,
-    ctb_PROJECT_NAME,
-    ctb_LAST
-  };
+  void BindArguments() override;
+  cmCTestGenericHandler* InitializeHandler() override;
 
-  cmCTestGenericHandler* InitializeHandler() CM_OVERRIDE;
+  std::string NumberErrors;
+  std::string NumberWarnings;
+  std::string Target;
+  std::string Configuration;
+  std::string Flags;
+  std::string ProjectName;
 };
 
 #endif

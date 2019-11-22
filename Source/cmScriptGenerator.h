@@ -3,7 +3,7 @@
 #ifndef cmScriptGenerator_h
 #define cmScriptGenerator_h
 
-#include <cmConfigure.h> // IWYU pragma: keep
+#include "cmConfigure.h" // IWYU pragma: keep
 
 #include <ostream>
 #include <string>
@@ -12,10 +12,7 @@
 class cmScriptGeneratorIndent
 {
 public:
-  cmScriptGeneratorIndent()
-    : Level(0)
-  {
-  }
+  cmScriptGeneratorIndent() = default;
   cmScriptGeneratorIndent(int level)
     : Level(level)
   {
@@ -28,14 +25,14 @@ public:
   }
   cmScriptGeneratorIndent Next(int step = 2) const
   {
-    return cmScriptGeneratorIndent(this->Level + step);
+    return { this->Level + step };
   }
 
 private:
-  int Level;
+  int Level = 0;
 };
 inline std::ostream& operator<<(std::ostream& os,
-                                cmScriptGeneratorIndent const& indent)
+                                cmScriptGeneratorIndent indent)
 {
   indent.Write(os);
   return os;
@@ -48,22 +45,25 @@ inline std::ostream& operator<<(std::ostream& os,
 class cmScriptGenerator
 {
 public:
-  cmScriptGenerator(const std::string& config_var,
-                    std::vector<std::string> const& configurations);
+  cmScriptGenerator(std::string config_var,
+                    std::vector<std::string> configurations);
   virtual ~cmScriptGenerator();
+
+  cmScriptGenerator(cmScriptGenerator const&) = delete;
+  cmScriptGenerator& operator=(cmScriptGenerator const&) = delete;
 
   void Generate(std::ostream& os, const std::string& config,
                 std::vector<std::string> const& configurationTypes);
 
 protected:
-  typedef cmScriptGeneratorIndent Indent;
+  using Indent = cmScriptGeneratorIndent;
   virtual void GenerateScript(std::ostream& os);
-  virtual void GenerateScriptConfigs(std::ostream& os, Indent const& indent);
-  virtual void GenerateScriptActions(std::ostream& os, Indent const& indent);
+  virtual void GenerateScriptConfigs(std::ostream& os, Indent indent);
+  virtual void GenerateScriptActions(std::ostream& os, Indent indent);
   virtual void GenerateScriptForConfig(std::ostream& os,
                                        const std::string& config,
-                                       Indent const& indent);
-  virtual void GenerateScriptNoConfig(std::ostream&, Indent const&) {}
+                                       Indent indent);
+  virtual void GenerateScriptNoConfig(std::ostream&, Indent) {}
   virtual bool NeedsScriptNoConfig() const { return false; }
 
   // Test if this generator does something for a given configuration.
@@ -87,8 +87,8 @@ protected:
   bool ActionsPerConfig;
 
 private:
-  void GenerateScriptActionsOnce(std::ostream& os, Indent const& indent);
-  void GenerateScriptActionsPerConfig(std::ostream& os, Indent const& indent);
+  void GenerateScriptActionsOnce(std::ostream& os, Indent indent);
+  void GenerateScriptActionsPerConfig(std::ostream& os, Indent indent);
 };
 
 #endif

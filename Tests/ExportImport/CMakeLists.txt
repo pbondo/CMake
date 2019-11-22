@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 2.7.20090711)
+cmake_minimum_required (VERSION 3.9)
 project(ExportImport C CXX)
 if(NOT DEFINED CMake_TEST_NESTED_MAKE_PROGRAM AND NOT CMAKE_GENERATOR MATCHES "Visual Studio")
   set(CMake_TEST_NESTED_MAKE_PROGRAM "${CMAKE_MAKE_PROGRAM}")
@@ -7,7 +7,7 @@ endif()
 # Wipe out the install tree to make sure the exporter works.
 add_custom_command(
   OUTPUT ${ExportImport_BINARY_DIR}/CleanupProject
-  COMMAND ${CMAKE_COMMAND} -E remove_directory ${ExportImport_BINARY_DIR}/Root
+  COMMAND ${CMAKE_COMMAND} -E rm -rf ${ExportImport_BINARY_DIR}/Root
   )
 add_custom_target(CleanupTarget ALL DEPENDS ${ExportImport_BINARY_DIR}/CleanupProject)
 set_property(
@@ -15,7 +15,8 @@ set_property(
   PROPERTY SYMBOLIC 1
   )
 
-if(CMAKE_CONFIGURATION_TYPES)
+get_property(_isMultiConfig GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+if(_isMultiConfig)
   set(NESTED_CONFIG_TYPE -C "${CMAKE_CFG_INTDIR}")
 else()
   if(CMAKE_BUILD_TYPE)

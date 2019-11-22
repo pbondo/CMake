@@ -3,21 +3,23 @@
 
 #include "cmTargetPropertyComputer.h"
 
+#include <cctype>
 #include <sstream>
+#include <unordered_set>
 
+#include "cmMessageType.h"
 #include "cmMessenger.h"
 #include "cmPolicies.h"
 #include "cmStateSnapshot.h"
-#include "cm_unordered_set.hxx"
-#include "cmake.h"
+#include "cmStringAlgorithms.h"
 
 bool cmTargetPropertyComputer::HandleLocationPropertyPolicy(
   std::string const& tgtName, cmMessenger* messenger,
   cmListFileBacktrace const& context)
 {
   std::ostringstream e;
-  const char* modal = CM_NULLPTR;
-  cmake::MessageType messageType = cmake::AUTHOR_WARNING;
+  const char* modal = nullptr;
+  MessageType messageType = MessageType::AUTHOR_WARNING;
   switch (context.GetBottom().GetPolicy(cmPolicies::CMP0026)) {
     case cmPolicies::WARN:
       e << cmPolicies::GetPolicyWarning(cmPolicies::CMP0026) << "\n";
@@ -28,7 +30,7 @@ bool cmTargetPropertyComputer::HandleLocationPropertyPolicy(
     case cmPolicies::REQUIRED_IF_USED:
     case cmPolicies::NEW:
       modal = "may";
-      messageType = cmake::FATAL_ERROR;
+      messageType = MessageType::FATAL_ERROR;
   }
 
   if (modal) {
@@ -40,7 +42,7 @@ bool cmTargetPropertyComputer::HandleLocationPropertyPolicy(
     messenger->IssueMessage(messageType, e.str(), context);
   }
 
-  return messageType != cmake::FATAL_ERROR;
+  return messageType != MessageType::FATAL_ERROR;
 }
 
 bool cmTargetPropertyComputer::WhiteListedInterfaceProperty(
@@ -49,26 +51,43 @@ bool cmTargetPropertyComputer::WhiteListedInterfaceProperty(
   if (cmHasLiteralPrefix(prop, "INTERFACE_")) {
     return true;
   }
-  static CM_UNORDERED_SET<std::string> builtIns;
-  if (builtIns.empty()) {
-    builtIns.insert("COMPATIBLE_INTERFACE_BOOL");
-    builtIns.insert("COMPATIBLE_INTERFACE_NUMBER_MAX");
-    builtIns.insert("COMPATIBLE_INTERFACE_NUMBER_MIN");
-    builtIns.insert("COMPATIBLE_INTERFACE_STRING");
-    builtIns.insert("EXPORT_NAME");
-    builtIns.insert("IMPORTED");
-    builtIns.insert("NAME");
-    builtIns.insert("TYPE");
+  if (cmHasLiteralPrefix(prop, "_")) {
+    return true;
   }
+  if (std::islower(prop[0])) {
+    return true;
+  }
+  static std::unordered_set<std::string> const builtIns{
+    "COMPATIBLE_INTERFACE_BOOL",
+    "COMPATIBLE_INTERFACE_NUMBER_MAX",
+    "COMPATIBLE_INTERFACE_NUMBER_MIN",
+    "COMPATIBLE_INTERFACE_STRING",
+    "EXPORT_NAME",
+    "EXPORT_PROPERTIES",
+    "IMPORTED",
+    "IMPORTED_GLOBAL",
+    "MANUALLY_ADDED_DEPENDENCIES",
+    "NAME",
+    "PRIVATE_HEADER",
+    "PUBLIC_HEADER",
+    "TYPE"
+  };
 
   if (builtIns.count(prop)) {
     return true;
   }
 
   if (prop == "IMPORTED_CONFIGURATIONS" || prop == "IMPORTED_LIBNAME" ||
-      prop == "NO_SYSTEM_FROM_IMPORTED" ||
       cmHasLiteralPrefix(prop, "IMPORTED_LIBNAME_") ||
       cmHasLiteralPrefix(prop, "MAP_IMPORTED_CONFIG_")) {
+    return true;
+  }
+
+  // This property should not be allowed but was incorrectly added in
+  // CMake 3.8.  We can't remove it from the whitelist without breaking
+  // projects that try to set it.  One day we could warn about this, but
+  // for now silently accept it.
+  if (prop == "NO_SYSTEM_FROM_IMPORTED") {
     return true;
   }
 
@@ -85,7 +104,7 @@ bool cmTargetPropertyComputer::PassesWhitelist(
     e << "INTERFACE_LIBRARY targets may only have whitelisted properties.  "
          "The property \""
       << prop << "\" is not allowed.";
-    messenger->IssueMessage(cmake::FATAL_ERROR, e.str(), context);
+    messenger->IssueMessage(MessageType::FATAL_ERROR, e.str(), context);
     return false;
   }
   return true;

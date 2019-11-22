@@ -3,24 +3,13 @@
 cmake_minimum_required(VERSION 3.3)
 enable_language(C)
 
-if(TEST_IOS)
-  set(CMAKE_OSX_SYSROOT iphoneos)
-  set(CMAKE_OSX_ARCHITECTURES "armv7")
-  set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED "NO")
-  set(CMAKE_XCODE_ATTRIBUTE_ENABLE_BITCODE "NO")
-endif(TEST_IOS)
-
-if(TEST_WATCHOS)
-  set(CMAKE_OSX_SYSROOT watchos)
-  set(CMAKE_OSX_ARCHITECTURES "armv7k")
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
   set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED "NO")
   set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "")
-  set(CMAKE_XCODE_ATTRIBUTE_ENABLE_BITCODE "YES")
+  set(CMAKE_XCODE_ATTRIBUTE_ENABLE_BITCODE "NO")
 endif()
 
-if(TEST_TVOS)
-  set(CMAKE_OSX_SYSROOT appletvos)
-  set(CMAKE_OSX_ARCHITECTURES "arm64")
+if(CMAKE_SYSTEM_NAME STREQUAL "tvOS" OR CMAKE_SYSTEM_NAME STREQUAL "watchOS")
   set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED "NO")
   set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "")
   set(CMAKE_XCODE_ATTRIBUTE_ENABLE_BITCODE "YES")
@@ -38,7 +27,7 @@ add_dependencies(AppBundleTest AppBundle)
 
 # with custom extension
 
-if (NOT TEST_IOS AND NOT TEST_WATCHOS AND NOT TEST_TVOS)
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   add_executable(AppBundleExt MACOSX_BUNDLE main.m)
   set_target_properties(AppBundleExt PROPERTIES BUNDLE_EXTENSION "foo")
   install(TARGETS AppBundleExt BUNDLE DESTINATION FooExtension)
@@ -52,11 +41,15 @@ endif()
 
 # Shared Framework (not supported for iOS on Xcode < 6)
 
-if(NOT TEST_IOS OR NOT XCODE_VERSION VERSION_LESS 6)
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS" OR NOT XCODE_VERSION VERSION_LESS 6)
   add_library(SharedFramework SHARED main.c)
   set_target_properties(SharedFramework PROPERTIES FRAMEWORK TRUE)
 
   add_custom_target(SharedFrameworkTest ALL
+    COMMAND ${CMAKE_COMMAND} -E copy
+      "$<TARGET_BUNDLE_DIR:SharedFramework>" "$<TARGET_BUNDLE_DIR:SharedFramework>.old"
+    COMMAND ${CMAKE_COMMAND} -E copy
+      "$<TARGET_BUNDLE_CONTENT_DIR:SharedFramework>" "$<TARGET_BUNDLE_CONTENT_DIR:SharedFramework>.old"
     COMMAND ${CMAKE_COMMAND} -E copy
       "$<TARGET_FILE:SharedFramework>" "$<TARGET_FILE:SharedFramework>.old")
 
@@ -71,6 +64,10 @@ if(NOT TEST_IOS OR NOT XCODE_VERSION VERSION_LESS 6)
 
   add_custom_target(SharedFrameworkExtTest ALL
     COMMAND ${CMAKE_COMMAND} -E copy
+      "$<TARGET_BUNDLE_DIR:SharedFrameworkExt>" "$<TARGET_BUNDLE_DIR:SharedFrameworkExt>.old"
+    COMMAND ${CMAKE_COMMAND} -E copy
+      "$<TARGET_BUNDLE_CONTENT_DIR:SharedFrameworkExt>" "$<TARGET_BUNDLE_CONTENT_DIR:SharedFrameworkExt>.old"
+    COMMAND ${CMAKE_COMMAND} -E copy
       "$<TARGET_FILE:SharedFrameworkExt>" "$<TARGET_FILE:SharedFrameworkExt>.old")
 
   add_dependencies(SharedFrameworkExtTest SharedFrameworkExt)
@@ -83,6 +80,10 @@ if(NOT XCODE_VERSION VERSION_LESS 6)
   set_target_properties(StaticFramework PROPERTIES FRAMEWORK TRUE)
 
   add_custom_target(StaticFrameworkTest ALL
+    COMMAND ${CMAKE_COMMAND} -E copy
+      "$<TARGET_BUNDLE_DIR:StaticFramework>" "$<TARGET_BUNDLE_DIR:StaticFramework>.old"
+    COMMAND ${CMAKE_COMMAND} -E copy
+      "$<TARGET_BUNDLE_CONTENT_DIR:StaticFramework>" "$<TARGET_BUNDLE_CONTENT_DIR:StaticFramework>.old"
     COMMAND ${CMAKE_COMMAND} -E copy
       "$<TARGET_FILE:StaticFramework>" "$<TARGET_FILE:StaticFramework>.old")
 
@@ -97,6 +98,10 @@ if(NOT XCODE_VERSION VERSION_LESS 6)
 
   add_custom_target(StaticFrameworkExtTest ALL
     COMMAND ${CMAKE_COMMAND} -E copy
+      "$<TARGET_BUNDLE_DIR:StaticFrameworkExt>" "$<TARGET_BUNDLE_DIR:StaticFrameworkExt>.old"
+    COMMAND ${CMAKE_COMMAND} -E copy
+      "$<TARGET_BUNDLE_CONTENT_DIR:StaticFrameworkExt>" "$<TARGET_BUNDLE_CONTENT_DIR:StaticFrameworkExt>.old"
+    COMMAND ${CMAKE_COMMAND} -E copy
       "$<TARGET_FILE:StaticFrameworkExt>" "$<TARGET_FILE:StaticFrameworkExt>.old")
 
   add_dependencies(StaticFrameworkExtTest StaticFrameworkExt)
@@ -110,6 +115,10 @@ if(NOT CMAKE_XCODE_ATTRIBUTE_ENABLE_BITCODE)
 
   add_custom_target(BundleTest ALL
     COMMAND ${CMAKE_COMMAND} -E copy
+      "$<TARGET_BUNDLE_DIR:Bundle>" "$<TARGET_BUNDLE_DIR:Bundle>.old"
+    COMMAND ${CMAKE_COMMAND} -E copy
+      "$<TARGET_BUNDLE_CONTENT_DIR:Bundle>" "$<TARGET_BUNDLE_CONTENT_DIR:Bundle>.old"
+    COMMAND ${CMAKE_COMMAND} -E copy
       "$<TARGET_FILE:Bundle>" "$<TARGET_FILE:Bundle>.old")
 
   add_dependencies(BundleTest Bundle)
@@ -122,6 +131,10 @@ if(NOT CMAKE_XCODE_ATTRIBUTE_ENABLE_BITCODE)
   install(TARGETS BundleExt LIBRARY DESTINATION FooExtension)
 
   add_custom_target(BundleExtTest ALL
+    COMMAND ${CMAKE_COMMAND} -E copy
+      "$<TARGET_BUNDLE_DIR:BundleExt>" "$<TARGET_BUNDLE_DIR:BundleExt>.old"
+    COMMAND ${CMAKE_COMMAND} -E copy
+      "$<TARGET_BUNDLE_CONTENT_DIR:BundleExt>" "$<TARGET_BUNDLE_CONTENT_DIR:BundleExt>.old"
     COMMAND ${CMAKE_COMMAND} -E copy
       "$<TARGET_FILE:BundleExt>" "$<TARGET_FILE:BundleExt>.old")
 

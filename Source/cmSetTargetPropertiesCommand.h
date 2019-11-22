@@ -3,38 +3,14 @@
 #ifndef cmSetTargetsPropertiesCommand_h
 #define cmSetTargetsPropertiesCommand_h
 
-#include <cmConfigure.h>
+#include "cmConfigure.h" // IWYU pragma: keep
+
 #include <string>
 #include <vector>
 
-#include "cmCommand.h"
-
 class cmExecutionStatus;
-class cmMakefile;
 
-class cmSetTargetPropertiesCommand : public cmCommand
-{
-public:
-  cmCommand* Clone() CM_OVERRIDE { return new cmSetTargetPropertiesCommand; }
-
-  /**
-   * This is called when the command is first encountered in
-   * the input file.
-   */
-  bool InitialPass(std::vector<std::string> const& args,
-                   cmExecutionStatus& status) CM_OVERRIDE;
-
-  /**
-   * The name of the command as specified in CMakeList.txt.
-   */
-  std::string GetName() const CM_OVERRIDE { return "set_target_properties"; }
-
-  /**
-   *  Used by this command and cmSetPropertiesCommand
-   */
-  static bool SetOneTarget(const std::string& tname,
-                           std::vector<std::string>& propertyPairs,
-                           cmMakefile* mf);
-};
+bool cmSetTargetPropertiesCommand(std::vector<std::string> const& args,
+                                  cmExecutionStatus& status);
 
 #endif

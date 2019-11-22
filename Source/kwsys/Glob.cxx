@@ -12,11 +12,11 @@
 // Work-around CMake dependency scanning limitation.  This must
 // duplicate the above list of headers.
 #if 0
-#include "Configure.hxx.in"
-#include "Directory.hxx.in"
-#include "Glob.hxx.in"
-#include "RegularExpression.hxx.in"
-#include "SystemTools.hxx.in"
+#  include "Configure.hxx.in"
+#  include "Directory.hxx.in"
+#  include "Glob.hxx.in"
+#  include "RegularExpression.hxx.in"
+#  include "SystemTools.hxx.in"
 #endif
 
 #include <algorithm>
@@ -28,16 +28,15 @@
 #include <string.h>
 namespace KWSYS_NAMESPACE {
 #if defined(_WIN32) || defined(__APPLE__) || defined(__CYGWIN__)
-// On Windows and apple, no difference between lower and upper case
-#define KWSYS_GLOB_CASE_INDEPENDENT
+// On Windows and Apple, no difference between lower and upper case
+#  define KWSYS_GLOB_CASE_INDEPENDENT
 #endif
 
 #if defined(_WIN32) || defined(__CYGWIN__)
 // Handle network paths
-#define KWSYS_GLOB_SUPPORT_NETWORK_PATHS
+#  define KWSYS_GLOB_SUPPORT_NETWORK_PATHS
 #endif
 
-//----------------------------------------------------------------------------
 class GlobInternals
 {
 public:
@@ -45,7 +44,6 @@ public:
   std::vector<kwsys::RegularExpression> Expressions;
 };
 
-//----------------------------------------------------------------------------
 Glob::Glob()
 {
   this->Internals = new GlobInternals;
@@ -62,19 +60,16 @@ Glob::Glob()
   this->RecurseListDirs = false;
 }
 
-//----------------------------------------------------------------------------
 Glob::~Glob()
 {
   delete this->Internals;
 }
 
-//----------------------------------------------------------------------------
 std::vector<std::string>& Glob::GetFiles()
 {
   return this->Internals->Files;
 }
 
-//----------------------------------------------------------------------------
 std::string Glob::PatternToRegex(const std::string& pattern,
                                  bool require_whole_string, bool preserve_case)
 {
@@ -86,13 +81,13 @@ std::string Glob::PatternToRegex(const std::string& pattern,
     int c = *i;
     if (c == '*') {
       // A '*' (not between brackets) matches any string.
-      // We modify this to not match slashes since the orignal glob
+      // We modify this to not match slashes since the original glob
       // pattern documentation was meant for matching file name
       // components separated by slashes.
       regex += "[^/]*";
     } else if (c == '?') {
       // A '?' (not between brackets) matches any single character.
-      // We modify this to not match slashes since the orignal glob
+      // We modify this to not match slashes since the original glob
       // pattern documentation was meant for matching file name
       // components separated by slashes.
       regex += "[^/]";
@@ -183,7 +178,6 @@ std::string Glob::PatternToRegex(const std::string& pattern,
   return regex;
 }
 
-//----------------------------------------------------------------------------
 bool Glob::RecurseDirectory(std::string::size_type start,
                             const std::string& dir, GlobMessages* messages)
 {
@@ -207,7 +201,7 @@ bool Glob::RecurseDirectory(std::string::size_type start,
     }
 
 #if defined(KWSYS_GLOB_CASE_INDEPENDENT)
-    // On Windows and apple, no difference between lower and upper case
+    // On Windows and Apple, no difference between lower and upper case
     fname = kwsys::SystemTools::LowerCase(fname);
 #endif
 
@@ -223,9 +217,10 @@ bool Glob::RecurseDirectory(std::string::size_type start,
 
         if (!realPathErrorMessage.empty()) {
           if (messages) {
-            messages->push_back(Message(
-              Glob::error, "Canonical path generation from path '" + dir +
-                "' failed! Reason: '" + realPathErrorMessage + "'"));
+            messages->push_back(
+              Message(Glob::error,
+                      "Canonical path generation from path '" + dir +
+                        "' failed! Reason: '" + realPathErrorMessage + "'"));
           }
           return false;
         }
@@ -268,7 +263,7 @@ bool Glob::RecurseDirectory(std::string::size_type start,
       }
     } else {
       if (!this->Internals->Expressions.empty() &&
-          this->Internals->Expressions.rbegin()->find(fname)) {
+          this->Internals->Expressions.back().find(fname)) {
         this->AddFile(this->Internals->Files, realname);
       }
     }
@@ -277,7 +272,6 @@ bool Glob::RecurseDirectory(std::string::size_type start,
   return true;
 }
 
-//----------------------------------------------------------------------------
 void Glob::ProcessDirectory(std::string::size_type start,
                             const std::string& dir, GlobMessages* messages)
 {
@@ -337,7 +331,6 @@ void Glob::ProcessDirectory(std::string::size_type start,
   }
 }
 
-//----------------------------------------------------------------------------
 bool Glob::FindFiles(const std::string& inexpr, GlobMessages* messages)
 {
   std::string cexpr;
@@ -420,14 +413,12 @@ bool Glob::FindFiles(const std::string& inexpr, GlobMessages* messages)
   return true;
 }
 
-//----------------------------------------------------------------------------
 void Glob::AddExpression(const std::string& expr)
 {
   this->Internals->Expressions.push_back(
     kwsys::RegularExpression(this->PatternToRegex(expr)));
 }
 
-//----------------------------------------------------------------------------
 void Glob::SetRelative(const char* dir)
 {
   if (!dir) {
@@ -437,16 +428,14 @@ void Glob::SetRelative(const char* dir)
   this->Relative = dir;
 }
 
-//----------------------------------------------------------------------------
 const char* Glob::GetRelative()
 {
   if (this->Relative.empty()) {
-    return 0;
+    return nullptr;
   }
   return this->Relative.c_str();
 }
 
-//----------------------------------------------------------------------------
 void Glob::AddFile(std::vector<std::string>& files, const std::string& file)
 {
   if (!this->Relative.empty()) {

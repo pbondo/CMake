@@ -1,8 +1,11 @@
-#include <fstream>
 #include <iostream>
 #include <string>
 
-#include <cmsys/ConsoleBuf.hxx>
+#include "cmsys/FStream.hxx"
+
+#ifdef _WIN32
+#  include "cmsys/ConsoleBuf.hxx"
+#endif
 
 #ifdef _WIN32
 void setEncoding(cmsys::ConsoleBuf::Manager& buf, UINT codepage)
@@ -29,7 +32,7 @@ int main(int argc, char* argv[])
   }
   const std::string encoding(argv[1]);
 #ifdef _WIN32
-  if (encoding == "UTF8") {
+  if ((encoding == "UTF8") || (encoding == "UTF-8")) {
     setEncoding(consoleOut, CP_UTF8);
   } else if (encoding == "ANSI") {
     setEncoding(consoleOut, CP_ACP);
@@ -37,7 +40,7 @@ int main(int argc, char* argv[])
     setEncoding(consoleOut, CP_OEMCP);
   } // else AUTO
 #endif
-  std::ifstream file(argv[2]);
+  cmsys::ifstream file(argv[2]);
   if (!file.is_open()) {
     std::cout << "Failed to open file: " << argv[2] << std::endl;
     return 2;

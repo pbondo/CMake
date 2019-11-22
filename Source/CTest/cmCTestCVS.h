@@ -3,14 +3,14 @@
 #ifndef cmCTestCVS_h
 #define cmCTestCVS_h
 
-#include <cmConfigure.h>
-
-#include "cmCTestVC.h"
+#include "cmConfigure.h" // IWYU pragma: keep
 
 #include <iosfwd>
 #include <map>
 #include <string>
 #include <vector>
+
+#include "cmCTestVC.h"
 
 class cmCTest;
 class cmXMLWriter;
@@ -25,12 +25,12 @@ public:
   /** Construct with a CTest instance and update log stream.  */
   cmCTestCVS(cmCTest* ctest, std::ostream& log);
 
-  ~cmCTestCVS() CM_OVERRIDE;
+  ~cmCTestCVS() override;
 
 private:
   // Implement cmCTestVC internal API.
-  bool UpdateImpl() CM_OVERRIDE;
-  bool WriteXMLUpdates(cmXMLWriter& xml) CM_OVERRIDE;
+  bool UpdateImpl() override;
+  bool WriteXMLUpdates(cmXMLWriter& xml) override;
 
   // Update status for files in each directory.
   class Directory : public std::map<std::string, PathStatus>

@@ -281,7 +281,7 @@ if (WIN32)
       ${file}
       "[${hkey}]" DOC "Registry_Test_Path")
     exec_program(${CMAKE_COMMAND} ARGS "-E delete_regv \"${hkey}\"")
-    exec_program(${CMAKE_COMMAND} ARGS "-E remove \"${dir}/${file}\"")
+    exec_program(${CMAKE_COMMAND} ARGS "-E rm -f \"${dir}/${file}\"")
   endif ()
 endif ()
 
@@ -313,6 +313,8 @@ endwhile()
 
 set(SHOULD_BE_ZERO )
 set(SHOULD_BE_ONE 1)
+set(SHOULD_BE_ZERO_AND_INDENTED )
+set(SHOULD_BE_ONE_AND_INDENTED 1)
 
 # test elseif functionality, the mess below tries to catch problem
 # of clauses being executed early or late etc
@@ -394,13 +396,6 @@ set(CMAKE_CXX_STANDARD 98)
 # GNU extensions are needed for stricmp() on Windows.
 #
 set(CMAKE_CXX_EXTENSIONS TRUE)
-
-# Those versions of the HP compiler that need a flag to get proper C++98
-# template support also need a flag to use the newer C++ library.
-if (CMAKE_CXX_COMPILER_ID STREQUAL HP AND
-    CMAKE_CXX98_STANDARD_COMPILE_OPTION STREQUAL "+hpxstd98")
-  string(APPEND CMAKE_CXX_FLAGS " -AA")
-endif ()
 
 # Clang/C2 in C++98 mode cannot properly handle some of MSVC headers
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND

@@ -3,21 +3,14 @@
 #ifndef cmUtilitySourceCommand_h
 #define cmUtilitySourceCommand_h
 
-#include <cmConfigure.h>
+#include "cmConfigure.h" // IWYU pragma: keep
+
 #include <string>
 #include <vector>
 
-#include "cmCommand.h"
-
 class cmExecutionStatus;
 
-class cmUtilitySourceCommand : public cmCommand
-{
-public:
-  cmCommand* Clone() CM_OVERRIDE { return new cmUtilitySourceCommand; }
-  bool InitialPass(std::vector<std::string> const& args,
-                   cmExecutionStatus& status) CM_OVERRIDE;
-  std::string GetName() const CM_OVERRIDE { return "utility_source"; }
-};
+bool cmUtilitySourceCommand(std::vector<std::string> const& args,
+                            cmExecutionStatus& status);
 
 #endif

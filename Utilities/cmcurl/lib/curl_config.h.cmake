@@ -42,9 +42,6 @@
 /* to disable RTSP */
 #cmakedefine CURL_DISABLE_RTSP 1
 
-/* to disable RTMP */
-#cmakedefine CURL_DISABLE_RTMP 1
-
 /* to disable SMB */
 #cmakedefine CURL_DISABLE_SMB 1
 
@@ -72,9 +69,6 @@
 
 /* when not building a shared library */
 #cmakedefine CURL_STATICLIB 1
-
-/* Set to explicitly specify we don't want to use thread-safe functions */
-#cmakedefine DISABLED_THREADSAFE 1
 
 /* your Entropy Gathering Daemon socket pathname */
 #cmakedefine EGD_SOCKET ${EGD_SOCKET}
@@ -123,6 +117,9 @@
 
 /* Define to 1 if bool is an available type. */
 #cmakedefine HAVE_BOOL_T 1
+
+/* Define to 1 if you have the __builtin_available function. */
+#cmakedefine HAVE_BUILTIN_AVAILABLE 1
 
 /* Define to 1 if you have the clock_gettime function and monotonic timer. */
 #cmakedefine HAVE_CLOCK_GETTIME_MONOTONIC 1
@@ -229,8 +226,17 @@
 /* Define to 1 if you have the `getprotobyname' function. */
 #cmakedefine HAVE_GETPROTOBYNAME 1
 
+/* Define to 1 if you have the `getpeername' function. */
+#cmakedefine HAVE_GETPEERNAME 1
+
+/* Define to 1 if you have the `getsockname' function. */
+#cmakedefine HAVE_GETSOCKNAME 1
+
 /* Define to 1 if you have the `getpwuid' function. */
 #cmakedefine HAVE_GETPWUID 1
+
+/* Define to 1 if you have the `getpwuid_r' function. */
+#cmakedefine HAVE_GETPWUID_R 1
 
 /* Define to 1 if you have the `getrlimit' function. */
 #cmakedefine HAVE_GETRLIMIT 1
@@ -395,8 +401,8 @@
 /* if zlib is available */
 #cmakedefine HAVE_LIBZ 1
 
-/* Define to 1 if you have the <limits.h> header file. */
-#cmakedefine HAVE_LIMITS_H 1
+/* if brotli is available */
+#cmakedefine HAVE_BROTLI 1
 
 /* if your compiler supports LL */
 #cmakedefine HAVE_LL 1
@@ -511,6 +517,15 @@
 
 /* Define to 1 if you have the send function. */
 #cmakedefine HAVE_SEND 1
+
+/* Define to 1 if you have the 'fsetxattr' function. */
+#cmakedefine HAVE_FSETXATTR 1
+
+/* fsetxattr() takes 5 args */
+#cmakedefine HAVE_FSETXATTR_5 1
+
+/* fsetxattr() takes 6 args */
+#cmakedefine HAVE_FSETXATTR_6 1
 
 /* Define to 1 if you have the <setjmp.h> header file. */
 #cmakedefine HAVE_SETJMP_H 1
@@ -873,8 +888,17 @@
 /* The size of `long', as computed by sizeof. */
 @SIZEOF_LONG_CODE@
 
+/* The size of `long long', as computed by sizeof. */
+@SIZEOF_LONG_LONG_CODE@
+
+/* The size of `__int64', as computed by sizeof. */
+@SIZEOF___INT64_CODE@
+
 /* The size of `off_t', as computed by sizeof. */
 @SIZEOF_OFF_T_CODE@
+
+/* The size of `curl_off_t', as computed by sizeof. */
+@SIZEOF_CURL_OFF_T_CODE@
 
 /* The size of `size_t', as computed by sizeof. */
 @SIZEOF_SIZE_T_CODE@
@@ -912,6 +936,9 @@
 /* if PolarSSL is enabled */
 #cmakedefine USE_POLARSSL 1
 
+/* if Secure Transport is enabled */
+#cmakedefine USE_SECTRANSP 1
+
 /* if mbedTLS is enabled */
 #cmakedefine USE_MBEDTLS 1
 
@@ -942,14 +969,14 @@
 /* to enable Windows SSL  */
 #cmakedefine USE_SCHANNEL 1
 
+/* enable multiple SSL backends */
+#cmakedefine CURL_WITH_MULTI_SSL 1
+
 /* Define to 1 if using yaSSL in OpenSSL compatibility mode. */
 #cmakedefine USE_YASSLEMUL 1
 
 /* Version number of package */
 #cmakedefine VERSION ${VERSION}
-
-/* Define to avoid automatic inclusion of winsock.h */
-#cmakedefine WIN32_LEAN_AND_MEAN 1
 
 /* Define to 1 if OS is AIX. */
 #ifndef _ALL_SOURCE
@@ -992,3 +1019,6 @@
    typedef int ssize_t;
 # endif
 #endif
+
+/* Define to 1 if you have the mach_absolute_time function. */
+#cmakedefine HAVE_MACH_ABSOLUTE_TIME 1

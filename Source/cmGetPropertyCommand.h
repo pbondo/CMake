@@ -3,64 +3,14 @@
 #ifndef cmGetPropertyCommand_h
 #define cmGetPropertyCommand_h
 
-#include <cmConfigure.h>
+#include "cmConfigure.h" // IWYU pragma: keep
+
 #include <string>
 #include <vector>
 
-#include "cmCommand.h"
-
 class cmExecutionStatus;
 
-class cmGetPropertyCommand : public cmCommand
-{
-public:
-  cmGetPropertyCommand();
-
-  cmCommand* Clone() CM_OVERRIDE { return new cmGetPropertyCommand; }
-
-  /**
-   * This is called when the command is first encountered in
-   * the input file.
-   */
-  bool InitialPass(std::vector<std::string> const& args,
-                   cmExecutionStatus& status) CM_OVERRIDE;
-
-  /**
-   * This determines if the command is invoked when in script mode.
-   */
-  bool IsScriptable() const CM_OVERRIDE { return true; }
-
-  /**
-   * The name of the command as specified in CMakeList.txt.
-   */
-  std::string GetName() const CM_OVERRIDE { return "get_property"; }
-
-private:
-  enum OutType
-  {
-    OutValue,
-    OutDefined,
-    OutBriefDoc,
-    OutFullDoc,
-    OutSet
-  };
-  std::string Variable;
-  std::string Name;
-  std::string PropertyName;
-  OutType InfoType;
-
-  // Implementation of result storage.
-  bool StoreResult(const char* value);
-
-  // Implementation of each property type.
-  bool HandleGlobalMode();
-  bool HandleDirectoryMode();
-  bool HandleTargetMode();
-  bool HandleSourceMode();
-  bool HandleTestMode();
-  bool HandleVariableMode();
-  bool HandleCacheMode();
-  bool HandleInstallMode();
-};
+bool cmGetPropertyCommand(std::vector<std::string> const& args,
+                          cmExecutionStatus& status);
 
 #endif

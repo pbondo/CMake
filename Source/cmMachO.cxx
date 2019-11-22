@@ -2,11 +2,15 @@
    file Copyright.txt or https://cmake.org/licensing for details.  */
 #include "cmMachO.h"
 
-#include <algorithm>
-#include <cmsys/FStream.hxx>
-#include <stddef.h>
+#include <cstddef>
 #include <string>
 #include <vector>
+
+#include <cm/memory>
+
+#include "cmsys/FStream.hxx"
+
+#include "cmAlgorithms.h"
 
 // Include the Mach-O format information system header.
 #include <mach-o/fat.h>
@@ -52,10 +56,7 @@ bool peek(cmsys::ifstream& fin, T& v)
 template <typename T>
 bool read(cmsys::ifstream& fin, T& v)
 {
-  if (!fin.read(reinterpret_cast<char*>(&v), sizeof(T))) {
-    return false;
-  }
-  return true;
+  return !!fin.read(reinterpret_cast<char*>(&v), sizeof(T));
 }
 
 // read from the file and fill multiple data structures where
@@ -67,10 +68,7 @@ bool read(cmsys::ifstream& fin, std::vector<T>& v)
   if (v.empty()) {
     return true;
   }
-  if (!fin.read(reinterpret_cast<char*>(&v[0]), sizeof(T) * v.size())) {
-    return false;
-  }
-  return true;
+  return !!fin.read(reinterpret_cast<char*>(&v[0]), sizeof(T) * v.size());
 }
 }
 
@@ -97,7 +95,7 @@ public:
     : Swap(_swap)
   {
   }
-  virtual ~cmMachOHeaderAndLoadCommands() {}
+  virtual ~cmMachOHeaderAndLoadCommands() = default;
 
   virtual bool read_mach_o(cmsys::ifstream& fin) = 0;
 
@@ -126,7 +124,7 @@ protected:
 
 // Implementation for reading Mach-O header and load commands.
 // This is 32 or 64 bit arch specific.
-template <class T>
+template <typename T>
 class cmMachOHeaderAndLoadCommandsImpl : public cmMachOHeaderAndLoadCommands
 {
 public:
@@ -134,7 +132,7 @@ public:
     : cmMachOHeaderAndLoadCommands(_swap)
   {
   }
-  bool read_mach_o(cmsys::ifstream& fin)
+  bool read_mach_o(cmsys::ifstream& fin) override
   {
     if (!read(fin, this->Header)) {
       return false;
@@ -251,8 +249,7 @@ cmMachOInternal::cmMachOInternal(const char* fname)
     }
 
     // parse each Mach-O file
-    for (size_t i = 0; i < this->FatArchs.size(); i++) {
-      const fat_arch& arch = this->FatArchs[i];
+    for (const auto& arch : this->FatArchs) {
       if (!this->read_mach_o(OSSwapBigToHostInt32(arch.offset))) {
         return;
       }
@@ -265,8 +262,8 @@ cmMachOInternal::cmMachOInternal(const char* fname)
 
 cmMachOInternal::~cmMachOInternal()
 {
-  for (size_t i = 0; i < this->MachOList.size(); i++) {
-    delete this->MachOList[i];
+  for (auto& i : this->MachOList) {
+    delete i;
   }
 }
 
@@ -283,7 +280,7 @@ bool cmMachOInternal::read_mach_o(uint32_t file_offset)
     return false;
   }
 
-  cmMachOHeaderAndLoadCommands* f = NULL;
+  cmMachOHeaderAndLoadCommands* f = nullptr;
   if (magic == MH_CIGAM || magic == MH_MAGIC) {
     bool swap = false;
     if (magic == MH_CIGAM) {
@@ -313,15 +310,11 @@ bool cmMachOInternal::read_mach_o(uint32_t file_offset)
 // External class implementation.
 
 cmMachO::cmMachO(const char* fname)
-  : Internal(0)
+  : Internal(cm::make_unique<cmMachOInternal>(fname))
 {
-  this->Internal = new cmMachOInternal(fname);
 }
 
-cmMachO::~cmMachO()
-{
-  delete this->Internal;
-}
+cmMachO::~cmMachO() = default;
 
 std::string const& cmMachO::GetErrorMessage() const
 {

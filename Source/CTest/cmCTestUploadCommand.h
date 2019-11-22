@@ -3,15 +3,18 @@
 #ifndef cmCTestUploadCommand_h
 #define cmCTestUploadCommand_h
 
-#include <cmConfigure.h>
-
-#include "cmCTest.h"
-#include "cmCTestHandlerCommand.h"
+#include "cmConfigure.h" // IWYU pragma: keep
 
 #include <string>
+#include <utility>
+#include <vector>
+
+#include <cm/memory>
+
+#include "cmCTestHandlerCommand.h"
+#include "cmCommand.h"
 
 class cmCTestGenericHandler;
-class cmCommand;
 
 /** \class cmCTestUpload
  * \brief Run a ctest script
@@ -22,40 +25,28 @@ class cmCommand;
 class cmCTestUploadCommand : public cmCTestHandlerCommand
 {
 public:
-  cmCTestUploadCommand() {}
-
   /**
    * This is a virtual constructor for the command.
    */
-  cmCommand* Clone() CM_OVERRIDE
+  std::unique_ptr<cmCommand> Clone() override
   {
-    cmCTestUploadCommand* ni = new cmCTestUploadCommand;
+    auto ni = cm::make_unique<cmCTestUploadCommand>();
     ni->CTest = this->CTest;
     ni->CTestScriptHandler = this->CTestScriptHandler;
-    return ni;
+    return std::unique_ptr<cmCommand>(std::move(ni));
   }
 
   /**
    * The name of the command as specified in CMakeList.txt.
    */
-  std::string GetName() const CM_OVERRIDE { return "ctest_upload"; }
-
-  typedef cmCTestHandlerCommand Superclass;
+  std::string GetName() const override { return "ctest_upload"; }
 
 protected:
-  cmCTestGenericHandler* InitializeHandler() CM_OVERRIDE;
+  void BindArguments() override;
+  void CheckArguments(std::vector<std::string> const&) override;
+  cmCTestGenericHandler* InitializeHandler() override;
 
-  bool CheckArgumentKeyword(std::string const& arg) CM_OVERRIDE;
-  bool CheckArgumentValue(std::string const& arg) CM_OVERRIDE;
-
-  enum
-  {
-    ArgumentDoingFiles = Superclass::ArgumentDoingLast1,
-    ArgumentDoingCaptureCMakeError,
-    ArgumentDoingLast2
-  };
-
-  cmCTest::SetOfStrings Files;
+  std::vector<std::string> Files;
 };
 
 #endif

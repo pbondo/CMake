@@ -2,10 +2,10 @@
    file Copyright.txt or https://cmake.org/licensing for details.  */
 #include "cmInstallGenerator.h"
 
+#include <ostream>
+
 #include "cmMakefile.h"
 #include "cmSystemTools.h"
-
-#include <ostream>
 
 cmInstallGenerator::cmInstallGenerator(
   const char* destination, std::vector<std::string> const& configurations,
@@ -18,8 +18,19 @@ cmInstallGenerator::cmInstallGenerator(
 {
 }
 
-cmInstallGenerator::~cmInstallGenerator()
+cmInstallGenerator::~cmInstallGenerator() = default;
+
+bool cmInstallGenerator::HaveInstall()
 {
+  return true;
+}
+
+void cmInstallGenerator::CheckCMP0082(bool& haveSubdirectoryInstall,
+                                      bool& haveInstallAfterSubdirectory)
+{
+  if (haveSubdirectoryInstall) {
+    haveInstallAfterSubdirectory = true;
+  }
 }
 
 void cmInstallGenerator::AddInstallRule(
@@ -27,7 +38,7 @@ void cmInstallGenerator::AddInstallRule(
   std::vector<std::string> const& files, bool optional /* = false */,
   const char* permissions_file /* = 0 */,
   const char* permissions_dir /* = 0 */, const char* rename /* = 0 */,
-  const char* literal_args /* = 0 */, Indent const& indent)
+  const char* literal_args /* = 0 */, Indent indent)
 {
   // Use the FILE command to install the file.
   std::string stype;
@@ -55,20 +66,21 @@ void cmInstallGenerator::AddInstallRule(
       break;
   }
   os << indent;
-  if (cmSystemTools::FileIsFullPath(dest.c_str())) {
+  if (cmSystemTools::FileIsFullPath(dest)) {
     os << "list(APPEND CMAKE_ABSOLUTE_DESTINATION_FILES\n";
     os << indent << " \"";
-    for (std::vector<std::string>::const_iterator fi = files.begin();
-         fi != files.end(); ++fi) {
-      if (fi != files.begin()) {
+    bool firstIteration = true;
+    for (std::string const& file : files) {
+      if (!firstIteration) {
         os << ";";
       }
       os << dest << "/";
       if (rename && *rename) {
         os << rename;
       } else {
-        os << cmSystemTools::GetFilenameName(*fi);
+        os << cmSystemTools::GetFilenameName(file);
       }
+      firstIteration = false;
     }
     os << "\")\n";
     os << indent << "if(CMAKE_WARN_ON_ABSOLUTE_INSTALL_DESTINATION)\n";
@@ -113,9 +125,8 @@ void cmInstallGenerator::AddInstallRule(
   if (files.size() == 1) {
     os << " \"" << files[0] << "\"";
   } else {
-    for (std::vector<std::string>::const_iterator fi = files.begin();
-         fi != files.end(); ++fi) {
-      os << "\n" << indent << "  \"" << *fi << "\"";
+    for (std::string const& f : files) {
+      os << "\n" << indent << "  \"" << f << "\"";
     }
     os << "\n" << indent << " ";
     if (!(literal_args && *literal_args)) {
@@ -131,9 +142,9 @@ void cmInstallGenerator::AddInstallRule(
 std::string cmInstallGenerator::CreateComponentTest(const char* component,
                                                     bool exclude_from_all)
 {
-  std::string result = "\"${CMAKE_INSTALL_COMPONENT}\" STREQUAL \"";
+  std::string result = R"("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "x)";
   result += component;
-  result += "\"";
+  result += "x\"";
   if (!exclude_from_all) {
     result += " OR NOT CMAKE_INSTALL_COMPONENT";
   }
@@ -166,7 +177,7 @@ std::string cmInstallGenerator::ConvertToAbsoluteDestination(
   std::string const& dest) const
 {
   std::string result;
-  if (!dest.empty() && !cmSystemTools::FileIsFullPath(dest.c_str())) {
+  if (!dest.empty() && !cmSystemTools::FileIsFullPath(dest)) {
     result = "${CMAKE_INSTALL_PREFIX}/";
   }
   result += dest;

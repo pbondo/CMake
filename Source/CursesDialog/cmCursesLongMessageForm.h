@@ -3,29 +3,38 @@
 #ifndef cmCursesLongMessageForm_h
 #define cmCursesLongMessageForm_h
 
-#include <cmConfigure.h>
-
-#include "cmCursesForm.h"
-#include "cmCursesStandardIncludes.h"
+#include "cmConfigure.h" // IWYU pragma: keep
 
 #include <string>
 #include <vector>
 
+#include "cmCursesForm.h"
+#include "cmCursesStandardIncludes.h"
+
 class cmCursesLongMessageForm : public cmCursesForm
 {
 public:
+  enum class ScrollBehavior
+  {
+    NoScroll,
+    ScrollDown
+  };
+
   cmCursesLongMessageForm(std::vector<std::string> const& messages,
-                          const char* title);
-  ~cmCursesLongMessageForm() CM_OVERRIDE;
+                          const char* title, ScrollBehavior scrollBehavior);
+  ~cmCursesLongMessageForm() override;
+
+  cmCursesLongMessageForm(cmCursesLongMessageForm const&) = delete;
+  cmCursesLongMessageForm& operator=(cmCursesLongMessageForm const&) = delete;
 
   // Description:
   // Handle user input.
-  void HandleInput() CM_OVERRIDE;
+  void HandleInput() override;
 
   // Description:
   // Display form. Use a window of size width x height, starting
   // at top, left.
-  void Render(int left, int top, int width, int height) CM_OVERRIDE;
+  void Render(int left, int top, int width, int height) override;
 
   // Description:
   // This method should normally  called only by the form.
@@ -35,14 +44,12 @@ public:
   // Description:
   // This method should normally  called only by the form.
   // The only exception is during a resize.
-  void UpdateStatusBar() CM_OVERRIDE;
+  void UpdateStatusBar() override;
 
 protected:
-  cmCursesLongMessageForm(const cmCursesLongMessageForm& from);
-  void operator=(const cmCursesLongMessageForm&);
-
   std::string Messages;
   std::string Title;
+  ScrollBehavior Scrolling;
 
   FIELD* Fields[2];
 };

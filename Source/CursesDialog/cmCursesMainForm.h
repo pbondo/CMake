@@ -3,18 +3,22 @@
 #ifndef cmCursesMainForm_h
 #define cmCursesMainForm_h
 
-#include <cmConfigure.h>
+#include "cmConfigure.h" // IWYU pragma: keep
 
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <cm/optional>
+
+#include "cmCursesCacheEntryComposite.h"
 #include "cmCursesForm.h"
 #include "cmCursesStandardIncludes.h"
 #include "cmStateTypes.h"
 
-#include <stddef.h>
-#include <string>
-#include <vector>
-
-class cmCursesCacheEntryComposite;
 class cmake;
+class cmCursesLongMessageForm;
 
 /** \class cmCursesMainForm
  * \brief The main page of ccmake
@@ -24,8 +28,11 @@ class cmake;
 class cmCursesMainForm : public cmCursesForm
 {
 public:
-  cmCursesMainForm(std::vector<std::string> const& args, int initwidth);
-  ~cmCursesMainForm() CM_OVERRIDE;
+  cmCursesMainForm(std::vector<std::string> args, int initwidth);
+  ~cmCursesMainForm() override;
+
+  cmCursesMainForm(cmCursesMainForm const&) = delete;
+  cmCursesMainForm& operator=(cmCursesMainForm const&) = delete;
 
   /**
    * Set the widgets which represent the cache entries.
@@ -35,13 +42,13 @@ public:
   /**
    * Handle user input.
    */
-  void HandleInput() CM_OVERRIDE;
+  void HandleInput() override;
 
   /**
    * Display form. Use a window of size width x height, starting
    * at top, left.
    */
-  void Render(int left, int top, int width, int height) CM_OVERRIDE;
+  void Render(int left, int top, int width, int height) override;
 
   /**
    * Returns true if an entry with the given key is in the
@@ -62,8 +69,8 @@ public:
    * exception is during a resize. The optional argument specifies the
    * string to be displayed in the status bar.
    */
-  void UpdateStatusBar() CM_OVERRIDE { this->UpdateStatusBar(CM_NULLPTR); }
-  virtual void UpdateStatusBar(const char* message);
+  void UpdateStatusBar() override { this->UpdateStatusBar(cm::nullopt); }
+  void UpdateStatusBar(cm::optional<std::string> message);
 
   /**
    * Display current commands and their keys on the toolbar.  This
@@ -78,7 +85,7 @@ public:
    * During a CMake run, an error handle should add errors
    * to be displayed afterwards.
    */
-  void AddError(const char* message, const char* title) CM_OVERRIDE;
+  void AddError(const std::string& message, const char* title) override;
 
   /**
    * Used to do a configure. If argument is specified, it does only the check
@@ -99,13 +106,9 @@ public:
   /**
    * Progress callback
    */
-  static void UpdateProgressOld(const char* msg, float prog, void*);
-  static void UpdateProgress(const char* msg, float prog, void*);
+  void UpdateProgress(const std::string& msg, float prog);
 
 protected:
-  cmCursesMainForm(const cmCursesMainForm& from);
-  void operator=(const cmCursesMainForm&);
-
   // Copy the cache values from the user interface to the actual
   // cache.
   void FillCacheManagerFromUI();
@@ -122,11 +125,25 @@ protected:
   // Jump to the cache entry whose name matches the string.
   void JumpToCacheEntry(const char* str);
 
+  // Clear and reset the output log and state
+  void ResetOutputs();
+
+  // Display the current progress and output
+  void DisplayOutputs();
+
   // Copies of cache entries stored in the user interface
-  std::vector<cmCursesCacheEntryComposite*>* Entries;
-  // Errors produced during last run of cmake
-  std::vector<std::string> Errors;
-  // Command line argumens to be passed to cmake each time
+  std::vector<cmCursesCacheEntryComposite> Entries;
+
+  // The form used to display logs during processing
+  std::unique_ptr<cmCursesLongMessageForm> LogForm;
+  // Output produced by the last pass
+  std::vector<std::string> Outputs;
+  // Did the last pass produced outputs of interest (errors, warnings, ...)
+  bool HasNonStatusOutputs;
+  // Last progress bar
+  std::string LastProgress;
+
+  // Command line arguments to be passed to cmake each time
   // it is run
   std::vector<std::string> Args;
   // Message displayed when user presses 'h'
@@ -137,11 +154,7 @@ protected:
   static const char* s_ConstHelpMessage;
 
   // Fields displayed. Includes labels, new entry markers, entries
-  FIELD** Fields;
-  // Where is source of current project
-  std::string WhereSource;
-  // Where is cmake executable
-  std::string WhereCMake;
+  std::vector<FIELD*> Fields;
   // Number of entries shown (depends on mode -normal or advanced-)
   size_t NumberOfVisibleEntries;
   bool AdvancedMode;
@@ -151,7 +164,7 @@ protected:
   int NumberOfPages;
 
   int InitialWidth;
-  cmake* CMakeInstance;
+  std::unique_ptr<cmake> CMakeInstance;
 
   std::string SearchString;
   std::string OldSearchString;

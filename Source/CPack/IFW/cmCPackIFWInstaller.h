@@ -3,27 +3,27 @@
 #ifndef cmCPackIFWInstaller_h
 #define cmCPackIFWInstaller_h
 
-#include <cmConfigure.h> // IWYU pragma: keep
+#include "cmConfigure.h" // IWYU pragma: keep
 
 #include <map>
 #include <string>
 #include <vector>
 
-class cmCPackIFWGenerator;
+#include "cmCPackIFWCommon.h"
+
 class cmCPackIFWPackage;
 class cmCPackIFWRepository;
-class cmXMLWriter;
 
 /** \class cmCPackIFWInstaller
  * \brief A binary installer to be created CPack IFW generator
  */
-class cmCPackIFWInstaller
+class cmCPackIFWInstaller : public cmCPackIFWCommon
 {
 public:
   // Types
 
-  typedef std::map<std::string, cmCPackIFWPackage*> PackagesMap;
-  typedef std::vector<cmCPackIFWRepository*> RepositoriesVector;
+  using PackagesMap = std::map<std::string, cmCPackIFWPackage*>;
+  using RepositoriesVector = std::vector<cmCPackIFWRepository*>;
 
 public:
   // Constructor
@@ -72,6 +72,9 @@ public:
   /// Wizard style name
   std::string WizardStyle;
 
+  /// Filename for a style sheet
+  std::string StyleSheet;
+
   /// Wizard width
   std::string WizardDefaultWidth;
 
@@ -99,6 +102,10 @@ public:
   /// Set to true if the installation path can contain non-ASCII characters
   std::string AllowNonAsciiCharacters;
 
+  /// Set to false if the target directory should not be deleted when
+  /// uninstalling
+  std::string RemoveTargetDir;
+
   /// Set to false if the installation path cannot contain space characters
   std::string AllowSpaceInPath;
 
@@ -111,28 +118,17 @@ public:
 public:
   // Internal implementation
 
-  const char* GetOption(const std::string& op) const;
-  bool IsOn(const std::string& op) const;
-
-  bool IsVersionLess(const char* version);
-  bool IsVersionGreater(const char* version);
-  bool IsVersionEqual(const char* version);
-
   void ConfigureFromOptions();
 
   void GenerateInstallerFile();
 
   void GeneratePackageFiles();
 
-  cmCPackIFWGenerator* Generator;
   PackagesMap Packages;
   RepositoriesVector RemoteRepositories;
   std::string Directory;
 
 protected:
-  void WriteGeneratedByToStrim(cmXMLWriter& xout);
-
-private:
   void printSkippedOptionWarning(const std::string& optionName,
                                  const std::string& optionValue);
 };

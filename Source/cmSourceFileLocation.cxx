@@ -2,24 +2,16 @@
    file Copyright.txt or https://cmake.org/licensing for details.  */
 #include "cmSourceFileLocation.h"
 
-#include <cmConfigure.h>
+#include <cassert>
 
-#include "cmAlgorithms.h"
 #include "cmGlobalGenerator.h"
 #include "cmMakefile.h"
+#include "cmMessageType.h"
+#include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 #include "cmake.h"
 
-#include <algorithm>
-#include <assert.h>
-#include <vector>
-
-cmSourceFileLocation::cmSourceFileLocation()
-  : Makefile(CM_NULLPTR)
-  , AmbiguousDirectory(true)
-  , AmbiguousExtension(true)
-{
-}
+cmSourceFileLocation::cmSourceFileLocation() = default;
 
 cmSourceFileLocation::cmSourceFileLocation(const cmSourceFileLocation& loc)
   : Makefile(loc.Makefile)
@@ -30,33 +22,34 @@ cmSourceFileLocation::cmSourceFileLocation(const cmSourceFileLocation& loc)
   this->Name = loc.Name;
 }
 
-cmSourceFileLocation& cmSourceFileLocation::operator=(
-  const cmSourceFileLocation& loc)
-{
-  if (this == &loc) {
-    return *this;
-  }
-  this->Makefile = loc.Makefile;
-  this->AmbiguousDirectory = loc.AmbiguousDirectory;
-  this->AmbiguousExtension = loc.AmbiguousExtension;
-  this->Directory = loc.Directory;
-  this->Name = loc.Name;
-  this->UpdateExtension(this->Name);
-  return *this;
-}
-
 cmSourceFileLocation::cmSourceFileLocation(cmMakefile const* mf,
-                                           const std::string& name)
+                                           const std::string& name,
+                                           cmSourceFileLocationKind kind)
   : Makefile(mf)
 {
-  this->AmbiguousDirectory = !cmSystemTools::FileIsFullPath(name.c_str());
+  this->AmbiguousDirectory = !cmSystemTools::FileIsFullPath(name);
   this->AmbiguousExtension = true;
   this->Directory = cmSystemTools::GetFilenamePath(name);
-  if (cmSystemTools::FileIsFullPath(this->Directory.c_str())) {
+  if (cmSystemTools::FileIsFullPath(this->Directory)) {
     this->Directory = cmSystemTools::CollapseFullPath(this->Directory);
   }
   this->Name = cmSystemTools::GetFilenameName(name);
-  this->UpdateExtension(name);
+  if (kind == cmSourceFileLocationKind::Known) {
+    this->DirectoryUseSource();
+    this->AmbiguousExtension = false;
+  } else {
+    this->UpdateExtension(name);
+  }
+}
+
+std::string cmSourceFileLocation::GetFullPath() const
+{
+  std::string path = this->GetDirectory();
+  if (!path.empty()) {
+    path += '/';
+  }
+  path += this->GetName();
+  return path;
 }
 
 void cmSourceFileLocation::Update(cmSourceFileLocation const& loc)
@@ -103,13 +96,9 @@ void cmSourceFileLocation::UpdateExtension(const std::string& name)
   // The global generator checks extensions of enabled languages.
   cmGlobalGenerator* gg = this->Makefile->GetGlobalGenerator();
   cmMakefile const* mf = this->Makefile;
-  const std::vector<std::string>& srcExts =
-    mf->GetCMakeInstance()->GetSourceExtensions();
-  const std::vector<std::string>& hdrExts =
-    mf->GetCMakeInstance()->GetHeaderExtensions();
+  auto cm = mf->GetCMakeInstance();
   if (!gg->GetLanguageFromExtension(ext.c_str()).empty() ||
-      std::find(srcExts.begin(), srcExts.end(), ext) != srcExts.end() ||
-      std::find(hdrExts.begin(), hdrExts.end(), ext) != hdrExts.end()) {
+      cm->IsSourceExtension(ext) || cm->IsHeaderExtension(ext)) {
     // This is a known extension.  Use the given filename with extension.
     this->Name = cmSystemTools::GetFilenameName(name);
     this->AmbiguousExtension = false;
@@ -121,15 +110,14 @@ void cmSourceFileLocation::UpdateExtension(const std::string& name)
       // Check the source tree only because a file in the build tree should
       // be specified by full path at least once.  We do not want this
       // detection to depend on whether the project has already been built.
-      tryPath = this->Makefile->GetCurrentSourceDirectory();
-      tryPath += "/";
+      tryPath = cmStrCat(this->Makefile->GetCurrentSourceDirectory(), '/');
     }
     if (!this->Directory.empty()) {
       tryPath += this->Directory;
       tryPath += "/";
     }
     tryPath += this->Name;
-    if (cmSystemTools::FileExists(tryPath.c_str(), true)) {
+    if (cmSystemTools::FileExists(tryPath, true)) {
       // We found a source file named by the user on disk.  Trust it's
       // extension.
       this->Name = cmSystemTools::GetFilenameName(name);
@@ -157,8 +145,7 @@ bool cmSourceFileLocation::MatchesAmbiguousExtension(
   // adding an extension.
   if (!(this->Name.size() > loc.Name.size() &&
         this->Name[loc.Name.size()] == '.' &&
-        cmHasLiteralPrefixImpl(this->Name.c_str(), loc.Name.c_str(),
-                               loc.Name.size()))) {
+        cmHasPrefix(this->Name, loc.Name))) {
     return false;
   }
 
@@ -166,14 +153,8 @@ bool cmSourceFileLocation::MatchesAmbiguousExtension(
   // disk.  One of these must match if loc refers to this source file.
   std::string const& ext = this->Name.substr(loc.Name.size() + 1);
   cmMakefile const* mf = this->Makefile;
-  const std::vector<std::string>& srcExts =
-    mf->GetCMakeInstance()->GetSourceExtensions();
-  if (std::find(srcExts.begin(), srcExts.end(), ext) != srcExts.end()) {
-    return true;
-  }
-  std::vector<std::string> hdrExts =
-    mf->GetCMakeInstance()->GetHeaderExtensions();
-  return std::find(hdrExts.begin(), hdrExts.end(), ext) != hdrExts.end();
+  auto cm = mf->GetCMakeInstance();
+  return cm->IsSourceExtension(ext) || cm->IsHeaderExtension(ext);
 }
 
 bool cmSourceFileLocation::Matches(cmSourceFileLocation const& loc)
@@ -220,7 +201,7 @@ bool cmSourceFileLocation::Matches(cmSourceFileLocation const& loc)
       // This can occur when referencing a source file from a different
       // directory.  This is not yet allowed.
       this->Makefile->IssueMessage(
-        cmake::INTERNAL_ERROR,
+        MessageType::INTERNAL_ERROR,
         "Matches error: Each side has a directory relative to a different "
         "location. This can occur when referencing a source file from a "
         "different directory.  This is not yet allowed.");
@@ -228,18 +209,18 @@ bool cmSourceFileLocation::Matches(cmSourceFileLocation const& loc)
     }
   } else if (this->AmbiguousDirectory) {
     // Compare possible directory combinations.
-    std::string const& srcDir = cmSystemTools::CollapseFullPath(
+    std::string const srcDir = cmSystemTools::CollapseFullPath(
       this->Directory, this->Makefile->GetCurrentSourceDirectory());
-    std::string const& binDir = cmSystemTools::CollapseFullPath(
+    std::string const binDir = cmSystemTools::CollapseFullPath(
       this->Directory, this->Makefile->GetCurrentBinaryDirectory());
     if (srcDir != loc.Directory && binDir != loc.Directory) {
       return false;
     }
   } else if (loc.AmbiguousDirectory) {
     // Compare possible directory combinations.
-    std::string const& srcDir = cmSystemTools::CollapseFullPath(
+    std::string const srcDir = cmSystemTools::CollapseFullPath(
       loc.Directory, loc.Makefile->GetCurrentSourceDirectory());
-    std::string const& binDir = cmSystemTools::CollapseFullPath(
+    std::string const binDir = cmSystemTools::CollapseFullPath(
       loc.Directory, loc.Makefile->GetCurrentBinaryDirectory());
     if (srcDir != this->Directory && binDir != this->Directory) {
       return false;

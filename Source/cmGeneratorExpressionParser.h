@@ -3,7 +3,7 @@
 #ifndef cmGeneratorExpressionParser_h
 #define cmGeneratorExpressionParser_h
 
-#include <cmConfigure.h> // IWYU pragma: keep
+#include "cmConfigure.h" // IWYU pragma: keep
 
 #include <vector>
 
@@ -13,8 +13,7 @@ struct cmGeneratorExpressionEvaluator;
 
 struct cmGeneratorExpressionParser
 {
-  cmGeneratorExpressionParser(
-    const std::vector<cmGeneratorExpressionToken>& tokens);
+  cmGeneratorExpressionParser(std::vector<cmGeneratorExpressionToken> tokens);
 
   void Parse(std::vector<cmGeneratorExpressionEvaluator*>& result);
 

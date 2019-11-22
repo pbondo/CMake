@@ -11,8 +11,10 @@ set(expect_DIRECTORY "/path/to")
 set(expect_NAME "filename.ext.in")
 set(expect_EXT ".ext.in")
 set(expect_NAME_WE "filename")
+set(expect_LAST_EXT ".in")
+set(expect_NAME_WLE "filename.ext")
 set(expect_PATH "/path/to")
-foreach(c DIRECTORY NAME EXT NAME_WE PATH)
+foreach(c DIRECTORY NAME EXT NAME_WE LAST_EXT NAME_WLE PATH)
   get_filename_component(actual_${c} "${filename}" ${c})
   check("${c}" "${actual_${c}}" "${expect_${c}}")
   list(APPEND non_cache_vars actual_${c})
@@ -79,6 +81,17 @@ get_filename_component(test_program_name "/ arg1 arg2" PROGRAM
   PROGRAM_ARGS test_program_args)
 check("PROGRAM with args output: name" "${test_program_name}" "/")
 check("PROGRAM with args output: args" "${test_program_args}" " arg1 arg2")
+
+get_filename_component(test_program_name " " PROGRAM)
+check("PROGRAM with just a space" "${test_program_name}" "")
+
+get_filename_component(test_program_name "${CMAKE_CURRENT_LIST_FILE}" PROGRAM)
+check("PROGRAM specified explicitly without quoting" "${test_program_name}" "${CMAKE_CURRENT_LIST_FILE}")
+
+get_filename_component(test_program_name "\"${CMAKE_CURRENT_LIST_FILE}\" arg1 arg2" PROGRAM
+  PROGRAM_ARGS test_program_args)
+check("PROGRAM specified explicitly with arguments: name" "${test_program_name}" "${CMAKE_CURRENT_LIST_FILE}")
+check("PROGRAM specified explicitly with arguments: args" "${test_program_args}" " arg1 arg2")
 
 list(APPEND non_cache_vars test_program_name)
 list(APPEND non_cache_vars test_program_args)

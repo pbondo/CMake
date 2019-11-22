@@ -4,27 +4,29 @@
 
 #include "cmExecutionStatus.h"
 #include "cmMakefile.h"
+#include "cmMessageType.h"
 #include "cmSystemTools.h"
-#include "cmake.h"
 
 // cmContinueCommand
-bool cmContinueCommand::InitialPass(std::vector<std::string> const& args,
-                                    cmExecutionStatus& status)
+bool cmContinueCommand(std::vector<std::string> const& args,
+                       cmExecutionStatus& status)
 {
-  if (!this->Makefile->IsLoopBlock()) {
-    this->Makefile->IssueMessage(cmake::FATAL_ERROR,
-                                 "A CONTINUE command was found outside of a "
-                                 "proper FOREACH or WHILE loop scope.");
+  if (!status.GetMakefile().IsLoopBlock()) {
+    status.GetMakefile().IssueMessage(
+      MessageType::FATAL_ERROR,
+      "A CONTINUE command was found outside of a "
+      "proper FOREACH or WHILE loop scope.");
     cmSystemTools::SetFatalErrorOccured();
     return true;
   }
 
-  status.SetContinueInvoked(true);
+  status.SetContinueInvoked();
 
   if (!args.empty()) {
-    this->Makefile->IssueMessage(cmake::FATAL_ERROR,
-                                 "The CONTINUE command does not accept any "
-                                 "arguments.");
+    status.GetMakefile().IssueMessage(
+      MessageType::FATAL_ERROR,
+      "The CONTINUE command does not accept any "
+      "arguments.");
     cmSystemTools::SetFatalErrorOccured();
     return true;
   }

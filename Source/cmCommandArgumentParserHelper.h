@@ -3,35 +3,27 @@
 #ifndef cmCommandArgumentParserHelper_h
 #define cmCommandArgumentParserHelper_h
 
-#include <cmConfigure.h> // IWYU pragma: keep
+#include "cmConfigure.h" // IWYU pragma: keep
 
 #include <string>
 #include <vector>
-
-#define YYSTYPE cmCommandArgumentParserHelper::ParserType
-#define YYSTYPE_IS_DECLARED
-#define YY_EXTRA_TYPE cmCommandArgumentParserHelper*
-#define YY_DECL                                                               \
-  int cmCommandArgument_yylex(YYSTYPE* yylvalp, yyscan_t yyscanner)
-
-/** \class cmCommandArgumentParserHelper
- * \brief Helper class for parsing java source files
- *
- * Finds dependencies for java file and list of outputs
- */
 
 class cmMakefile;
 
 class cmCommandArgumentParserHelper
 {
 public:
-  typedef struct
+  struct ParserType
   {
-    char* str;
-  } ParserType;
+    const char* str;
+  };
 
   cmCommandArgumentParserHelper();
   ~cmCommandArgumentParserHelper();
+
+  cmCommandArgumentParserHelper(cmCommandArgumentParserHelper const&) = delete;
+  cmCommandArgumentParserHelper& operator=(
+    cmCommandArgumentParserHelper const&) = delete;
 
   int ParseString(const char* str, int verb);
 
@@ -45,11 +37,11 @@ public:
   void Error(const char* str);
 
   // For yacc
-  char* CombineUnions(char* in1, char* in2);
+  const char* CombineUnions(const char* in1, const char* in2);
 
-  char* ExpandSpecialVariable(const char* key, const char* var);
-  char* ExpandVariable(const char* var);
-  char* ExpandVariableForAt(const char* var);
+  const char* ExpandSpecialVariable(const char* key, const char* var);
+  const char* ExpandVariable(const char* var);
+  const char* ExpandVariableForAt(const char* var);
   void SetResult(const char* value);
 
   void SetMakefile(const cmMakefile* mf);
@@ -63,13 +55,6 @@ public:
   void SetRemoveEmpty(bool b) { this->RemoveEmpty = b; }
 
   const char* GetError() { return this->ErrorString.c_str(); }
-  char EmptyVariable[1];
-  char DCURLYVariable[3];
-  char RCURLYVariable[3];
-  char ATVariable[3];
-  char DOLLARVariable[3];
-  char LCURLYVariable[3];
-  char BSLASHVariable[3];
 
 private:
   std::string::size_type InputBufferPos;
@@ -79,7 +64,7 @@ private:
   void Print(const char* place, const char* str);
   void SafePrintMissing(const char* str, int line, int cnt);
 
-  char* AddString(const std::string& str);
+  const char* AddString(const std::string& str);
 
   void CleanupParser();
   void SetError(std::string const& msg);
@@ -92,12 +77,16 @@ private:
   long FileLine;
   int CurrentLine;
   int Verbose;
-  bool WarnUninitialized;
-  bool CheckSystemVars;
   bool EscapeQuotes;
   bool NoEscapeMode;
   bool ReplaceAtSyntax;
   bool RemoveEmpty;
 };
+
+#define YYSTYPE cmCommandArgumentParserHelper::ParserType
+#define YYSTYPE_IS_DECLARED
+#define YY_EXTRA_TYPE cmCommandArgumentParserHelper*
+#define YY_DECL                                                               \
+  int cmCommandArgument_yylex(YYSTYPE* yylvalp, yyscan_t yyscanner)
 
 #endif

@@ -3,19 +3,18 @@
 #include "cmSeparateArgumentsCommand.h"
 
 #include <algorithm>
-#include <sstream>
 
+#include "cmExecutionStatus.h"
 #include "cmMakefile.h"
+#include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 
-class cmExecutionStatus;
-
 // cmSeparateArgumentsCommand
-bool cmSeparateArgumentsCommand::InitialPass(
-  std::vector<std::string> const& args, cmExecutionStatus&)
+bool cmSeparateArgumentsCommand(std::vector<std::string> const& args,
+                                cmExecutionStatus& status)
 {
   if (args.empty()) {
-    this->SetError("must be given at least one argument.");
+    status.SetError("must be given at least one argument.");
     return false;
   }
 
@@ -36,33 +35,38 @@ bool cmSeparateArgumentsCommand::InitialPass(
     DoingCommand
   };
   Doing doing = DoingVariable;
-  for (unsigned int i = 0; i < args.size(); ++i) {
+  for (std::string const& arg : args) {
     if (doing == DoingVariable) {
-      var = args[i];
+      var = arg;
       doing = DoingMode;
-    } else if (doing == DoingMode && args[i] == "UNIX_COMMAND") {
+    } else if (doing == DoingMode && arg == "NATIVE_COMMAND") {
+#ifdef _WIN32
+      mode = ModeWindows;
+#else
+      mode = ModeUnix;
+#endif
+      doing = DoingCommand;
+    } else if (doing == DoingMode && arg == "UNIX_COMMAND") {
       mode = ModeUnix;
       doing = DoingCommand;
-    } else if (doing == DoingMode && args[i] == "WINDOWS_COMMAND") {
+    } else if (doing == DoingMode && arg == "WINDOWS_COMMAND") {
       mode = ModeWindows;
       doing = DoingCommand;
     } else if (doing == DoingCommand) {
-      command = args[i];
+      command = arg;
       doing = DoingNone;
     } else {
-      std::ostringstream e;
-      e << "given unknown argument " << args[i];
-      this->SetError(e.str());
+      status.SetError(cmStrCat("given unknown argument ", arg));
       return false;
     }
   }
 
   if (mode == ModeOld) {
     // Original space-replacement version of command.
-    if (const char* def = this->Makefile->GetDefinition(var)) {
+    if (const char* def = status.GetMakefile().GetDefinition(var)) {
       std::string value = def;
       std::replace(value.begin(), value.end(), ' ', ';');
-      this->Makefile->AddDefinition(var, value.c_str());
+      status.GetMakefile().AddDefinition(var, value);
     }
   } else {
     // Parse the command line.
@@ -77,22 +81,20 @@ bool cmSeparateArgumentsCommand::InitialPass(
     // Construct the result list value.
     std::string value;
     const char* sep = "";
-    for (std::vector<std::string>::const_iterator vi = vec.begin();
-         vi != vec.end(); ++vi) {
+    for (std::string const& vi : vec) {
       // Separate from the previous argument.
       value += sep;
       sep = ";";
 
       // Preserve semicolons.
-      for (std::string::const_iterator si = vi->begin(); si != vi->end();
-           ++si) {
-        if (*si == ';') {
+      for (char si : vi) {
+        if (si == ';') {
           value += '\\';
         }
-        value += *si;
+        value += si;
       }
     }
-    this->Makefile->AddDefinition(var, value.c_str());
+    status.GetMakefile().AddDefinition(var, value);
   }
 
   return true;

@@ -3,17 +3,19 @@
 #ifndef cmComputeLinkDepends_h
 #define cmComputeLinkDepends_h
 
-#include <cmConfigure.h> // IWYU pragma: keep
+#include "cmConfigure.h" // IWYU pragma: keep
+
+#include <map>
+#include <memory>
+#include <set>
+#include <string>
+#include <vector>
+
+#include <queue>
 
 #include "cmGraphAdjacencyList.h"
 #include "cmLinkItem.h"
 #include "cmTargetLinkLibraryType.h"
-
-#include <map>
-#include <queue>
-#include <set>
-#include <string>
-#include <vector>
 
 class cmComputeComponentGraph;
 class cmGeneratorTarget;
@@ -31,30 +33,19 @@ public:
                        const std::string& config);
   ~cmComputeLinkDepends();
 
+  cmComputeLinkDepends(const cmComputeLinkDepends&) = delete;
+  cmComputeLinkDepends& operator=(const cmComputeLinkDepends&) = delete;
+
   // Basic information about each link item.
   struct LinkEntry
   {
     std::string Item;
-    cmGeneratorTarget const* Target;
-    bool IsSharedDep;
-    bool IsFlag;
-    LinkEntry()
-      : Item()
-      , Target(CM_NULLPTR)
-      , IsSharedDep(false)
-      , IsFlag(false)
-    {
-    }
-    LinkEntry(LinkEntry const& r)
-      : Item(r.Item)
-      , Target(r.Target)
-      , IsSharedDep(r.IsSharedDep)
-      , IsFlag(r.IsFlag)
-    {
-    }
+    cmGeneratorTarget const* Target = nullptr;
+    bool IsSharedDep = false;
+    bool IsFlag = false;
   };
 
-  typedef std::vector<LinkEntry> EntryVector;
+  using EntryVector = std::vector<LinkEntry>;
   EntryVector const& Compute();
 
   void SetOldLinkDirMode(bool b);
@@ -72,19 +63,18 @@ private:
   std::string Config;
   EntryVector FinalLinkEntries;
 
-  std::map<std::string, int>::iterator AllocateLinkEntry(
-    std::string const& item);
+  std::map<cmLinkItem, int>::iterator AllocateLinkEntry(
+    cmLinkItem const& item);
   int AddLinkEntry(cmLinkItem const& item);
   void AddVarLinkEntries(int depender_index, const char* value);
   void AddDirectLinkEntries();
   template <typename T>
   void AddLinkEntries(int depender_index, std::vector<T> const& libs);
-  cmGeneratorTarget const* FindTargetToLink(int depender_index,
-                                            const std::string& name);
+  cmLinkItem ResolveLinkItem(int depender_index, const std::string& name);
 
   // One entry for each unique item.
   std::vector<LinkEntry> EntryList;
-  std::map<std::string, int> LinkEntryIndex;
+  std::map<cmLinkItem, int> LinkEntryIndex;
 
   // BFS of initial dependencies.
   struct BFSEntry
@@ -93,7 +83,7 @@ private:
     const char* LibDepends;
   };
   std::queue<BFSEntry> BFSQueue;
-  void FollowLinkEntry(BFSEntry const&);
+  void FollowLinkEntry(BFSEntry qe);
 
   // Shared libraries that are included only because they are
   // dependencies of other shared libraries, not because they are part
@@ -117,14 +107,15 @@ private:
   };
   struct DependSetList : public std::vector<DependSet>
   {
+    bool Initialized = false;
   };
-  std::vector<DependSetList*> InferredDependSets;
+  std::vector<DependSetList> InferredDependSets;
   void InferDependencies();
 
   // Ordering constraint graph adjacency list.
-  typedef cmGraphNodeList NodeList;
-  typedef cmGraphEdgeList EdgeList;
-  typedef cmGraphAdjacencyList Graph;
+  using NodeList = cmGraphNodeList;
+  using EdgeList = cmGraphEdgeList;
+  using Graph = cmGraphAdjacencyList;
   Graph EntryConstraintGraph;
   void CleanConstraintGraph();
   void DisplayConstraintGraph();
@@ -149,7 +140,7 @@ private:
     std::set<int> Entries;
   };
   std::map<int, PendingComponent> PendingComponents;
-  cmComputeComponentGraph* CCG;
+  std::unique_ptr<cmComputeComponentGraph> CCG;
   std::vector<int> FinalLinkOrder;
   void DisplayComponents();
   void VisitComponent(unsigned int c);

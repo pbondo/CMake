@@ -9,9 +9,11 @@ endif()
 
 function(run_BuildDepends CASE)
   # Use a single build tree for a few tests without cleaning.
-  set(RunCMake_TEST_BINARY_DIR ${RunCMake_BINARY_DIR}/${CASE}-build)
+  if(NOT RunCMake_TEST_BINARY_DIR)
+    set(RunCMake_TEST_BINARY_DIR ${RunCMake_BINARY_DIR}/${CASE}-build)
+  endif()
   set(RunCMake_TEST_NO_CLEAN 1)
-  if(RunCMake_GENERATOR MATCHES "Make|Ninja")
+  if(NOT RunCMake_GENERATOR_IS_MULTI_CONFIG)
     set(RunCMake_TEST_OPTIONS -DCMAKE_BUILD_TYPE=Debug)
   endif()
   file(REMOVE_RECURSE "${RunCMake_TEST_BINARY_DIR}")
@@ -31,8 +33,9 @@ function(run_BuildDepends CASE)
 endfunction()
 
 run_BuildDepends(C-Exe)
-if(NOT RunCMake_GENERATOR MATCHES "Visual Studio 7|Xcode")
-  if(RunCMake_GENERATOR MATCHES "Visual Studio 10")
+if(NOT RunCMake_GENERATOR STREQUAL "Xcode")
+  if(RunCMake_GENERATOR MATCHES "Visual Studio 10" OR
+      RunCMake_GENERATOR_TOOLSET MATCHES "^(v80|v90|v100)$")
     # VS 10 forgets to re-link when a manifest changes
     set(run_BuildDepends_skip_step_2 1)
   endif()
@@ -43,9 +46,23 @@ endif()
 run_BuildDepends(Custom-Symbolic-and-Byproduct)
 run_BuildDepends(Custom-Always)
 
-if(RunCMake_GENERATOR MATCHES "Make" AND
-   NOT "${RunCMake_BINARY_DIR}" STREQUAL "${RunCMake_SOURCE_DIR}")
-  run_BuildDepends(MakeInProjectOnly)
+# Test header dependencies with a build tree underneath a source tree.
+set(RunCMake_TEST_SOURCE_DIR "${RunCMake_BINARY_DIR}/BuildUnderSource")
+set(RunCMake_TEST_BINARY_DIR "${RunCMake_BINARY_DIR}/BuildUnderSource/build")
+file(REMOVE_RECURSE "${RunCMake_TEST_SOURCE_DIR}")
+file(MAKE_DIRECTORY "${RunCMake_TEST_SOURCE_DIR}/include")
+foreach(f CMakeLists.txt BuildUnderSource.cmake BuildUnderSource.c)
+  configure_file("${RunCMake_SOURCE_DIR}/${f}" "${RunCMake_TEST_SOURCE_DIR}/${f}" COPYONLY)
+endforeach()
+run_BuildDepends(BuildUnderSource)
+unset(RunCMake_TEST_BINARY_DIR)
+unset(RunCMake_TEST_SOURCE_DIR)
+
+if(RunCMake_GENERATOR MATCHES "Make")
+  run_BuildDepends(MakeCustomIncludes)
+  if(NOT "${RunCMake_BINARY_DIR}" STREQUAL "${RunCMake_SOURCE_DIR}")
+    run_BuildDepends(MakeInProjectOnly)
+  endif()
 endif()
 
 function(run_ReGeneration)

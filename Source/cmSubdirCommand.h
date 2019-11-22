@@ -3,40 +3,14 @@
 #ifndef cmSubdirCommand_h
 #define cmSubdirCommand_h
 
-#include <cmConfigure.h>
+#include "cmConfigure.h" // IWYU pragma: keep
+
 #include <string>
 #include <vector>
 
-#include "cmCommand.h"
-
 class cmExecutionStatus;
 
-/** \class cmSubdirCommand
- * \brief Specify a list of subdirectories to build.
- *
- * cmSubdirCommand specifies a list of subdirectories to process
- * by CMake. For each subdirectory listed, CMake will descend
- * into that subdirectory and process any CMakeLists.txt found.
- */
-class cmSubdirCommand : public cmCommand
-{
-public:
-  /**
-   * This is a virtual constructor for the command.
-   */
-  cmCommand* Clone() CM_OVERRIDE { return new cmSubdirCommand; }
-
-  /**
-   * This is called when the command is first encountered in
-   * the CMakeLists.txt file.
-   */
-  bool InitialPass(std::vector<std::string> const& args,
-                   cmExecutionStatus& status) CM_OVERRIDE;
-
-  /**
-   * The name of the command as specified in CMakeList.txt.
-   */
-  std::string GetName() const CM_OVERRIDE { return "subdirs"; }
-};
+bool cmSubdirCommand(std::vector<std::string> const& args,
+                     cmExecutionStatus& status);
 
 #endif

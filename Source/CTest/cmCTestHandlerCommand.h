@@ -3,13 +3,13 @@
 #ifndef cmCTestHandlerCommand_h
 #define cmCTestHandlerCommand_h
 
-#include <cmConfigure.h>
+#include "cmConfigure.h" // IWYU pragma: keep
 
-#include "cmCTestCommand.h"
-
-#include <stddef.h>
 #include <string>
 #include <vector>
+
+#include "cmArgumentParser.h"
+#include "cmCTestCommand.h"
 
 class cmCTestGenericHandler;
 class cmExecutionStatus;
@@ -19,28 +19,22 @@ class cmExecutionStatus;
  *
  * cmCTestHandlerCommand defineds the command to test the project.
  */
-class cmCTestHandlerCommand : public cmCTestCommand
+class cmCTestHandlerCommand
+  : public cmCTestCommand
+  , public cmArgumentParser<void>
 {
 public:
-  cmCTestHandlerCommand();
+  /**
+   * The name of the command as specified in CMakeList.txt.
+   */
+  virtual std::string GetName() const = 0;
 
   /**
    * This is called when the command is first encountered in
    * the CMakeLists.txt file.
    */
   bool InitialPass(std::vector<std::string> const& args,
-                   cmExecutionStatus& status) CM_OVERRIDE;
-
-  enum
-  {
-    ct_NONE,
-    ct_RETURN_VALUE,
-    ct_CAPTURE_CMAKE_ERROR,
-    ct_BUILD,
-    ct_SOURCE,
-    ct_SUBMIT_INDEX,
-    ct_LAST
-  };
+                   cmExecutionStatus& status) override;
 
 protected:
   virtual cmCTestGenericHandler* InitializeHandler() = 0;
@@ -48,25 +42,16 @@ protected:
   virtual void ProcessAdditionalValues(cmCTestGenericHandler* handler);
 
   // Command argument handling.
-  virtual bool CheckArgumentKeyword(std::string const& arg);
-  virtual bool CheckArgumentValue(std::string const& arg);
-  enum
-  {
-    ArgumentDoingNone,
-    ArgumentDoingError,
-    ArgumentDoingKeyword,
-    ArgumentDoingLast1
-  };
-  int ArgumentDoing;
-  unsigned int ArgumentIndex;
+  virtual void BindArguments();
+  virtual void CheckArguments(std::vector<std::string> const& keywords);
 
-  bool AppendXML;
-  bool Quiet;
-
-  std::string ReturnVariable;
-  std::vector<const char*> Arguments;
-  std::vector<const char*> Values;
-  size_t Last;
+  bool Append = false;
+  bool Quiet = false;
+  std::string CaptureCMakeError;
+  std::string ReturnValue;
+  std::string Build;
+  std::string Source;
+  std::string SubmitIndex;
 };
 
 #define CTEST_COMMAND_APPEND_OPTION_DOCS                                      \

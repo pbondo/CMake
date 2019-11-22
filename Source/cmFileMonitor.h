@@ -2,6 +2,8 @@
    file Copyright.txt or https://cmake.org/licensing for details.  */
 #pragma once
 
+#include "cmConfigure.h" // IWYU pragma: keep
+
 #include <functional>
 #include <string>
 #include <vector>
@@ -12,9 +14,13 @@ class cmRootWatcher;
 
 class cmFileMonitor
 {
+
 public:
   cmFileMonitor(uv_loop_t* l);
   ~cmFileMonitor();
+
+  cmFileMonitor(cmFileMonitor const&) = delete;
+  cmFileMonitor& operator=(cmFileMonitor const&) = delete;
 
   using Callback = std::function<void(const std::string&, int, int)>;
   void MonitorPaths(const std::vector<std::string>& paths, Callback const& cb);

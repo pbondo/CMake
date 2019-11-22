@@ -95,7 +95,8 @@ void cmExtraCodeLiteGenerator2::Generate()
   for (auto& p : this->GlobalGenerator->GetProjectMap())
   {
     auto mf = p.second[0]->GetMakefile();
-    if (strcmp(mf->GetCurrentBinaryDirectory(), mf->GetHomeOutputDirectory()) == 0)
+    //if (strcmp(mf->GetCurrentBinaryDirectory(), mf->GetHomeOutputDirectory()) == 0)
+    if (mf->GetCurrentBinaryDirectory() == mf->GetHomeOutputDirectory()) 
     {
       workspaceProjectName = p.second[0]->GetProjectName();
       workspaceFileName = std::string(mf->GetCurrentBinaryDirectory()) + "/" + workspaceProjectName + ".workspace";

@@ -1,12 +1,13 @@
 
-#include <cuda.h>
 #include <iostream>
 #include <string>
 
+#include <cuda.h>
+
 #ifdef _WIN32
-#define EXPORT __declspec(dllexport)
+#  define EXPORT __declspec(dllexport)
 #else
-#define EXPORT
+#  define EXPORT
 #endif
 
 int dynamic_base_func(int);
@@ -37,7 +38,7 @@ EXPORT int choose_cuda_device()
                 << std::endl;
       return 1;
     }
-    if (prop.major >= 4) {
+    if (prop.major >= 3) {
       err = cudaSetDevice(i);
       if (err != cudaSuccess) {
         std::cout << "Could not select CUDA device " << i << std::endl;

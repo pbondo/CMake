@@ -3,7 +3,7 @@
 #ifndef cmCursesFilePathWidget_h
 #define cmCursesFilePathWidget_h
 
-#include <cmConfigure.h> // IWYU pragma: keep
+#include "cmConfigure.h" // IWYU pragma: keep
 
 #include "cmCursesPathWidget.h"
 
@@ -12,9 +12,8 @@ class cmCursesFilePathWidget : public cmCursesPathWidget
 public:
   cmCursesFilePathWidget(int width, int height, int left, int top);
 
-protected:
-  cmCursesFilePathWidget(const cmCursesFilePathWidget& from);
-  void operator=(const cmCursesFilePathWidget&);
+  cmCursesFilePathWidget(cmCursesFilePathWidget const&) = delete;
+  cmCursesFilePathWidget& operator=(cmCursesFilePathWidget const&) = delete;
 };
 
 #endif // cmCursesFilePathWidget_h

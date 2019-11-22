@@ -3,14 +3,14 @@
 #ifndef cmInstallGenerator_h
 #define cmInstallGenerator_h
 
-#include <cmConfigure.h>
-
-#include "cmInstallType.h"
-#include "cmScriptGenerator.h"
+#include "cmConfigure.h" // IWYU pragma: keep
 
 #include <iosfwd>
 #include <string>
 #include <vector>
+
+#include "cmInstallType.h"
+#include "cmScriptGenerator.h"
 
 class cmLocalGenerator;
 class cmMakefile;
@@ -34,14 +34,21 @@ public:
                      std::vector<std::string> const& configurations,
                      const char* component, MessageLevel message,
                      bool exclude_from_all);
-  ~cmInstallGenerator() CM_OVERRIDE;
+  ~cmInstallGenerator() override;
+
+  cmInstallGenerator(cmInstallGenerator const&) = delete;
+  cmInstallGenerator& operator=(cmInstallGenerator const&) = delete;
+
+  virtual bool HaveInstall();
+  virtual void CheckCMP0082(bool& haveSubdirectoryInstall,
+                            bool& haveInstallAfterSubdirectory);
 
   void AddInstallRule(
     std::ostream& os, std::string const& dest, cmInstallType type,
     std::vector<std::string> const& files, bool optional = false,
-    const char* permissions_file = CM_NULLPTR,
-    const char* permissions_dir = CM_NULLPTR, const char* rename = CM_NULLPTR,
-    const char* literal_args = CM_NULLPTR, Indent const& indent = Indent());
+    const char* permissions_file = nullptr,
+    const char* permissions_dir = nullptr, const char* rename = nullptr,
+    const char* literal_args = nullptr, Indent indent = Indent());
 
   /** Get the install destination as it should appear in the
       installation script.  */
@@ -53,10 +60,10 @@ public:
   /** Select message level from CMAKE_INSTALL_MESSAGE or 'never'.  */
   static MessageLevel SelectMessageLevel(cmMakefile* mf, bool never = false);
 
-  virtual void Compute(cmLocalGenerator*) {}
+  virtual bool Compute(cmLocalGenerator*) { return true; }
 
 protected:
-  void GenerateScript(std::ostream& os) CM_OVERRIDE;
+  void GenerateScript(std::ostream& os) override;
 
   std::string CreateComponentTest(const char* component,
                                   bool exclude_from_all);

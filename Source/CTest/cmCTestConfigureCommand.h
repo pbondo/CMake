@@ -3,14 +3,17 @@
 #ifndef cmCTestConfigureCommand_h
 #define cmCTestConfigureCommand_h
 
-#include <cmConfigure.h>
-
-#include "cmCTestHandlerCommand.h"
+#include "cmConfigure.h" // IWYU pragma: keep
 
 #include <string>
+#include <utility>
+
+#include <cm/memory>
+
+#include "cmCTestHandlerCommand.h"
+#include "cmCommand.h"
 
 class cmCTestGenericHandler;
-class cmCommand;
 
 /** \class cmCTestConfigure
  * \brief Run a ctest script
@@ -20,33 +23,27 @@ class cmCommand;
 class cmCTestConfigureCommand : public cmCTestHandlerCommand
 {
 public:
-  cmCTestConfigureCommand();
-
   /**
    * This is a virtual constructor for the command.
    */
-  cmCommand* Clone() CM_OVERRIDE
+  std::unique_ptr<cmCommand> Clone() override
   {
-    cmCTestConfigureCommand* ni = new cmCTestConfigureCommand;
+    auto ni = cm::make_unique<cmCTestConfigureCommand>();
     ni->CTest = this->CTest;
     ni->CTestScriptHandler = this->CTestScriptHandler;
-    return ni;
+    return std::unique_ptr<cmCommand>(std::move(ni));
   }
 
   /**
    * The name of the command as specified in CMakeList.txt.
    */
-  std::string GetName() const CM_OVERRIDE { return "ctest_configure"; }
+  std::string GetName() const override { return "ctest_configure"; }
 
 protected:
-  cmCTestGenericHandler* InitializeHandler() CM_OVERRIDE;
+  void BindArguments() override;
+  cmCTestGenericHandler* InitializeHandler() override;
 
-  enum
-  {
-    ctc_FIRST = ct_LAST,
-    ctc_OPTIONS,
-    ctc_LAST
-  };
+  std::string Options;
 };
 
 #endif

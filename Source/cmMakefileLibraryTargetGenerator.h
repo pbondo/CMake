@@ -3,11 +3,11 @@
 #ifndef cmMakefileLibraryTargetGenerator_h
 #define cmMakefileLibraryTargetGenerator_h
 
-#include <cmConfigure.h>
-
-#include "cmMakefileTargetGenerator.h"
+#include "cmConfigure.h" // IWYU pragma: keep
 
 #include <string>
+
+#include "cmMakefileTargetGenerator.h"
 
 class cmGeneratorTarget;
 
@@ -15,11 +15,11 @@ class cmMakefileLibraryTargetGenerator : public cmMakefileTargetGenerator
 {
 public:
   cmMakefileLibraryTargetGenerator(cmGeneratorTarget* target);
-  ~cmMakefileLibraryTargetGenerator() CM_OVERRIDE;
+  ~cmMakefileLibraryTargetGenerator() override;
 
   /* the main entry point for this class. Writes the Makefiles associated
      with this target */
-  void WriteRuleFiles() CM_OVERRIDE;
+  void WriteRuleFiles() override;
 
 protected:
   void WriteObjectLibraryRules();
@@ -27,8 +27,7 @@ protected:
   void WriteSharedLibraryRules(bool relink);
   void WriteModuleLibraryRules(bool relink);
 
-  void WriteDeviceLibraryRules(const std::string& linkRule,
-                               const std::string& extraFlags, bool relink);
+  void WriteDeviceLibraryRules(const std::string& linkRule, bool relink);
   void WriteLibraryRules(const std::string& linkRule,
                          const std::string& extraFlags, bool relink);
   // MacOSX Framework support methods

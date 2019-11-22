@@ -3,7 +3,7 @@
 #ifndef cmXMLParser_h
 #define cmXMLParser_h
 
-#include <cmConfigure.h> // IWYU pragma: keep
+#include "cmConfigure.h" // IWYU pragma: keep
 
 #include <string>
 
@@ -42,7 +42,7 @@ public:
   virtual int ParseChunk(const char* inputString,
                          std::string::size_type length);
   virtual int CleanupParser();
-  typedef void (*ReportFunction)(int, const char*, void*);
+  using ReportFunction = void (*)(int, const char*, void*);
   void SetErrorCallback(ReportFunction f, void* d)
   {
     this->ReportCallback = f;

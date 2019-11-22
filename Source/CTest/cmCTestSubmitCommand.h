@@ -3,17 +3,16 @@
 #ifndef cmCTestSubmitCommand_h
 #define cmCTestSubmitCommand_h
 
-#include <cmConfigure.h>
+#include "cmConfigure.h" // IWYU pragma: keep
 
-#include "cmCTest.h"
-#include "cmCTestHandlerCommand.h"
-
-#include <set>
+#include <memory>
 #include <string>
 #include <vector>
 
-class cmCTestGenericHandler;
+#include "cmCTestHandlerCommand.h"
+
 class cmCommand;
+class cmCTestGenericHandler;
 class cmExecutionStatus;
 
 /** \class cmCTestSubmit
@@ -25,64 +24,36 @@ class cmExecutionStatus;
 class cmCTestSubmitCommand : public cmCTestHandlerCommand
 {
 public:
-  cmCTestSubmitCommand()
-  {
-    this->PartsMentioned = false;
-    this->FilesMentioned = false;
-    this->InternalTest = false;
-    this->RetryCount = "";
-    this->RetryDelay = "";
-    this->CDashUpload = false;
-  }
-
-  /**
-   * This is a virtual constructor for the command.
-   */
-  cmCommand* Clone() CM_OVERRIDE
-  {
-    cmCTestSubmitCommand* ni = new cmCTestSubmitCommand;
-    ni->CTest = this->CTest;
-    ni->CTestScriptHandler = this->CTestScriptHandler;
-    return ni;
-  }
+  std::unique_ptr<cmCommand> Clone() override;
 
   bool InitialPass(std::vector<std::string> const& args,
-                   cmExecutionStatus& status) CM_OVERRIDE;
+                   cmExecutionStatus& status) override;
 
   /**
    * The name of the command as specified in CMakeList.txt.
    */
-  std::string GetName() const CM_OVERRIDE { return "ctest_submit"; }
-
-  typedef cmCTestHandlerCommand Superclass;
+  std::string GetName() const override { return "ctest_submit"; }
 
 protected:
-  cmCTestGenericHandler* InitializeHandler() CM_OVERRIDE;
+  void BindArguments() override;
+  void CheckArguments(std::vector<std::string> const& keywords) override;
+  cmCTestGenericHandler* InitializeHandler() override;
 
-  bool CheckArgumentKeyword(std::string const& arg) CM_OVERRIDE;
-  bool CheckArgumentValue(std::string const& arg) CM_OVERRIDE;
+  bool CDashUpload = false;
+  bool FilesMentioned = false;
+  bool InternalTest = false;
+  bool PartsMentioned = false;
 
-  enum
-  {
-    ArgumentDoingParts = Superclass::ArgumentDoingLast1,
-    ArgumentDoingFiles,
-    ArgumentDoingRetryDelay,
-    ArgumentDoingRetryCount,
-    ArgumentDoingCDashUpload,
-    ArgumentDoingCDashUploadType,
-    ArgumentDoingLast2
-  };
-
-  bool PartsMentioned;
-  std::set<cmCTest::Part> Parts;
-  bool FilesMentioned;
-  bool InternalTest;
-  cmCTest::SetOfStrings Files;
-  std::string RetryCount;
-  std::string RetryDelay;
-  bool CDashUpload;
+  std::string BuildID;
   std::string CDashUploadFile;
   std::string CDashUploadType;
+  std::string RetryCount;
+  std::string RetryDelay;
+  std::string SubmitURL;
+
+  std::vector<std::string> Files;
+  std::vector<std::string> HttpHeaders;
+  std::vector<std::string> Parts;
 };
 
 #endif

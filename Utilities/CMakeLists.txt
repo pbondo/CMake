@@ -13,7 +13,7 @@ if(CMAKE_DOC_TARBALL)
   endif()
   add_custom_command(
     OUTPUT ${dir}.stamp
-    COMMAND cmake -E remove_directory ${dir}
+    COMMAND cmake -E rm -rf ${dir}
     COMMAND cmake -E tar xf ${CMAKE_DOC_TARBALL}
     COMMAND cmake -E touch ${dir}.stamp
     DEPENDS ${CMAKE_DOC_TARBALL}
@@ -29,3 +29,6 @@ endif()
 if(WIX_CUSTOM_ACTION_ENABLED)
   add_subdirectory(Release/WiX)
 endif()
+
+# Make sure generated files use the same clang-tidy checks (none).
+configure_file(.clang-tidy .clang-tidy COPYONLY)

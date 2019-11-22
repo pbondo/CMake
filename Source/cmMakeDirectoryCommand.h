@@ -3,15 +3,14 @@
 #ifndef cmMakeDirectoryCommand_h
 #define cmMakeDirectoryCommand_h
 
-#include <cmConfigure.h>
+#include "cmConfigure.h" // IWYU pragma: keep
+
 #include <string>
 #include <vector>
 
-#include "cmCommand.h"
-
 class cmExecutionStatus;
 
-/** \class cmMakeDirectoryCommand
+/**
  * \brief Specify auxiliary source code directories.
  *
  * cmMakeDirectoryCommand specifies source code directories
@@ -20,30 +19,7 @@ class cmExecutionStatus;
  * A side effect of this command is to create a subdirectory in the build
  * directory structure.
  */
-class cmMakeDirectoryCommand : public cmCommand
-{
-public:
-  /**
-   * This is a virtual constructor for the command.
-   */
-  cmCommand* Clone() CM_OVERRIDE { return new cmMakeDirectoryCommand; }
-
-  /**
-   * This is called when the command is first encountered in
-   * the CMakeLists.txt file.
-   */
-  bool InitialPass(std::vector<std::string> const& args,
-                   cmExecutionStatus& status) CM_OVERRIDE;
-
-  /**
-   * The name of the command as specified in CMakeList.txt.
-   */
-  std::string GetName() const CM_OVERRIDE { return "make_directory"; }
-
-  /**
-   * This determines if the command is invoked when in script mode.
-   */
-  bool IsScriptable() const CM_OVERRIDE { return true; }
-};
+bool cmMakeDirectoryCommand(std::vector<std::string> const& args,
+                            cmExecutionStatus& status);
 
 #endif

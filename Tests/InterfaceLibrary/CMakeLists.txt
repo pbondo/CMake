@@ -31,6 +31,7 @@ add_library(item_real STATIC item.cpp)
 add_library(item_iface INTERFACE IMPORTED)
 set_property(TARGET item_iface PROPERTY IMPORTED_LIBNAME item_real)
 add_dependencies(item_iface item_real)
+get_property(item_iface_dependencies TARGET item_iface PROPERTY MANUALLY_ADDED_DEPENDENCIES)
 link_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 add_executable(InterfaceLibrary definetestexe.cpp)
@@ -46,6 +47,7 @@ target_link_libraries(InterfaceLibrary
 add_dependencies(InterfaceLibrary item_fake_tgt)
 
 add_subdirectory(libsdir)
+add_subdirectory(excluded EXCLUDE_FROM_ALL)
 
 add_executable(sharedlibtestexe sharedlibtestexe.cpp)
 target_link_libraries(sharedlibtestexe shared_iface imported::iface)
@@ -64,7 +66,6 @@ target_link_libraries(iface_whitelist INTERFACE $<$<BOOL:$<TARGET_PROPERTY:CUSTO
 add_executable(exec_whitelist dummy.cpp)
 target_link_libraries(exec_whitelist iface_whitelist)
 
-set(CMAKE_NO_SYSTEM_FROM_IMPORTED 1)
 add_library(iface_imported INTERFACE IMPORTED)
 set_property(TARGET iface_imported PROPERTY
   INTERFACE_COMPILE_DEFINITIONS

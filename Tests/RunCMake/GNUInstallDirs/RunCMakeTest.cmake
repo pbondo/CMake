@@ -1,6 +1,19 @@
 include(RunCMake)
 
-run_cmake(Opt)
-run_cmake(Root)
-run_cmake(Usr)
-run_cmake(UsrLocal)
+if(SYSTEM_NAME STREQUAL "FreeBSD")
+  set(variant "-FreeBSD")
+elseif(SYSTEM_NAME MATCHES "^(([^k].*)?BSD|DragonFly)$")
+  set(variant "-BSD")
+else()
+  set(variant "")
+endif()
+
+foreach(case
+    Opt
+    Root
+    Usr
+    UsrLocal
+    )
+  set(RunCMake-stderr-file ${case}${variant}-stderr.txt)
+  run_cmake(${case})
+endforeach()
