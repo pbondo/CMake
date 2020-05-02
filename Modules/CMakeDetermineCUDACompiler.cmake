@@ -70,10 +70,13 @@ if(NOT CMAKE_CUDA_COMPILER_ID_RUN)
 
   include(${CMAKE_ROOT}/Modules/CMakeDetermineCompilerId.cmake)
   CMAKE_DETERMINE_COMPILER_ID(CUDA CUDAFLAGS CMakeCUDACompilerId.cu)
+
+  _cmake_find_compiler_sysroot(CUDA)
 endif()
 
 set(_CMAKE_PROCESSING_LANGUAGE "CUDA")
 include(CMakeFindBinUtils)
+include(Compiler/${CMAKE_CUDA_COMPILER_ID}-FindBinUtils OPTIONAL)
 unset(_CMAKE_PROCESSING_LANGUAGE)
 
 if(MSVC_CUDA_ARCHITECTURE_ID)
@@ -86,7 +89,7 @@ if(${CMAKE_GENERATOR} MATCHES "Visual Studio")
   set(CMAKE_CUDA_HOST_IMPLICIT_LINK_LIBRARIES "")
   set(CMAKE_CUDA_HOST_IMPLICIT_LINK_DIRECTORIES "")
   set(CMAKE_CUDA_HOST_IMPLICIT_LINK_FRAMEWORK_DIRECTORIES "")
-elseif(CMAKE_CUDA_COMPILER_ID STREQUAL NVIDIA)
+elseif(CMAKE_CUDA_COMPILER_ID STREQUAL "NVIDIA")
   set(_nvcc_log "")
   string(REPLACE "\r" "" _nvcc_output_orig "${CMAKE_CUDA_COMPILER_PRODUCED_OUTPUT}")
   if(_nvcc_output_orig MATCHES "#\\\$ +PATH= *([^\n]*)\n")
@@ -186,8 +189,20 @@ elseif(CMAKE_CUDA_COMPILER_ID STREQUAL NVIDIA)
       "Failed to parsed CUDA nvcc implicit link information:\n${_nvcc_log}\n\n")
     message(FATAL_ERROR "Failed to extract nvcc implicit link line.")
   endif()
+endif()
 
-  set(CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES )
+if(CMAKE_CUDA_COMPILER_SYSROOT)
+  string(CONCAT _SET_CMAKE_CUDA_COMPILER_SYSROOT
+    "set(CMAKE_CUDA_COMPILER_SYSROOT \"${CMAKE_CUDA_COMPILER_SYSROOT}\")\n"
+    "set(CMAKE_COMPILER_SYSROOT \"${CMAKE_CUDA_COMPILER_SYSROOT}\")")
+else()
+  set(_SET_CMAKE_CUDA_COMPILER_SYSROOT "")
+endif()
+
+# Determine CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES
+if(CMAKE_CUDA_COMPILER_ID STREQUAL "NVIDIA")
+  set(CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES)
+  string(REPLACE "\r" "" _nvcc_output_orig "${CMAKE_CUDA_COMPILER_PRODUCED_OUTPUT}")
   if(_nvcc_output_orig MATCHES "#\\\$ +INCLUDES= *([^\n]*)\n")
     set(_nvcc_includes "${CMAKE_MATCH_1}")
     string(APPEND _nvcc_log "  found 'INCLUDES=' string: [${_nvcc_includes}]\n")
@@ -198,7 +213,7 @@ elseif(CMAKE_CUDA_COMPILER_ID STREQUAL NVIDIA)
   endif()
   if(_nvcc_includes)
     # across all operating system each include directory is prefixed with -I
-    separate_arguments(_nvcc_output UNIX_COMMAND "${_nvcc_includes}")
+    separate_arguments(_nvcc_output NATIVE_COMMAND "${_nvcc_includes}")
     foreach(line IN LISTS _nvcc_output)
       string(REGEX REPLACE "^-I" "" line "${line}")
       get_filename_component(line "${line}" ABSOLUTE)
@@ -212,7 +227,16 @@ elseif(CMAKE_CUDA_COMPILER_ID STREQUAL NVIDIA)
       "Failed to detect CUDA nvcc include information:\n${_nvcc_log}\n\n")
   endif()
 
+  # Parse default CUDA architecture.
+  cmake_policy(GET CMP0104 _CUDA_CMP0104)
+  if(NOT CMAKE_CUDA_ARCHITECTURES AND _CUDA_CMP0104 STREQUAL "NEW")
+    string(REGEX MATCH "arch[ =]compute_([0-9]+)" dont_care "${CMAKE_CUDA_COMPILER_PRODUCED_OUTPUT}")
+    set(CMAKE_CUDA_ARCHITECTURES "${CMAKE_MATCH_1}" CACHE STRING "CUDA architectures")
 
+    if(NOT CMAKE_CUDA_ARCHITECTURES)
+      message(FATAL_ERROR "Failed to find default CUDA architecture.")
+    endif()
+  endif()
 endif()
 
 # configure all variables set in this file

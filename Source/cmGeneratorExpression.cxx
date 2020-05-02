@@ -8,7 +8,6 @@
 
 #include "cmsys/RegularExpression.hxx"
 
-#include "cmAlgorithms.h"
 #include "cmGeneratorExpressionContext.h"
 #include "cmGeneratorExpressionDAGChecker.h"
 #include "cmGeneratorExpressionEvaluator.h"
@@ -22,6 +21,8 @@ cmGeneratorExpression::cmGeneratorExpression(cmListFileBacktrace backtrace)
 {
 }
 
+cmCompiledGeneratorExpression::~cmCompiledGeneratorExpression() = default;
+
 cmGeneratorExpression::~cmGeneratorExpression() = default;
 
 std::unique_ptr<cmCompiledGeneratorExpression> cmGeneratorExpression::Parse(
@@ -29,12 +30,6 @@ std::unique_ptr<cmCompiledGeneratorExpression> cmGeneratorExpression::Parse(
 {
   return std::unique_ptr<cmCompiledGeneratorExpression>(
     new cmCompiledGeneratorExpression(this->Backtrace, std::move(input)));
-}
-
-std::unique_ptr<cmCompiledGeneratorExpression> cmGeneratorExpression::Parse(
-  const char* input) const
-{
-  return this->Parse(std::string(input ? input : ""));
 }
 
 std::string cmGeneratorExpression::Evaluate(
@@ -49,17 +44,6 @@ std::string cmGeneratorExpression::Evaluate(
                         language);
   }
   return input;
-}
-
-std::string cmGeneratorExpression::Evaluate(
-  const char* input, cmLocalGenerator* lg, const std::string& config,
-  cmGeneratorTarget const* headTarget,
-  cmGeneratorExpressionDAGChecker* dagChecker,
-  cmGeneratorTarget const* currentTarget, std::string const& language)
-{
-  return input ? Evaluate(std::string(input), lg, config, headTarget,
-                          dagChecker, currentTarget, language)
-               : "";
 }
 
 const std::string& cmCompiledGeneratorExpression::Evaluate(
@@ -86,7 +70,7 @@ const std::string& cmCompiledGeneratorExpression::EvaluateWithContext(
 
   this->Output.clear();
 
-  for (const cmGeneratorExpressionEvaluator* it : this->Evaluators) {
+  for (const auto& it : this->Evaluators) {
     this->Output += it->Evaluate(&context, dagChecker);
 
     this->SeenTargetProperties.insert(context.SeenTargetProperties.cbegin(),
@@ -102,6 +86,8 @@ const std::string& cmCompiledGeneratorExpression::EvaluateWithContext(
   if (!context.HadError) {
     this->HadContextSensitiveCondition = context.HadContextSensitiveCondition;
     this->HadHeadSensitiveCondition = context.HadHeadSensitiveCondition;
+    this->HadLinkLanguageSensitiveCondition =
+      context.HadLinkLanguageSensitiveCondition;
     this->SourceSensitiveTargets = context.SourceSensitiveTargets;
   }
 
@@ -118,6 +104,7 @@ cmCompiledGeneratorExpression::cmCompiledGeneratorExpression(
   , Quiet(false)
   , HadContextSensitiveCondition(false)
   , HadHeadSensitiveCondition(false)
+  , HadLinkLanguageSensitiveCondition(false)
 {
   cmGeneratorExpressionLexer l;
   std::vector<cmGeneratorExpressionToken> tokens = l.Tokenize(this->Input);
@@ -127,11 +114,6 @@ cmCompiledGeneratorExpression::cmCompiledGeneratorExpression(
     cmGeneratorExpressionParser p(tokens);
     p.Parse(this->Evaluators);
   }
-}
-
-cmCompiledGeneratorExpression::~cmCompiledGeneratorExpression()
-{
-  cmDeleteAll(this->Evaluators);
 }
 
 std::string cmGeneratorExpression::StripEmptyListElements(

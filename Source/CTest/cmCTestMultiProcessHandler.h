@@ -6,6 +6,7 @@
 #include "cmConfigure.h" // IWYU pragma: keep
 
 #include <map>
+#include <memory>
 #include <set>
 #include <string>
 #include <vector>
@@ -124,7 +125,7 @@ protected:
   // Removes the checkpoint file
   void MarkFinished();
   void EraseTest(int index);
-  void FinishTestProcess(cmCTestRunTest* runner, bool started);
+  void FinishTestProcess(std::unique_ptr<cmCTestRunTest> runner, bool started);
 
   static void OnTestLoadRetryCB(uv_timer_t* timer);
 
@@ -137,17 +138,26 @@ protected:
   inline size_t GetProcessorsUsed(int index);
   std::string GetName(int index);
 
+  bool CheckStopOnFailure();
+
   bool CheckStopTimePassed();
   void SetStopTimePassed();
 
   void LockResources(int index);
   void UnlockResources(int index);
 
+  enum class ResourceAllocationError
+  {
+    NoResourceType,
+    InsufficientResources,
+  };
+
   bool AllocateResources(int index);
   bool TryAllocateResources(
     int index,
     std::map<std::string, std::vector<cmCTestBinPackerAllocation>>&
-      allocations);
+      allocations,
+    std::map<std::string, ResourceAllocationError>* errors = nullptr);
   void DeallocateResources(int index);
   bool AllResourcesAvailable();
 
@@ -174,7 +184,8 @@ protected:
   std::map<int,
            std::vector<std::map<std::string, std::vector<ResourceAllocation>>>>
     AllocatedResources;
-  std::map<int, bool> TestsHaveSufficientResources;
+  std::map<int, std::map<std::string, ResourceAllocationError>>
+    ResourceAllocationErrors;
   cmCTestResourceAllocator ResourceAllocator;
   std::vector<cmCTestTestHandler::cmCTestTestResult>* TestResults;
   size_t ParallelLevel; // max number of process that can be run at once

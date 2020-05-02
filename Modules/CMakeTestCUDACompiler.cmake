@@ -58,10 +58,36 @@ else()
   # Try to identify the ABI and configure it into CMakeCUDACompiler.cmake
   include(${CMAKE_ROOT}/Modules/CMakeDetermineCompilerABI.cmake)
   CMAKE_DETERMINE_COMPILER_ABI(CUDA ${CMAKE_ROOT}/Modules/CMakeCUDACompilerABI.cu)
+  # Try to identify the compiler features
+  include(${CMAKE_ROOT}/Modules/CMakeDetermineCompileFeatures.cmake)
+  CMAKE_DETERMINE_COMPILE_FEATURES(CUDA)
 
   if("x${CMAKE_CUDA_SIMULATE_ID}" STREQUAL "xMSVC")
     set(CMAKE_CUDA_IMPLICIT_LINK_LIBRARIES "${CMAKE_CUDA_HOST_IMPLICIT_LINK_LIBRARIES}")
     set(CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES "${CMAKE_CUDA_HOST_IMPLICIT_LINK_DIRECTORIES}")
+  endif()
+
+  # Remove the following libraries from CMAKE_CUDA_HOST_IMPLICIT_LINK_LIBRARIES and
+  # CMAKE_CUDA_IMPLICIT_LINK_LIBRARIES
+  #
+  # - cudart
+  # - cudart_static
+  # - cudadevrt
+  #
+  # These are controlled by CMAKE_CUDA_RUNTIME_LIBRARY
+  list(REMOVE_ITEM CMAKE_CUDA_IMPLICIT_LINK_LIBRARIES cudart cudart_static cudadevrt)
+  list(REMOVE_ITEM CMAKE_CUDA_HOST_IMPLICIT_LINK_LIBRARIES cudart cudart_static cudadevrt)
+
+  # Remove the CUDA Toolkit include directories from the set of
+  # implicit system include directories.
+  # This resolves the issue that NVCC doesn't specify these
+  # includes as SYSTEM includes when compiling device code, and sometimes
+  # they contain headers that generate warnings, so let users mark them
+  # as SYSTEM explicitly
+  if(CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES)
+    list(REMOVE_ITEM CMAKE_CUDA_IMPLICIT_INCLUDE_DIRECTORIES
+      ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
+      )
   endif()
 
   # Re-configure to save learned information.

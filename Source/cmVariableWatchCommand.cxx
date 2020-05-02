@@ -15,6 +15,8 @@
 #include "cmVariableWatch.h"
 #include "cmake.h"
 
+class cmLocalGenerator;
+
 namespace {
 struct cmVariableWatchCallbackData
 {
@@ -40,7 +42,7 @@ void cmVariableWatchCommandVariableAccessed(const std::string& variable,
   /// Ultra bad!!
   cmMakefile* makefile = const_cast<cmMakefile*>(mf);
 
-  std::string stack = makefile->GetProperty("LISTFILE_STACK");
+  std::string stack = *mf->GetProperty("LISTFILE_STACK");
   if (!data->Command.empty()) {
     cmListFileFunction newLFF;
     const char* const currentListFile =
@@ -91,7 +93,7 @@ public:
   {
   }
 
-  void operator()(cmMakefile&) const {}
+  void operator()(cmLocalGenerator&, const cmListFileBacktrace&) const {}
 
 private:
   struct Impl
@@ -145,7 +147,7 @@ bool cmVariableWatchCommand(std::vector<std::string> const& args,
     return false;
   }
 
-  status.GetMakefile().AddFinalAction(
+  status.GetMakefile().AddGeneratorAction(
     FinalAction{ &status.GetMakefile(), variable });
   return true;
 }

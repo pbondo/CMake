@@ -3,6 +3,8 @@
 #ifndef cmGlobalVisualStudio10Generator_h
 #define cmGlobalVisualStudio10Generator_h
 
+#include <memory>
+
 #include "cmGlobalVisualStudio8Generator.h"
 #include "cmVisualStudio10ToolsetOptions.h"
 
@@ -14,7 +16,7 @@
 class cmGlobalVisualStudio10Generator : public cmGlobalVisualStudio8Generator
 {
 public:
-  static cmGlobalGeneratorFactory* NewFactory();
+  static std::unique_ptr<cmGlobalGeneratorFactory> NewFactory();
 
   bool MatchesGeneratorName(const std::string& name) const override;
 
@@ -31,7 +33,8 @@ public:
       std::vector<std::string>()) override;
 
   //! create the correct local generator
-  cmLocalGenerator* CreateLocalGenerator(cmMakefile* mf) override;
+  std::unique_ptr<cmLocalGenerator> CreateLocalGenerator(
+    cmMakefile* mf) override;
 
   /**
    * Try to determine system information such as shared library
@@ -112,6 +115,8 @@ public:
   virtual bool IsDefaultToolset(const std::string& version) const;
   virtual std::string GetAuxiliaryToolset() const;
 
+  bool GetSupportsUnityBuilds() const { return this->SupportsUnityBuilds; }
+
   bool FindMakeProgram(cmMakefile* mf) override;
 
   bool IsIPOSupported() const override { return true; }
@@ -177,6 +182,7 @@ protected:
   std::string DefaultMasmFlagTableName;
   std::string DefaultNasmFlagTableName;
   std::string DefaultRCFlagTableName;
+  bool SupportsUnityBuilds = false;
   bool SystemIsWindowsCE;
   bool SystemIsWindowsPhone;
   bool SystemIsWindowsStore;

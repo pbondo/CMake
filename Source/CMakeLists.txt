@@ -1,6 +1,11 @@
 # Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
 # file Copyright.txt or https://cmake.org/licensing for details.
 
+# To ensure maximum portability across various compilers and platforms
+# deactivate any compiler extensions
+set(CMAKE_C_EXTENSIONS FALSE)
+set(CMAKE_CXX_EXTENSIONS FALSE)
+
 include(CheckIncludeFile)
 # Check if we can build support for ELF parsing.
 if(CMAKE_CXX_PLATFORM_ID MATCHES "OpenBSD")
@@ -134,6 +139,9 @@ set(SRCS
   LexerParser/cmFortranParser.cxx
   LexerParser/cmFortranParserTokens.h
   LexerParser/cmFortranParser.y
+  LexerParser/cmGccDepfileLexer.cxx
+  LexerParser/cmGccDepfileLexer.h
+  LexerParser/cmGccDepfileLexer.in.l
   LexerParser/cmListFileLexer.c
   LexerParser/cmListFileLexer.in.l
 
@@ -272,6 +280,10 @@ set(SRCS
   cmFortranParserImpl.cxx
   cmFSPermissions.cxx
   cmFSPermissions.h
+  cmGccDepfileLexerHelper.cxx
+  cmGccDepfileLexerHelper.h
+  cmGccDepfileReader.cxx
+  cmGccDepfileReader.h
   cmGeneratedFileStream.cxx
   cmGeneratorExpressionContext.cxx
   cmGeneratorExpressionContext.h
@@ -349,6 +361,7 @@ set(SRCS
   cmMakefileTargetGenerator.cxx
   cmMakefileExecutableTargetGenerator.cxx
   cmMakefileLibraryTargetGenerator.cxx
+  cmMakefileProfilingData.cxx
   cmMakefileUtilityTargetGenerator.cxx
   cmMessageType.h
   cmMessenger.cxx
@@ -479,6 +492,8 @@ set(SRCS
   cmBuildCommand.h
   cmBuildNameCommand.cxx
   cmBuildNameCommand.h
+  cmCMakeCommand.cxx
+  cmCMakeCommand.h
   cmCMakeHostSystemInformationCommand.cxx
   cmCMakeHostSystemInformationCommand.h
   cmCMakeMinimumRequired.cxx
@@ -685,7 +700,6 @@ set(SRCS
   cmWriteFileCommand.cxx
   cmWriteFileCommand.h
 
-  cm_static_string_view.hxx
   cm_get_date.h
   cm_get_date.c
   cm_utf8.h
@@ -695,6 +709,8 @@ set(SRCS
 
   cmDuration.h
   cmDuration.cxx
+
+  bindexplib.cxx
   )
 
 SET_PROPERTY(SOURCE cmProcessOutput.cxx APPEND PROPERTY COMPILE_DEFINITIONS
@@ -717,7 +733,6 @@ if (WIN32)
   set(SRCS ${SRCS}
     cmCallVisualStudioMacro.cxx
     cmCallVisualStudioMacro.h
-    bindexplib.cxx
     )
 
   if(NOT UNIX)

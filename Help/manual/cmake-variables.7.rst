@@ -14,6 +14,7 @@ For general information on variables, see the
 :ref:`Variables <CMake Language Variables>`
 section in the cmake-language manual.
 
+.. include:: ID_RESERVE.txt
 
 Variables that Provide Information
 ==================================
@@ -37,17 +38,24 @@ Variables that Provide Information
    /variable/CMAKE_CROSSCOMPILING_EMULATOR
    /variable/CMAKE_CTEST_COMMAND
    /variable/CMAKE_CURRENT_BINARY_DIR
+   /variable/CMAKE_CURRENT_FUNCTION
+   /variable/CMAKE_CURRENT_FUNCTION_LIST_DIR
+   /variable/CMAKE_CURRENT_FUNCTION_LIST_FILE
+   /variable/CMAKE_CURRENT_FUNCTION_LIST_LINE
    /variable/CMAKE_CURRENT_LIST_DIR
    /variable/CMAKE_CURRENT_LIST_FILE
    /variable/CMAKE_CURRENT_LIST_LINE
    /variable/CMAKE_CURRENT_SOURCE_DIR
+   /variable/CMAKE_DEBUG_TARGET_PROPERTIES
    /variable/CMAKE_DIRECTORY_LABELS
    /variable/CMAKE_DL_LIBS
+   /variable/CMAKE_DOTNET_TARGET_FRAMEWORK
    /variable/CMAKE_DOTNET_TARGET_FRAMEWORK_VERSION
    /variable/CMAKE_EDIT_COMMAND
    /variable/CMAKE_EXECUTABLE_SUFFIX
    /variable/CMAKE_EXTRA_GENERATOR
    /variable/CMAKE_EXTRA_SHARED_LIBRARY_SUFFIXES
+   /variable/CMAKE_FIND_DEBUG_MODE
    /variable/CMAKE_FIND_PACKAGE_NAME
    /variable/CMAKE_FIND_PACKAGE_SORT_DIRECTION
    /variable/CMAKE_FIND_PACKAGE_SORT_ORDER
@@ -59,6 +67,7 @@ Variables that Provide Information
    /variable/CMAKE_IMPORT_LIBRARY_SUFFIX
    /variable/CMAKE_JOB_POOL_COMPILE
    /variable/CMAKE_JOB_POOL_LINK
+   /variable/CMAKE_JOB_POOL_PRECOMPILE_HEADER
    /variable/CMAKE_JOB_POOLS
    /variable/CMAKE_LANG_COMPILER_AR
    /variable/CMAKE_LANG_COMPILER_RANLIB
@@ -154,7 +163,6 @@ Variables that Change Behavior
    /variable/CMAKE_CODELITE_USE_TARGETS
    /variable/CMAKE_COLOR_MAKEFILE
    /variable/CMAKE_CONFIGURATION_TYPES
-   /variable/CMAKE_DEBUG_TARGET_PROPERTIES
    /variable/CMAKE_DEPENDS_IN_PROJECT_ONLY
    /variable/CMAKE_DISABLE_FIND_PACKAGE_PackageName
    /variable/CMAKE_ECLIPSE_GENERATE_LINKED_RESOURCES
@@ -239,7 +247,6 @@ Variables that Change Behavior
    /variable/CMAKE_XCODE_GENERATE_TOP_LEVEL_PROJECT_ONLY
    /variable/CMAKE_XCODE_SCHEME_ADDRESS_SANITIZER
    /variable/CMAKE_XCODE_SCHEME_ADDRESS_SANITIZER_USE_AFTER_RETURN
-   /variable/CMAKE_XCODE_SCHEME_WORKING_DIRECTORY
    /variable/CMAKE_XCODE_SCHEME_DEBUG_DOCUMENT_VERSIONING
    /variable/CMAKE_XCODE_SCHEME_DISABLE_MAIN_THREAD_CHECKER
    /variable/CMAKE_XCODE_SCHEME_DYNAMIC_LIBRARY_LOADS
@@ -254,6 +261,7 @@ Variables that Change Behavior
    /variable/CMAKE_XCODE_SCHEME_THREAD_SANITIZER_STOP
    /variable/CMAKE_XCODE_SCHEME_UNDEFINED_BEHAVIOUR_SANITIZER
    /variable/CMAKE_XCODE_SCHEME_UNDEFINED_BEHAVIOUR_SANITIZER_STOP
+   /variable/CMAKE_XCODE_SCHEME_WORKING_DIRECTORY
    /variable/CMAKE_XCODE_SCHEME_ZOMBIE_OBJECTS
    /variable/PackageName_ROOT
 
@@ -315,6 +323,7 @@ Variables that Control the Build
 .. toctree::
    :maxdepth: 1
 
+   /variable/CMAKE_AIX_EXPORT_ALL_SYMBOLS
    /variable/CMAKE_ANDROID_ANT_ADDITIONAL_OPTIONS
    /variable/CMAKE_ANDROID_API
    /variable/CMAKE_ANDROID_API_MIN
@@ -363,9 +372,14 @@ Variables that Control the Build
    /variable/CMAKE_COMPILE_PDB_OUTPUT_DIRECTORY
    /variable/CMAKE_COMPILE_PDB_OUTPUT_DIRECTORY_CONFIG
    /variable/CMAKE_CONFIG_POSTFIX
+   /variable/CMAKE_CROSS_CONFIGS
+   /variable/CMAKE_CTEST_ARGUMENTS
    /variable/CMAKE_CUDA_SEPARABLE_COMPILATION
    /variable/CMAKE_CUDA_RESOLVE_DEVICE_SYMBOLS
+   /variable/CMAKE_CUDA_RUNTIME_LIBRARY
    /variable/CMAKE_DEBUG_POSTFIX
+   /variable/CMAKE_DEFAULT_BUILD_TYPE
+   /variable/CMAKE_DEFAULT_CONFIGS
    /variable/CMAKE_DISABLE_PRECOMPILE_HEADERS
    /variable/CMAKE_ENABLE_EXPORTS
    /variable/CMAKE_EXE_LINKER_FLAGS
@@ -374,6 +388,7 @@ Variables that Control the Build
    /variable/CMAKE_EXE_LINKER_FLAGS_INIT
    /variable/CMAKE_FOLDER
    /variable/CMAKE_FRAMEWORK
+   /variable/CMAKE_FRAMEWORK_MULTI_CONFIG_POSTFIX_CONFIG
    /variable/CMAKE_Fortran_FORMAT
    /variable/CMAKE_Fortran_MODULE_DIRECTORY
    /variable/CMAKE_GHS_NO_SOURCE_GROUP_FILE
@@ -423,6 +438,7 @@ Variables that Control the Build
    /variable/CMAKE_OSX_ARCHITECTURES
    /variable/CMAKE_OSX_DEPLOYMENT_TARGET
    /variable/CMAKE_OSX_SYSROOT
+   /variable/CMAKE_PCH_WARN_INVALID
    /variable/CMAKE_PDB_OUTPUT_DIRECTORY
    /variable/CMAKE_PDB_OUTPUT_DIRECTORY_CONFIG
    /variable/CMAKE_POSITION_INDEPENDENT_CODE
@@ -472,6 +488,8 @@ Variables for Languages
    /variable/CMAKE_COMPILER_IS_GNUCC
    /variable/CMAKE_COMPILER_IS_GNUCXX
    /variable/CMAKE_COMPILER_IS_GNUG77
+   /variable/CMAKE_CUDA_ARCHITECTURES
+   /variable/CMAKE_CUDA_COMPILE_FEATURES
    /variable/CMAKE_CUDA_HOST_COMPILER
    /variable/CMAKE_CUDA_EXTENSIONS
    /variable/CMAKE_CUDA_STANDARD
@@ -606,6 +624,7 @@ Variables for CTest
    /variable/CTEST_P4_COMMAND
    /variable/CTEST_P4_OPTIONS
    /variable/CTEST_P4_UPDATE_OPTIONS
+   /variable/CTEST_RESOURCE_SPEC_FILE
    /variable/CTEST_RUN_CURRENT_SCRIPT
    /variable/CTEST_SCP_COMMAND
    /variable/CTEST_SITE

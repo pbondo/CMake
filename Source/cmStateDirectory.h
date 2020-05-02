@@ -16,6 +16,8 @@
 #include "cmStateSnapshot.h"
 #include "cmStringAlgorithms.h"
 
+using cmProp = const std::string*;
+
 class cmStateDirectory
 {
   cmStateDirectory(
@@ -84,10 +86,10 @@ public:
 
   void SetProperty(const std::string& prop, const char* value,
                    cmListFileBacktrace const& lfbt);
-  void AppendProperty(const std::string& prop, const char* value,
+  void AppendProperty(const std::string& prop, const std::string& value,
                       bool asString, cmListFileBacktrace const& lfbt);
-  const char* GetProperty(const std::string& prop) const;
-  const char* GetProperty(const std::string& prop, bool chain) const;
+  cmProp GetProperty(const std::string& prop) const;
+  cmProp GetProperty(const std::string& prop, bool chain) const;
   bool GetPropertyAsBool(const std::string& prop) const;
   std::vector<std::string> GetPropertyKeys() const;
 

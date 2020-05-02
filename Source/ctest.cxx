@@ -35,6 +35,7 @@ static const char* cmDocumentationOptions[][2] = {
   { "--output-on-failure",
     "Output anything outputted by the test program "
     "if the test should fail." },
+  { "--stop-on-failure", "Stop running the tests after one has failed." },
   { "--test-output-size-passed <size>",
     "Limit the output for passed tests "
     "to <size> bytes" },
@@ -144,6 +145,8 @@ static const char* cmDocumentationOptions[][2] = {
   { "--http1.0", "Submit using HTTP 1.0." },
   { "--no-compress-output", "Do not compress test output when submitting." },
   { "--print-labels", "Print all available test labels." },
+  { "--no-tests=<[error|ignore]>",
+    "Regard no tests found either as 'error' or 'ignore' it." },
   { nullptr, nullptr }
 };
 

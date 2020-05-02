@@ -6,7 +6,8 @@
 #include <set>
 #include <utility>
 
-#include "cmAlgorithms.h"
+#include <cmext/algorithm>
+
 #include "cmComputeLinkInformation.h"
 #include "cmGeneratorTarget.h"
 #include "cmGlobalGenerator.h"
@@ -115,18 +116,18 @@ void cmLinkLineDeviceComputer::ComputeLinkLibraries(
       // These should be passed to nvlink.  Other extensions need to be left
       // out because nvlink may not understand or need them.  Even though it
       // can tolerate '.so' or '.dylib' it cannot tolerate '.so.1'.
-      if (cmHasLiteralSuffix(item.Value, ".a") ||
-          cmHasLiteralSuffix(item.Value, ".lib")) {
+      if (cmHasLiteralSuffix(item.Value.Value, ".a") ||
+          cmHasLiteralSuffix(item.Value.Value, ".lib")) {
         linkLib.Value += this->ConvertToOutputFormat(
-          this->ConvertToLinkReference(item.Value));
+          this->ConvertToLinkReference(item.Value.Value));
       }
     } else if (item.Value == "-framework") {
       // This is the first part of '-framework Name' where the framework
       // name is specified as a following item.  Ignore both.
       skipItemAfterFramework = true;
       continue;
-    } else if (cmLinkItemValidForDevice(item.Value)) {
-      linkLib.Value += item.Value;
+    } else if (cmLinkItemValidForDevice(item.Value.Value)) {
+      linkLib.Value += item.Value.Value;
     }
 
     if (emitted.insert(linkLib.Value).second) {
@@ -176,28 +177,11 @@ bool requireDeviceLinking(cmGeneratorTarget& target, cmLocalGenerator& lg,
     return false;
   }
 
-  if (const char* resolveDeviceSymbols =
+  if (cmProp resolveDeviceSymbols =
         target.GetProperty("CUDA_RESOLVE_DEVICE_SYMBOLS")) {
     // If CUDA_RESOLVE_DEVICE_SYMBOLS has been explicitly set we need
     // to honor the value no matter what it is.
-    return cmIsOn(resolveDeviceSymbols);
-  }
-
-  if (const char* separableCompilation =
-        target.GetProperty("CUDA_SEPARABLE_COMPILATION")) {
-    if (cmIsOn(separableCompilation)) {
-      bool doDeviceLinking = false;
-      switch (target.GetType()) {
-        case cmStateEnums::SHARED_LIBRARY:
-        case cmStateEnums::MODULE_LIBRARY:
-        case cmStateEnums::EXECUTABLE:
-          doDeviceLinking = true;
-          break;
-        default:
-          break;
-      }
-      return doDeviceLinking;
-    }
+    return cmIsOn(*resolveDeviceSymbols);
   }
 
   // Determine if we have any dependencies that require
@@ -205,7 +189,24 @@ bool requireDeviceLinking(cmGeneratorTarget& target, cmLocalGenerator& lg,
   cmGeneratorTarget::LinkClosure const* closure =
     target.GetLinkClosure(config);
 
-  if (cmContains(closure->Languages, "CUDA")) {
+  if (cm::contains(closure->Languages, "CUDA")) {
+    if (cmProp separableCompilation =
+          target.GetProperty("CUDA_SEPARABLE_COMPILATION")) {
+      if (cmIsOn(*separableCompilation)) {
+        bool doDeviceLinking = false;
+        switch (target.GetType()) {
+          case cmStateEnums::SHARED_LIBRARY:
+          case cmStateEnums::MODULE_LIBRARY:
+          case cmStateEnums::EXECUTABLE:
+            doDeviceLinking = true;
+            break;
+          default:
+            break;
+        }
+        return doDeviceLinking;
+      }
+    }
+
     cmComputeLinkInformation* pcli = target.GetLinkInformation(config);
     if (pcli) {
       cmLinkLineDeviceComputer deviceLinkComputer(

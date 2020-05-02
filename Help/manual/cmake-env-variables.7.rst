@@ -14,6 +14,13 @@ For general information on environment variables, see the
 :ref:`Environment Variables <CMake Language Environment Variables>`
 section in the cmake-language manual.
 
+Environment Variables that Change Behavior
+==========================================
+
+.. toctree::
+   :maxdepth: 1
+
+   /envvar/CMAKE_PREFIX_PATH
 
 Environment Variables that Control the Build
 ============================================
@@ -28,6 +35,7 @@ Environment Variables that Control the Build
    /envvar/CMAKE_GENERATOR_INSTANCE
    /envvar/CMAKE_GENERATOR_PLATFORM
    /envvar/CMAKE_GENERATOR_TOOLSET
+   /envvar/CMAKE_LANG_COMPILER_LAUNCHER
    /envvar/CMAKE_MSVCIDE_RUN_PATH
    /envvar/CMAKE_NO_VERBOSE
    /envvar/CMAKE_OSX_ARCHITECTURES
@@ -72,3 +80,11 @@ Environment Variables for CTest
    /envvar/CTEST_PROGRESS_OUTPUT
    /envvar/CTEST_USE_LAUNCHERS_DEFAULT
    /envvar/DASHBOARD_TEST_FROM_CTEST
+
+Environment Variables for the CMake curses interface
+====================================================
+
+.. toctree::
+   :maxdepth: 1
+
+   /envvar/CCMAKE_COLORS

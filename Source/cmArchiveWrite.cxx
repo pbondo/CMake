@@ -170,15 +170,19 @@ cmArchiveWrite::cmArchiveWrite(std::ostream& os, Compress c,
                            cm_archive_error_string(this->Archive));
     return;
   }
+}
 
+bool cmArchiveWrite::Open()
+{
   if (archive_write_open(
         this->Archive, this, nullptr,
         reinterpret_cast<archive_write_callback*>(&Callback::Write),
         nullptr) != ARCHIVE_OK) {
     this->Error =
       cmStrCat("archive_write_open: ", cm_archive_error_string(this->Archive));
-    return;
+    return false;
   }
+  return true;
 }
 
 cmArchiveWrite::~cmArchiveWrite()
@@ -200,8 +204,11 @@ bool cmArchiveWrite::Add(std::string path, size_t skip, const char* prefix,
 bool cmArchiveWrite::AddPath(const char* path, size_t skip, const char* prefix,
                              bool recursive)
 {
-  if (!this->AddFile(path, skip, prefix)) {
-    return false;
+  if (strcmp(path, ".") != 0 ||
+      (this->Format != "zip" && this->Format != "7zip")) {
+    if (!this->AddFile(path, skip, prefix)) {
+      return false;
+    }
   }
   if ((!cmSystemTools::FileIsDirectory(path) || !recursive) ||
       cmSystemTools::FileIsSymlink(path)) {
@@ -210,6 +217,9 @@ bool cmArchiveWrite::AddPath(const char* path, size_t skip, const char* prefix,
   cmsys::Directory d;
   if (d.Load(path)) {
     std::string next = cmStrCat(path, '/');
+    if (next == "./" && (this->Format == "zip" || this->Format == "7zip")) {
+      next.clear();
+    }
     std::string::size_type end = next.size();
     unsigned long n = d.GetNumberOfFiles();
     for (unsigned long i = 0; i < n; ++i) {
@@ -357,5 +367,18 @@ bool cmArchiveWrite::AddData(const char* file, size_t size)
                            "\": ", cmSystemTools::GetLastSystemError());
     return false;
   }
+  return true;
+}
+
+bool cmArchiveWrite::SetFilterOption(const char* module, const char* key,
+                                     const char* value)
+{
+  if (archive_write_set_filter_option(this->Archive, module, key, value) !=
+      ARCHIVE_OK) {
+    this->Error = "archive_write_set_filter_option: ";
+    this->Error += cm_archive_error_string(this->Archive);
+    return false;
+  }
+
   return true;
 }

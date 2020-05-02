@@ -211,6 +211,13 @@ if(BUILD_TESTING)
   #---------------------------------------------------------------------------
   # Add tests below here.
 
+  if(NOT DEFINED CMake_TEST_Qt5)
+    set(CMake_TEST_Qt5 1)
+  endif()
+  if(CMake_TEST_Qt5)
+    find_package(Qt5Widgets QUIET NO_MODULE)
+  endif()
+
   if(NOT CMake_TEST_EXTERNAL_CMAKE)
     add_subdirectory(CMakeLib)
 
@@ -356,7 +363,10 @@ if(BUILD_TESTING)
       add_test_macro(VSResourceNinjaForceRSP VSResourceNinjaForceRSP)
     endif ()
   endif()
-  ADD_TEST_MACRO(MSManifest MSManifest)
+  if(_isMultiConfig)
+    set(MSManifest_CTEST_OPTIONS -C $<CONFIGURATION>)
+  endif()
+  ADD_TEST_MACRO(MSManifest ${CMAKE_CTEST_COMMAND} -V -C $<CONFIGURATION>)
   ADD_TEST_MACRO(Simple Simple)
   ADD_TEST_MACRO(PreOrder PreOrder)
   ADD_TEST_MACRO(MissingSourceFile MissingSourceFile)
@@ -436,7 +446,9 @@ if(BUILD_TESTING)
   ADD_TEST_MACRO(Assembler HelloAsm)
   ADD_TEST_MACRO(SourceGroups SourceGroups)
   ADD_TEST_MACRO(Preprocess Preprocess)
-  set(ExportImport_BUILD_OPTIONS -DCMake_TEST_NESTED_MAKE_PROGRAM:FILEPATH=${CMake_TEST_EXPLICIT_MAKE_PROGRAM})
+  set(ExportImport_BUILD_OPTIONS -DCMake_TEST_NESTED_MAKE_PROGRAM:FILEPATH=${CMake_TEST_EXPLICIT_MAKE_PROGRAM}
+                                 -DCMake_TEST_CUDA:BOOL=${CMake_TEST_CUDA}
+                                 )
   ADD_TEST_MACRO(ExportImport ExportImport)
   ADD_TEST_MACRO(Unset Unset)
   ADD_TEST_MACRO(PolicyScope PolicyScope)
@@ -980,6 +992,27 @@ ${CMake_SOURCE_DIR}/Utilities/Release/push.bash --dir dev -- '${CMake_BUILD_NIGH
     endif()
   endif()
 
+  # On Windows run the CPackNSISGenerator test
+  # if the nsis is available
+  if(WIN32 AND NSIS_MAKENSIS_EXECUTABLE)
+    add_test(CPackNSISGenerator ${CMAKE_CTEST_COMMAND}
+      -C \${CTEST_CONFIGURATION_TYPE}
+      --build-and-test
+      "${CMake_SOURCE_DIR}/Tests/CPackNSISGenerator"
+      "${CMake_BINARY_DIR}/Tests/CPackNSISGenerator"
+      ${build_generator_args}
+      --build-project CPackNSISGenerator
+      --build-options
+      --test-command ${CMAKE_CMAKE_COMMAND}
+        "-DCPackNSISGenerator_BINARY_DIR:PATH=${CMake_BINARY_DIR}/Tests/CPackNSISGenerator"
+        "-Dconfig=\${CTEST_CONFIGURATION_TYPE}"
+        -P "${CMake_SOURCE_DIR}/Tests/CPackNSISGenerator/RunCPackVerifyResult.cmake")
+
+    set_property(TEST CPackNSISGenerator PROPERTY
+      ATTACHED_FILES_ON_FAIL
+      "${CMake_BINARY_DIR}/Tests/CPackNSISGenerator/_CPack_Packages/win32/NSIS/NSISOutput.log")
+  endif()
+
   if(CTEST_TEST_CPACK)
     add_test(CPackUseDefaultVersion ${CMAKE_CTEST_COMMAND}
       --build-and-test
@@ -1132,8 +1165,8 @@ ${CMake_SOURCE_DIR}/Utilities/Release/push.bash --dir dev -- '${CMake_BUILD_NIGH
 
       foreach(CPackDEBConfiguration IN LISTS DEB_CONFIGURATIONS_TO_TEST)
         set(CPackRun_CPackDEBConfiguration "-DCPackDEBConfiguration=${CPackDEBConfiguration}")
-        add_test(${DEB_TEST_NAMES}-${CPackDEBConfiguration}
-          ${CMAKE_CTEST_COMMAND} -C \${CTEST_CONFIGURATION_TYPE}
+        add_test(NAME ${DEB_TEST_NAMES}-${CPackDEBConfiguration} COMMAND
+          ${CMAKE_CTEST_COMMAND} -C $<CONFIG>
           --build-and-test
               "${CMake_SOURCE_DIR}/Tests/${DEB_TEST_NAMES}"
               "${CMake_BINARY_DIR}/Tests/${DEB_TEST_NAMES}/build${CPackGen}-${CPackDEBConfiguration}"
@@ -1150,6 +1183,7 @@ ${CMake_SOURCE_DIR}/Utilities/Release/push.bash --dir dev -- '${CMake_BUILD_NIGH
               "-D${DEB_TEST_NAMES}_BINARY_DIR:PATH=${CMake_BINARY_DIR}/Tests/${DEB_TEST_NAMES}/build${CPackGen}-${CPackDEBConfiguration}"
               "${CPackRun_CPackGen}"
               "${CPackRun_CPackDEBConfiguration}"
+              "-DCONFIG=$<CONFIG>"
               -P "${CMake_SOURCE_DIR}/Tests/${DEB_TEST_NAMES}/RunCPackVerifyResult-${CPackDEBConfiguration}.cmake")
           list(APPEND TEST_BUILD_DIRS "${CMake_BINARY_DIR}/Tests/${DEB_TEST_NAMES}/build${CPackGen}-${CPackDEBConfiguration}")
       endforeach()
@@ -1329,12 +1363,6 @@ ${CMake_SOURCE_DIR}/Utilities/Release/push.bash --dir dev -- '${CMake_BUILD_NIGH
     )
   list(APPEND TEST_BUILD_DIRS "${CMake_BINARY_DIR}/Tests/QtAutomocNoQt")
 
-  if(NOT DEFINED CMake_TEST_Qt5)
-    set(CMake_TEST_Qt5 1)
-  endif()
-  if(CMake_TEST_Qt5)
-    find_package(Qt5Widgets QUIET NO_MODULE)
-  endif()
   if(CMake_TEST_Qt5 AND Qt5Widgets_FOUND)
     add_subdirectory(Qt5Autogen)
   endif()
@@ -1386,6 +1414,7 @@ ${CMake_SOURCE_DIR}/Utilities/Release/push.bash --dir dev -- '${CMake_BUILD_NIGH
   foreach(_mod IN ITEMS
             ALSA
             Boost
+            BLAS
             BZip2
             CURL
             Cups
@@ -1405,11 +1434,14 @@ ${CMake_SOURCE_DIR}/Utilities/Release/push.bash --dir dev -- '${CMake_BUILD_NIGH
             ICU
             JPEG
             JsonCpp
+            LAPACK
+            LibArchive
             LibLZMA
             LibRHash
             Libinput
             LibUV
             LibXml2
+            LibXslt
             LTTngUST
             ODBC
             OpenACC
@@ -1444,12 +1476,17 @@ ${CMake_SOURCE_DIR}/Utilities/Release/push.bash --dir dev -- '${CMake_BUILD_NIGH
     add_subdirectory(GoogleTest)
   endif()
 
-  if(CMake_TEST_FindPython OR CMake_TEST_FindPython_NumPy)
+  if(CMake_TEST_FindPython OR CMake_TEST_FindPython_NumPy
+      OR CMake_TEST_FindPython_Conda OR CMake_TEST_FindPython_IronPython)
     add_subdirectory(FindPython)
   endif()
 
   if(CMake_TEST_UseSWIG)
     add_subdirectory(UseSWIG)
+  endif()
+
+  if(CMake_TEST_FindRuby)
+    add_subdirectory(FindRuby)
   endif()
 
   add_subdirectory(FindThreads)
@@ -1579,7 +1616,7 @@ ${CMake_SOURCE_DIR}/Utilities/Release/push.bash --dir dev -- '${CMake_BUILD_NIGH
     DEPENDS ExternalProjectUpdateSetup )
 
   # do each of the tutorial steps
-  function(add_tutorial_test step_name use_mymath)
+  function(add_tutorial_test step_name use_mymath tutorial_arg pass_regex)
     set(tutorial_test_name Tutorial${step_name})
     set(tutorial_build_dir "${CMake_BINARY_DIR}/Tests/Tutorial/${step_name}")
     if (use_mymath)
@@ -1590,25 +1627,35 @@ ${CMake_SOURCE_DIR}/Utilities/Release/push.bash --dir dev -- '${CMake_BUILD_NIGH
       set(tutorial_build_options -DUSE_MYMATH:BOOL=OFF)
     endif()
     add_test(${tutorial_test_name} ${CMAKE_CTEST_COMMAND}
+      -C "Release"
       --build-and-test
       "${CMake_SOURCE_DIR}/Help/guide/tutorial/${step_name}"
       ${tutorial_build_dir}_Build
       ${build_generator_args}
       --build-project Tutorial
       --build-options ${tutorial_build_options}
-      --test-command Tutorial 25.0)
+      --test-command Tutorial ${tutorial_arg})
+    set_tests_properties(${tutorial_test_name} PROPERTIES
+      PASS_REGULAR_EXPRESSION ${pass_regex})
+
     list(APPEND TEST_BUILD_DIRS "${CMake_BINARY_DIR}/${tutorial_build_dir}_Build")
   endfunction()
 
   if(NOT CMake_TEST_EXTERNAL_CMAKE)
-    foreach(STP RANGE 2 11)
-      add_tutorial_test(Step${STP} TRUE)
+    foreach(STP RANGE 2 12)
+      if (STP EQUAL 6)
+        set(pass_regex ".*using log and exp")
+      else()
+        set(pass_regex "The square root of 25 is 5")
+      endif()
+      add_tutorial_test(Step${STP} TRUE 25 ${pass_regex})
     endforeach()
-    add_tutorial_test(Complete TRUE)
-    foreach(STP RANGE 3 11)
-      add_tutorial_test(Step${STP} FALSE)
+    set(pass_regex "The square root of 25 is 5")
+    add_tutorial_test(Complete TRUE 25 ${pass_regex})
+    foreach(STP RANGE 3 12)
+      add_tutorial_test(Step${STP} FALSE 25 ${pass_regex})
     endforeach()
-    add_tutorial_test(Complete FALSE)
+    add_tutorial_test(Complete FALSE 25 ${pass_regex})
   endif()
 
   add_test(testing ${CMAKE_CTEST_COMMAND} -C \${CTEST_CONFIGURATION_TYPE}
@@ -1865,7 +1912,7 @@ ${CMake_SOURCE_DIR}/Utilities/Release/push.bash --dir dev -- '${CMake_BUILD_NIGH
   ADD_TEST_MACRO(CheckCompilerRelatedVariables CheckCompilerRelatedVariables)
 
   if("${CMAKE_GENERATOR}" MATCHES "Makefile" OR
-     "${CMAKE_GENERATOR}" MATCHES "Ninja")
+     "${CMAKE_GENERATOR}" MATCHES "^Ninja$")
     add_test(MakeClean ${CMAKE_CTEST_COMMAND}
       --build-and-test
       "${CMake_SOURCE_DIR}/Tests/MakeClean"
@@ -2648,9 +2695,6 @@ ${CMake_SOURCE_DIR}/Utilities/Release/push.bash --dir dev -- '${CMake_BUILD_NIGH
     -S "${CMake_BINARY_DIR}/Tests/CTestCoverageCollectGCOV/test.cmake" -VV
     --output-log "${CMake_BINARY_DIR}/Tests/CTestCoverageCollectGCOV/testOut.log"
     )
-  set_tests_properties(CTestCoverageCollectGCOV PROPERTIES
-    PASS_REGULAR_EXPRESSION
-    "PASSED with correct output.*Testing/CoverageInfo/main.cpp.gcov")
   set_property(TEST CTestCoverageCollectGCOV PROPERTY ENVIRONMENT CTEST_PARALLEL_LEVEL=)
 
   configure_file(
@@ -3396,17 +3440,6 @@ ${CMake_SOURCE_DIR}/Utilities/Release/push.bash --dir dev -- '${CMake_BUILD_NIGH
     set_tests_properties ( KDELibsAlpha1 PROPERTIES TIMEOUT 5400)
   endif()
 
-  # If this is not an in-source build, provide a target to wipe out
-  # all the test build directories.
-  if(NOT EXISTS "${CMake_BINARY_DIR}/CMakeLists.txt")
-    configure_file(${CMake_SOURCE_DIR}/Tests/test_clean.cmake.in
-                   ${CMake_BINARY_DIR}/Tests/test_clean.cmake @ONLY)
-    add_custom_target(test_clean
-      COMMAND ${CMAKE_COMMAND} -P ${CMake_BINARY_DIR}/Tests/test_clean.cmake
-      COMMENT "Removing test build directories."
-      )
-  endif()
-
   # Define a set of "contract" tests, each activated by a cache entry
   # named "CMake_TEST_CONTRACT_<project>".  For each Contract test,
   # the project should provide a directory with a CMakeLists.txt file
@@ -3448,6 +3481,8 @@ ${CMake_SOURCE_DIR}/Utilities/Release/push.bash --dir dev -- '${CMake_BUILD_NIGH
     --build-two-config
     ${build_generator_args}
     --build-project IncludeDirectories
+    --build-options
+      -DMAKE_SUPPORTS_SPACES=${MAKE_SUPPORTS_SPACES}
     --test-command IncludeDirectories)
   list(APPEND TEST_BUILD_DIRS "${CMake_BINARY_DIR}/Tests/IncludeDirectories")
 
@@ -3480,5 +3515,17 @@ ${CMake_SOURCE_DIR}/Utilities/Release/push.bash --dir dev -- '${CMake_BUILD_NIGH
 
   if(NOT CMake_TEST_EXTERNAL_CMAKE)
     add_subdirectory(CMakeTests)
+  endif()
+
+  # If this is not an in-source build, provide a target to wipe out
+  # all the test build directories. This must come at the end after
+  # all the above logic has finished adding to TEST_BUILD_DIRS
+  if(NOT EXISTS "${CMake_BINARY_DIR}/CMakeLists.txt")
+    configure_file(${CMake_SOURCE_DIR}/Tests/test_clean.cmake.in
+                   ${CMake_BINARY_DIR}/Tests/test_clean.cmake @ONLY)
+    add_custom_target(test_clean
+      COMMAND ${CMAKE_COMMAND} -P ${CMake_BINARY_DIR}/Tests/test_clean.cmake
+      COMMENT "Removing test build directories."
+      )
   endif()
 endif()

@@ -534,3 +534,43 @@ add_custom_command(
 set_property(SOURCE "${gen_file}" PROPERTY SYMBOLIC ON)
 add_custom_target(command_expand_lists ALL DEPENDS "${gen_file}")
 set_property(TARGET command_expand_lists PROPERTY CMPARGS "${cmp_args}")
+
+# This also tests that `./` is squeezed out of the resulting path.
+set(depends_path "./depended_upon_path.txt")
+
+add_custom_command(
+  OUTPUT ${depends_path}
+  COMMAND ${CMAKE_COMMAND} -E touch ${depends_path}
+)
+
+add_custom_command(
+  OUTPUT "depends_on_path.txt"
+  COMMAND ${CMAKE_COMMAND} -E touch "depends_on_path.txt"
+  DEPENDS ${depends_path}
+)
+
+add_custom_target(depends_on_path ALL DEPENDS "depends_on_path.txt")
+
+add_custom_command(
+  OUTPUT "depends_on_in_source_path.txt"
+  COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/main.cxx" depends_on_in_source_path.txt
+  DEPENDS main.cxx
+)
+
+add_custom_target(depends_on_in_source_path ALL DEPENDS "depends_on_in_source_path.txt")
+
+add_custom_command(
+  OUTPUT "depends_on_in_rel_source_path.txt"
+  COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/main.cxx" depends_on_in_rel_source_path.txt
+  DEPENDS ./main.cxx
+)
+
+add_custom_target(depends_on_in_rel_source_path ALL DEPENDS "depends_on_in_rel_source_path.txt")
+
+add_library(mac_fw SHARED mac_fw.c)
+set_target_properties(mac_fw PROPERTIES
+  FRAMEWORK 1
+  LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/lib
+  )
+add_custom_command(OUTPUT mac_fw.txt COMMAND ${CMAKE_COMMAND} -E touch mac_fw.txt DEPENDS mac_fw)
+add_custom_target(drive_mac_fw ALL DEPENDS mac_fw.txt)

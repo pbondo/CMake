@@ -7,6 +7,7 @@
 
 #include <iosfwd>
 #include <map>
+#include <memory>
 #include <set>
 #include <string>
 #include <vector>
@@ -34,7 +35,11 @@ class cmGlobalXCodeGenerator : public cmGlobalGenerator
 public:
   cmGlobalXCodeGenerator(cmake* cm, std::string const& version_string,
                          unsigned int version_number);
-  static cmGlobalGeneratorFactory* NewFactory();
+  static std::unique_ptr<cmGlobalGeneratorFactory> NewFactory();
+
+  cmGlobalXCodeGenerator(const cmGlobalXCodeGenerator&) = delete;
+  const cmGlobalXCodeGenerator& operator=(const cmGlobalXCodeGenerator&) =
+    delete;
 
   //! Get the name for the generator.
   std::string GetName() const override
@@ -47,7 +52,8 @@ public:
   static void GetDocumentation(cmDocumentationEntry& entry);
 
   //! Create a local generator appropriate to this Global Generator
-  cmLocalGenerator* CreateLocalGenerator(cmMakefile* mf) override;
+  std::unique_ptr<cmLocalGenerator> CreateLocalGenerator(
+    cmMakefile* mf) override;
 
   /**
    * Try to determine system information such as shared library
@@ -247,7 +253,7 @@ protected:
   unsigned int XcodeVersion;
   std::string VersionString;
   std::set<std::string> XCodeObjectIDs;
-  std::vector<cmXCodeObject*> XCodeObjects;
+  std::vector<std::unique_ptr<cmXCodeObject>> XCodeObjects;
   cmXCodeObject* RootObject;
 
 private:
@@ -271,7 +277,7 @@ private:
   void ComputeArchitectures(cmMakefile* mf);
   void ComputeObjectDirArch(cmMakefile* mf);
 
-  void addObject(cmXCodeObject* obj);
+  void addObject(std::unique_ptr<cmXCodeObject> obj);
   std::string PostBuildMakeTarget(std::string const& tName,
                                   std::string const& configName);
   cmXCodeObject* MainGroupChildren;

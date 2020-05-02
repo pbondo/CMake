@@ -1,10 +1,21 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
+
+#if !defined(_WIN32) && !defined(__sun)
+// POSIX APIs are needed
+#  define _POSIX_C_SOURCE 200809L
+#endif
+#if defined(__OpenBSD__) || defined(__FreeBSD__) || defined(__NetBSD__)
+// For isascii
+#  define _XOPEN_SOURCE 700
+#endif
+
 #include "cmSystemTools.h"
+
+#include <cmext/algorithm>
 
 #include "cm_uv.h"
 
-#include "cmAlgorithms.h"
 #include "cmDuration.h"
 #include "cmProcessOutput.h"
 #include "cmRange.h"
@@ -24,6 +35,9 @@
 #endif
 
 #if !defined(CMAKE_BOOTSTRAP)
+#  if defined(_WIN32)
+#    include <cm/memory>
+#  endif
 #  include "cmCryptoHash.h"
 #endif
 
@@ -360,7 +374,7 @@ std::vector<std::string> cmSystemTools::HandleResponseFile(
 #else
         cmSystemTools::ParseUnixCommandLine(line.c_str(), args2);
 #endif
-        cmAppend(arg_full, args2);
+        cm::append(arg_full, args2);
       }
     } else {
       arg_full.push_back(arg);
@@ -585,7 +599,7 @@ bool cmSystemTools::RunSingleCommand(std::vector<std::string> const& command,
           cmSystemTools::Stdout(strdata);
         }
         if (captureStdOut) {
-          cmAppend(tempStdOut, data, data + length);
+          cm::append(tempStdOut, data, data + length);
         }
       } else if (pipe == cmsysProcess_Pipe_STDERR) {
         if (outputflag != OUTPUT_NONE) {
@@ -593,7 +607,7 @@ bool cmSystemTools::RunSingleCommand(std::vector<std::string> const& command,
           cmSystemTools::Stderr(strdata);
         }
         if (captureStdErr) {
-          cmAppend(tempStdErr, data, data + length);
+          cm::append(tempStdErr, data, data + length);
         }
       }
     }
@@ -907,7 +921,6 @@ std::string cmSystemTools::ComputeCertificateThumbprint(
   std::string thumbprint;
 
 #if !defined(CMAKE_BOOTSTRAP) && defined(_WIN32)
-  BYTE* certData = NULL;
   CRYPT_INTEGER_BLOB cryptBlob;
   HCERTSTORE certStore = NULL;
   PCCERT_CONTEXT certContext = NULL;
@@ -919,12 +932,12 @@ std::string cmSystemTools::ComputeCertificateThumbprint(
   if (certFile != INVALID_HANDLE_VALUE && certFile != NULL) {
     DWORD fileSize = GetFileSize(certFile, NULL);
     if (fileSize != INVALID_FILE_SIZE) {
-      certData = new BYTE[fileSize];
+      auto certData = cm::make_unique<BYTE[]>(fileSize);
       if (certData != NULL) {
         DWORD dwRead = 0;
-        if (ReadFile(certFile, certData, fileSize, &dwRead, NULL)) {
+        if (ReadFile(certFile, certData.get(), fileSize, &dwRead, NULL)) {
           cryptBlob.cbData = fileSize;
-          cryptBlob.pbData = certData;
+          cryptBlob.pbData = certData.get();
 
           // Verify that this is a valid cert
           if (PFXIsPFXBlob(&cryptBlob)) {
@@ -960,7 +973,6 @@ std::string cmSystemTools::ComputeCertificateThumbprint(
             }
           }
         }
-        delete[] certData;
       }
     }
     CloseHandle(certFile);
@@ -1053,8 +1065,7 @@ bool cmSystemTools::SimpleGlob(const std::string& glob,
         if (type < 0 && !cmSystemTools::FileIsDirectory(fname)) {
           continue;
         }
-        if (sfname.size() >= ppath.size() &&
-            sfname.substr(0, ppath.size()) == ppath) {
+        if (cmHasPrefix(sfname, ppath)) {
           files.push_back(fname);
           res = true;
         }
@@ -1310,6 +1321,7 @@ bool cmSystemTools::CreateTar(const std::string& outFileName,
 
   cmArchiveWrite a(fout, compress, format.empty() ? "paxr" : format);
 
+  a.Open();
   a.SetMTime(mtime);
   a.SetVerbose(verbose);
   bool tarCreatedSuccessfully = true;
@@ -1712,26 +1724,26 @@ int cmSystemTools::WaitForLine(cmsysProcess* process, std::string& line,
       processOutput.DecodeText(data, length, strdata, 1);
       // Append to the stdout buffer.
       std::vector<char>::size_type size = out.size();
-      cmAppend(out, strdata);
+      cm::append(out, strdata);
       outiter = out.begin() + size;
     } else if (pipe == cmsysProcess_Pipe_STDERR) {
       processOutput.DecodeText(data, length, strdata, 2);
       // Append to the stderr buffer.
       std::vector<char>::size_type size = err.size();
-      cmAppend(err, strdata);
+      cm::append(err, strdata);
       erriter = err.begin() + size;
     } else if (pipe == cmsysProcess_Pipe_None) {
       // Both stdout and stderr pipes have broken.  Return leftover data.
       processOutput.DecodeText(std::string(), strdata, 1);
       if (!strdata.empty()) {
         std::vector<char>::size_type size = out.size();
-        cmAppend(out, strdata);
+        cm::append(out, strdata);
         outiter = out.begin() + size;
       }
       processOutput.DecodeText(std::string(), strdata, 2);
       if (!strdata.empty()) {
         std::vector<char>::size_type size = err.size();
-        cmAppend(err, strdata);
+        cm::append(err, strdata);
         erriter = err.begin() + size;
       }
       if (!out.empty()) {

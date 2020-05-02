@@ -1,5 +1,8 @@
 include(RunCMake)
 
+set(RunCMake_GENERATOR "Ninja")
+set(RunCMake_GENERATOR_IS_MULTI_CONFIG 0)
+
 # Detect ninja version so we know what tests can be supported.
 execute_process(
   COMMAND "${RunCMake_MAKE_PROGRAM}" --version
@@ -13,6 +16,12 @@ if(ninja_res EQUAL 0 AND "x${ninja_out}" MATCHES "^x[0-9]+\\.[0-9]+")
   message(STATUS "ninja version: ${ninja_version}")
 else()
   message(FATAL_ERROR "'ninja --version' reported:\n${ninja_out}")
+endif()
+
+if(CMAKE_HOST_WIN32)
+  run_cmake(SelectCompilerWindows)
+else()
+  run_cmake(SelectCompilerUNIX)
 endif()
 
 function(run_NinjaToolMissing)
@@ -304,3 +313,12 @@ function (run_PreventConfigureFileDupBuildRule)
   run_ninja("${RunCMake_TEST_BINARY_DIR}" -w dupbuild=err)
 endfunction()
 run_PreventConfigureFileDupBuildRule()
+
+function (run_ChangeBuildType)
+  set(RunCMake_TEST_BINARY_DIR ${RunCMake_BINARY_DIR}/ChangeBuildType-build)
+  set(RunCMake_TEST_OPTIONS "-DCMAKE_BUILD_TYPE:STRING=Debug")
+  run_cmake(ChangeBuildType)
+  unset(RunCMake_TEST_OPTIONS)
+  run_ninja("${RunCMake_TEST_BINARY_DIR}" -w dupbuild=err)
+endfunction()
+run_ChangeBuildType()

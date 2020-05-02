@@ -9,6 +9,8 @@
 #include "cmTarget.h"
 #include "cmake.h"
 
+using cmProp = const std::string*;
+
 cmTargetPropCommandBase::cmTargetPropCommandBase(cmExecutionStatus& status)
   : Makefile(&status.GetMakefile())
   , Status(status)
@@ -84,9 +86,7 @@ bool cmTargetPropCommandBase::HandleArguments(
     }
     ++argIndex;
 
-    this->Target->SetProperty("PRECOMPILE_HEADERS_REUSE_FROM",
-                              args[argIndex].c_str());
-
+    this->Target->SetProperty("PRECOMPILE_HEADERS_REUSE_FROM", args[argIndex]);
     ++argIndex;
   }
 
@@ -159,12 +159,11 @@ void cmTargetPropCommandBase::HandleInterfaceContent(
 {
   if (prepend) {
     const std::string propName = std::string("INTERFACE_") + this->Property;
-    const char* propValue = tgt->GetProperty(propName);
-    const std::string totalContent = this->Join(content) +
-      (propValue ? std::string(";") + propValue : std::string());
-    tgt->SetProperty(propName, totalContent.c_str());
+    cmProp propValue = tgt->GetProperty(propName);
+    const std::string totalContent =
+      this->Join(content) + (propValue ? (";" + *propValue) : std::string());
+    tgt->SetProperty(propName, totalContent);
   } else {
-    tgt->AppendProperty("INTERFACE_" + this->Property,
-                        this->Join(content).c_str());
+    tgt->AppendProperty("INTERFACE_" + this->Property, this->Join(content));
   }
 }

@@ -8,6 +8,8 @@
 #include <set>
 #include <utility>
 
+#include <cmext/algorithm>
+
 #include "cmAlgorithms.h"
 #include "cmGeneratedFileStream.h"
 #include "cmGeneratorTarget.h"
@@ -210,13 +212,13 @@ void cmExtraCodeBlocksGenerator::CreateNewProjectFile(
     // Collect all files
     std::vector<std::string> listFiles;
     for (cmLocalGenerator* lg : it.second) {
-      cmAppend(listFiles, lg->GetMakefile()->GetListFiles());
+      cm::append(listFiles, lg->GetMakefile()->GetListFiles());
     }
 
     // Convert
     for (std::string const& listFile : listFiles) {
       // don't put cmake's own files into the project (#12110):
-      if (listFile.find(cmSystemTools::GetCMakeRoot()) == 0) {
+      if (cmHasPrefix(listFile, cmSystemTools::GetCMakeRoot())) {
         continue;
       }
 
@@ -299,11 +301,11 @@ void cmExtraCodeBlocksGenerator::CreateNewProjectFile(
         case cmStateEnums::UTILITY:
           // Add all utility targets, except the Nightly/Continuous/
           // Experimental-"sub"targets as e.g. NightlyStart
-          if (((targetName.find("Nightly") == 0) &&
+          if ((cmHasLiteralPrefix(targetName, "Nightly") &&
                (targetName != "Nightly")) ||
-              ((targetName.find("Continuous") == 0) &&
+              (cmHasLiteralPrefix(targetName, "Continuous") &&
                (targetName != "Continuous")) ||
-              ((targetName.find("Experimental") == 0) &&
+              (cmHasLiteralPrefix(targetName, "Experimental") &&
                (targetName != "Experimental"))) {
             break;
           }
@@ -558,19 +560,19 @@ void cmExtraCodeBlocksGenerator::AppendTarget(
     {
       std::vector<std::string> includes;
       lg->GetIncludeDirectories(includes, target, "C", buildType);
-      cmAppend(allIncludeDirs, includes);
+      cm::append(allIncludeDirs, includes);
     }
 
     std::string systemIncludeDirs = makefile->GetSafeDefinition(
       "CMAKE_EXTRA_GENERATOR_CXX_SYSTEM_INCLUDE_DIRS");
     if (!systemIncludeDirs.empty()) {
-      cmAppend(allIncludeDirs, cmExpandedList(systemIncludeDirs));
+      cm::append(allIncludeDirs, cmExpandedList(systemIncludeDirs));
     }
 
     systemIncludeDirs = makefile->GetSafeDefinition(
       "CMAKE_EXTRA_GENERATOR_C_SYSTEM_INCLUDE_DIRS");
     if (!systemIncludeDirs.empty()) {
-      cmAppend(allIncludeDirs, cmExpandedList(systemIncludeDirs));
+      cm::append(allIncludeDirs, cmExpandedList(systemIncludeDirs));
     }
 
     auto end = cmRemoveDuplicates(allIncludeDirs);

@@ -32,6 +32,9 @@ function(CMAKE_DETERMINE_COMPILER_ABI lang src)
     endif()
     __TestCompiler_setTryCompileTargetType()
 
+    # Avoid failing ABI detection on warnings.
+    string(REGEX REPLACE "(^| )-Werror(=[^ ]*)?( |$)" " " CMAKE_${lang}_FLAGS "${CMAKE_${lang}_FLAGS}")
+
     # Save the current LC_ALL, LC_MESSAGES, and LANG environment variables
     # and set them to "C" that way GCC's "search starts here" text is in
     # English and we can grok it.
@@ -159,6 +162,18 @@ function(CMAKE_DETERMINE_COMPILER_ABI lang src)
             get_filename_component(arch "${dir}" NAME)
             set(CMAKE_${lang}_LIBRARY_ARCHITECTURE "${arch}" PARENT_SCOPE)
             break()
+          endif()
+        endforeach()
+      elseif(CMAKE_CXX_COMPILER_ID STREQUAL QCC)
+        foreach(dir ${implicit_dirs})
+          if (dir MATCHES "/lib$")
+            get_filename_component(assumedArchDir "${dir}" DIRECTORY)
+            get_filename_component(archParentDir "${assumedArchDir}" DIRECTORY)
+            if (archParentDir STREQUAL CMAKE_SYSROOT)
+              get_filename_component(archDirName "${assumedArchDir}" NAME)
+              set(CMAKE_${lang}_LIBRARY_ARCHITECTURE "${archDirName}" PARENT_SCOPE)
+              break()
+            endif()
           endif()
         endforeach()
       endif()

@@ -15,9 +15,10 @@
 #include <utility>
 #include <vector>
 
+#include <cmext/algorithm>
+
 #include "cm_jsoncpp_value.h"
 
-#include "cmAlgorithms.h"
 #include "cmCryptoHash.h"
 #include "cmFileAPI.h"
 #include "cmGeneratorExpression.h"
@@ -426,7 +427,7 @@ Json::Value Codemodel::DumpConfigurations()
   Json::Value configurations = Json::arrayValue;
   cmGlobalGenerator* gg =
     this->FileAPI.GetCMakeInstance()->GetGlobalGenerator();
-  auto makefiles = gg->GetMakefiles();
+  const auto& makefiles = gg->GetMakefiles();
   if (!makefiles.empty()) {
     std::vector<std::string> const& configs =
       makefiles[0]->GetGeneratorConfigs();
@@ -469,17 +470,17 @@ void CodemodelConfig::ProcessDirectories()
 {
   cmGlobalGenerator* gg =
     this->FileAPI.GetCMakeInstance()->GetGlobalGenerator();
-  std::vector<cmLocalGenerator*> const& localGens = gg->GetLocalGenerators();
+  auto const& localGens = gg->GetLocalGenerators();
 
   // Add directories in forward order to process parents before children.
   this->Directories.reserve(localGens.size());
-  for (cmLocalGenerator* lg : localGens) {
+  for (const auto& lg : localGens) {
     auto directoryIndex =
       static_cast<Json::ArrayIndex>(this->Directories.size());
     this->Directories.emplace_back();
     Directory& d = this->Directories[directoryIndex];
     d.Snapshot = lg->GetStateSnapshot().GetBuildsystemDirectory();
-    d.LocalGenerator = lg;
+    d.LocalGenerator = lg.get();
     this->DirectoryMap[d.Snapshot] = directoryIndex;
 
     d.ProjectIndex = this->AddProject(d.Snapshot);
@@ -492,8 +493,9 @@ void CodemodelConfig::ProcessDirectories()
     Directory& d = *di;
 
     // Accumulate the presence of install rules on the way up.
-    for (auto gen : d.LocalGenerator->GetMakefile()->GetInstallGenerators()) {
-      if (!dynamic_cast<cmInstallSubdirectoryGenerator*>(gen)) {
+    for (const auto& gen :
+         d.LocalGenerator->GetMakefile()->GetInstallGenerators()) {
+      if (!dynamic_cast<cmInstallSubdirectoryGenerator*>(gen.get())) {
         d.HasInstallRule = true;
         break;
       }
@@ -554,8 +556,8 @@ Json::Value CodemodelConfig::DumpTargets()
   std::vector<cmGeneratorTarget*> targetList;
   cmGlobalGenerator* gg =
     this->FileAPI.GetCMakeInstance()->GetGlobalGenerator();
-  for (cmLocalGenerator const* lg : gg->GetLocalGenerators()) {
-    cmAppend(targetList, lg->GetGeneratorTargets());
+  for (const auto& lg : gg->GetLocalGenerators()) {
+    cm::append(targetList, lg->GetGeneratorTargets());
   }
   std::sort(targetList.begin(), targetList.end(),
             [](cmGeneratorTarget* l, cmGeneratorTarget* r) {
@@ -853,8 +855,8 @@ CompileData Target::BuildCompileData(cmSourceFile* sf)
                                                     fd.Language);
 
   const std::string COMPILE_FLAGS("COMPILE_FLAGS");
-  if (const char* cflags = sf->GetProperty(COMPILE_FLAGS)) {
-    std::string flags = genexInterpreter.Evaluate(cflags, COMPILE_FLAGS);
+  if (cmProp cflags = sf->GetProperty(COMPILE_FLAGS)) {
+    std::string flags = genexInterpreter.Evaluate(*cflags, COMPILE_FLAGS);
     fd.Flags.emplace_back(std::move(flags), JBTIndex());
   }
   const std::string COMPILE_OPTIONS("COMPILE_OPTIONS");
@@ -870,14 +872,27 @@ CompileData Target::BuildCompileData(cmSourceFile* sf)
   }
 
   // Add precompile headers compile options.
-  const std::string pchSource =
-    this->GT->GetPchSource(this->Config, fd.Language);
+  std::vector<std::string> architectures;
+  this->GT->GetAppleArchs(this->Config, architectures);
+  if (architectures.empty()) {
+    architectures.emplace_back();
+  }
 
-  if (!pchSource.empty() && !sf->GetProperty("SKIP_PRECOMPILE_HEADERS")) {
+  std::unordered_map<std::string, std::string> pchSources;
+  for (const std::string& arch : architectures) {
+    const std::string pchSource =
+      this->GT->GetPchSource(this->Config, fd.Language, arch);
+    if (!pchSource.empty()) {
+      pchSources.insert(std::make_pair(pchSource, arch));
+    }
+  }
+
+  if (!pchSources.empty() && !sf->GetProperty("SKIP_PRECOMPILE_HEADERS")) {
     std::string pchOptions;
-    if (sf->ResolveFullPath() == pchSource) {
-      pchOptions =
-        this->GT->GetPchCreateCompileOptions(this->Config, fd.Language);
+    auto pchIt = pchSources.find(sf->ResolveFullPath());
+    if (pchIt != pchSources.end()) {
+      pchOptions = this->GT->GetPchCreateCompileOptions(
+        this->Config, fd.Language, pchIt->second);
     } else {
       pchOptions =
         this->GT->GetPchUseCompileOptions(this->Config, fd.Language);
@@ -934,10 +949,10 @@ CompileData Target::BuildCompileData(cmSourceFile* sf)
   std::set<std::string> configFileDefines;
   const std::string defPropName =
     "COMPILE_DEFINITIONS_" + cmSystemTools::UpperCase(this->Config);
-  if (const char* config_defs = sf->GetProperty(defPropName)) {
+  if (cmProp config_defs = sf->GetProperty(defPropName)) {
     lg->AppendDefines(
       configFileDefines,
-      genexInterpreter.Evaluate(config_defs, COMPILE_DEFINITIONS));
+      genexInterpreter.Evaluate(*config_defs, COMPILE_DEFINITIONS));
   }
 
   fd.Defines.reserve(fileDefines.size() + configFileDefines.size());
@@ -1409,9 +1424,9 @@ Json::Value Target::DumpDependency(cmTargetDepend const& td)
 Json::Value Target::DumpFolder()
 {
   Json::Value folder;
-  if (const char* f = this->GT->GetProperty("FOLDER")) {
+  if (cmProp f = this->GT->GetProperty("FOLDER")) {
     folder = Json::objectValue;
-    folder["name"] = f;
+    folder["name"] = *f;
   }
   return folder;
 }

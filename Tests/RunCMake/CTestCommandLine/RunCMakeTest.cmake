@@ -1,4 +1,6 @@
 include(RunCMake)
+include(RunCTest)
+
 set(RunCMake_TEST_TIMEOUT 60)
 
 unset(ENV{CTEST_PARALLEL_LEVEL})
@@ -240,6 +242,20 @@ function(run_TestOutputSize)
 endfunction()
 run_TestOutputSize()
 
+# Test --stop-on-failure
+function(run_stop_on_failure)
+  set(RunCMake_TEST_BINARY_DIR ${RunCMake_BINARY_DIR}/stop-on-failure)
+  set(RunCMake_TEST_NO_CLEAN 1)
+  file(REMOVE_RECURSE "${RunCMake_TEST_BINARY_DIR}")
+  file(MAKE_DIRECTORY "${RunCMake_TEST_BINARY_DIR}")
+  file(WRITE "${RunCMake_TEST_BINARY_DIR}/CTestTestfile.cmake" "
+add_test(test1 \"${CMAKE_COMMAND}\" -E false)
+add_test(test2 \"${CMAKE_COMMAND}\" -E echo \"not running\")
+")
+  run_cmake_command(stop-on-failure ${CMAKE_CTEST_COMMAND} --stop-on-failure)
+endfunction()
+run_stop_on_failure()
+
 function(run_TestAffinity)
   set(RunCMake_TEST_BINARY_DIR ${RunCMake_BINARY_DIR}/TestAffinity)
   set(RunCMake_TEST_NO_CLEAN 1)
@@ -311,3 +327,56 @@ function(run_ShowOnly)
   run_cmake_command(show-only_json-v1 ${CMAKE_CTEST_COMMAND} --show-only=json-v1)
 endfunction()
 run_ShowOnly()
+
+function(run_NoTests)
+  set(RunCMake_TEST_BINARY_DIR ${RunCMake_BINARY_DIR}/NoTests)
+  set(RunCMake_TEST_NO_CLEAN 1)
+  file(REMOVE_RECURSE "${RunCMake_TEST_BINARY_DIR}")
+  file(MAKE_DIRECTORY "${RunCMake_TEST_BINARY_DIR}")
+  file(WRITE "${RunCMake_TEST_BINARY_DIR}/CTestTestfile.cmake" "")
+  run_cmake_command(no-tests_ignore ${CMAKE_CTEST_COMMAND} --no-tests=ignore)
+  run_cmake_command(no-tests_error ${CMAKE_CTEST_COMMAND} --no-tests=error)
+  run_cmake_command(no-tests_bad ${CMAKE_CTEST_COMMAND} --no-tests=bad)
+  run_cmake_command(no-tests_legacy ${CMAKE_CTEST_COMMAND})
+  file(WRITE "${RunCMake_TEST_BINARY_DIR}/NoTestsScript.cmake" "
+    set(CTEST_COMMAND \"${CMAKE_CTEST_COMMAND}\")
+    set(CTEST_SOURCE_DIRECTORY \"${RunCMake_SOURCE_DIR}\")
+    set(CTEST_BINARY_DIRECTORY \"${RunCMake_TEST_BINARY_DIR}\")
+    ctest_start(Experimental)
+    ctest_test()
+")
+  run_cmake_command(
+    no-tests-script_ignore ${CMAKE_CTEST_COMMAND} --no-tests=ignore
+    -S "${RunCMake_TEST_BINARY_DIR}/NoTestsScript.cmake")
+  run_cmake_command(
+    no-tests-script_error ${CMAKE_CTEST_COMMAND} --no-tests=error
+    -S "${RunCMake_TEST_BINARY_DIR}/NoTestsScript.cmake")
+  run_cmake_command(
+    no-tests-script_legacy ${CMAKE_CTEST_COMMAND}
+    -S "${RunCMake_TEST_BINARY_DIR}/NoTestsScript.cmake")
+endfunction()
+run_NoTests()
+
+# Check the configuration type variable is passed
+run_ctest(check-configuration-type)
+
+function(run_MemCheckSan case opts)
+  # Use a single build tree for a few tests without cleaning.
+  set(RunCMake_TEST_BINARY_DIR ${RunCMake_BINARY_DIR}/MemCheckSan${case}-build)
+  set(RunCMake_TEST_OPTIONS
+    "-DMEMORYCHECK_TYPE=${case}Sanitizer"
+    "-DMEMORYCHECK_SANITIZER_OPTIONS=${opts}"
+    )
+  run_cmake(MemCheckSan)
+  unset(RunCMake_TEST_OPTIONS)
+  set(RunCMake_TEST_NO_CLEAN 1)
+  set(RunCMake-stdout-file "../ctest_memcheck/Dummy${case}Sanitizer-stdout.txt")
+  run_cmake_command(MemCheckSan${case}-ctest
+    ${CMAKE_CTEST_COMMAND} -C Debug -M Experimental -T MemCheck -V
+    )
+endfunction()
+run_MemCheckSan(Address "simulate_sanitizer=1:report_bugs=1:history_size=5:exitcode=55")
+run_MemCheckSan(Leak "simulate_sanitizer=1:report_bugs=1:history_size=5:exitcode=55")
+run_MemCheckSan(Memory "simulate_sanitizer=1:report_bugs=1:history_size=5:exitcode=55")
+run_MemCheckSan(Thread "report_bugs=1:history_size=5:exitcode=55")
+run_MemCheckSan(UndefinedBehavior "simulate_sanitizer=1")

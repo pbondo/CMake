@@ -235,7 +235,7 @@ protected:
   void AttachFiles(cmXMLWriter& xml, cmCTestTestResult& result);
 
   //! Clean test output to specified length
-  bool CleanTestOutput(std::string& output, size_t length);
+  void CleanTestOutput(std::string& output, size_t length);
 
   cmDuration ElapsedTestingTime;
 
@@ -278,7 +278,7 @@ private:
   /**
    * Run the tests for a directory and any subdirectories
    */
-  void ProcessDirectory(std::vector<std::string>& passed,
+  bool ProcessDirectory(std::vector<std::string>& passed,
                         std::vector<std::string>& failed);
 
   /**
@@ -338,6 +338,7 @@ private:
 
   bool UseResourceSpec;
   cmCTestResourceSpec ResourceSpec;
+  std::string ResourceSpecFile;
 
   void GenerateRegressionImages(cmXMLWriter& xml, const std::string& dart);
   cmsys::RegularExpression DartStuff1;

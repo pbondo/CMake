@@ -154,7 +154,7 @@ macro(CMAKE_HANDLE_SYSTEM_LIBRARIES)
 
   # Allow the user to enable/disable all system utility library options by
   # defining CMAKE_USE_SYSTEM_LIBRARIES or CMAKE_USE_SYSTEM_LIBRARY_${util}.
-  set(UTILITIES BZIP2 CURL EXPAT FORM JSONCPP LIBARCHIVE LIBLZMA LIBRHASH LIBUV ZLIB ZSTD)
+  set(UTILITIES BZIP2 CURL EXPAT FORM JSONCPP LIBARCHIVE LIBLZMA LIBRHASH LIBUV NGHTTP2 ZLIB ZSTD)
   foreach(util ${UTILITIES})
     if(NOT DEFINED CMAKE_USE_SYSTEM_LIBRARY_${util}
         AND DEFINED CMAKE_USE_SYSTEM_LIBRARIES)
@@ -192,6 +192,8 @@ macro(CMAKE_HANDLE_SYSTEM_LIBRARIES)
     "${CMAKE_USE_SYSTEM_LIBRARY_ZSTD}" "NOT CMAKE_USE_SYSTEM_LIBARCHIVE" ON)
   CMAKE_DEPENDENT_OPTION(CMAKE_USE_SYSTEM_LIBLZMA "Use system-installed liblzma"
     "${CMAKE_USE_SYSTEM_LIBRARY_LIBLZMA}" "NOT CMAKE_USE_SYSTEM_LIBARCHIVE" ON)
+  CMAKE_DEPENDENT_OPTION(CMAKE_USE_SYSTEM_NGHTTP2 "Use system-installed nghttp2"
+    "${CMAKE_USE_SYSTEM_LIBRARY_NGHTTP2}" "NOT CMAKE_USE_SYSTEM_CURL" ON)
   option(CMAKE_USE_SYSTEM_FORM "Use system-installed libform" "${CMAKE_USE_SYSTEM_LIBRARY_FORM}")
   option(CMAKE_USE_SYSTEM_JSONCPP "Use system-installed jsoncpp" "${CMAKE_USE_SYSTEM_LIBRARY_JSONCPP}")
   option(CMAKE_USE_SYSTEM_LIBRHASH "Use system-installed librhash" "${CMAKE_USE_SYSTEM_LIBRARY_LIBRHASH}")
@@ -264,7 +266,6 @@ macro(CMAKE_SETUP_TESTING)
       ${CMake_BINARY_DIR}/Testing/HTML/TestingResults/Icons/Logo.gif COPYONLY)
   endif()
   mark_as_advanced(DART_ROOT)
-  mark_as_advanced(CURL_TESTING)
 endmacro()
 
 
@@ -368,7 +369,7 @@ macro (CMAKE_BUILD_UTILITIES)
   # Setup third-party libraries.
   # Everything in the tree should be able to include files from the
   # Utilities directory.
-  if (CMAKE_SYSTEM_NAME STREQUAL "AIX" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  if ((CMAKE_SYSTEM_NAME STREQUAL "AIX" OR CMAKE_SYSTEM_NAME STREQUAL "OS400") AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     # using -isystem option generate error "template with C linkage"
     include_directories("${CMake_SOURCE_DIR}/Utilities/std")
   else()
@@ -466,9 +467,19 @@ macro (CMAKE_BUILD_UTILITIES)
       set(CURL_CA_PATH "" CACHE PATH "Path to SSL CA Certificate Directory")
       mark_as_advanced(CURL_CA_BUNDLE CURL_CA_PATH)
     endif()
+    if(NOT CMAKE_USE_SYSTEM_NGHTTP2)
+      # Tell curl's FindNGHTTP2 module to use our library.
+      set(NGHTTP2_LIBRARY cmnghttp2)
+      set(NGHTTP2_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/Utilities/cmnghttp2/lib/includes)
+    endif()
     add_subdirectory(Utilities/cmcurl)
     CMAKE_SET_TARGET_FOLDER(cmcurl "Utilities/3rdParty")
     CMAKE_SET_TARGET_FOLDER(LIBCURL "Utilities/3rdParty")
+    if(NOT CMAKE_USE_SYSTEM_NGHTTP2)
+      # Configure after curl to re-use some check results.
+      add_subdirectory(Utilities/cmnghttp2)
+      CMAKE_SET_TARGET_FOLDER(cmnghttp2 "Utilities/3rdParty")
+    endif()
   endif()
 
   #---------------------------------------------------------------------
@@ -548,21 +559,25 @@ macro (CMAKE_BUILD_UTILITIES)
     set(ZLIB_INCLUDE_DIR ${CMAKE_ZLIB_INCLUDES})
     set(ZLIB_LIBRARY ${CMAKE_ZLIB_LIBRARIES})
     add_definitions(-DLIBARCHIVE_STATIC)
+    set(ENABLE_MBEDTLS OFF CACHE INTERNAL "Enable use of mbed TLS")
     set(ENABLE_NETTLE OFF CACHE INTERNAL "Enable use of Nettle")
     set(ENABLE_OPENSSL ${CMAKE_USE_OPENSSL} CACHE INTERNAL "Enable use of OpenSSL")
+    set(ENABLE_LIBB2 OFF CACHE INTERNAL "Enable the use of the system LIBB2 library if found")
     set(ENABLE_LZMA ON CACHE INTERNAL "Enable the use of the system LZMA library if found")
     set(ENABLE_LZ4 OFF CACHE INTERNAL "Enable the use of the system LZ4 library if found")
     set(ENABLE_LZO OFF CACHE INTERNAL "Enable the use of the system LZO library if found")
     set(ENABLE_ZLIB ON CACHE INTERNAL "Enable the use of the system ZLIB library if found")
     set(ENABLE_BZip2 ON CACHE INTERNAL "Enable the use of the system BZip2 library if found")
+    set(ENABLE_ZSTD ON CACHE INTERNAL "Enable the use of the system zstd library if found")
     set(ENABLE_LIBXML2 OFF CACHE INTERNAL "Enable the use of the system libxml2 library if found")
-    set(ENABLE_EXPAT ON CACHE INTERNAL "Enable the use of the system EXPAT library if found")
+    set(ENABLE_EXPAT OFF CACHE INTERNAL "Enable the use of the system EXPAT library if found")
     set(ENABLE_PCREPOSIX OFF CACHE INTERNAL "Enable the use of the system PCREPOSIX library if found")
     set(ENABLE_LibGCC OFF CACHE INTERNAL "Enable the use of the system LibGCC library if found")
     set(ENABLE_XATTR OFF CACHE INTERNAL "Enable extended attribute support")
     set(ENABLE_ACL OFF CACHE INTERNAL "Enable ACL support")
     set(ENABLE_ICONV OFF CACHE INTERNAL "Enable iconv support")
     set(ENABLE_CNG OFF CACHE INTERNAL "Enable the use of CNG(Crypto Next Generation)")
+    SET(POSIX_REGEX_LIB "" CACHE INTERNAL "Choose what library should provide POSIX regular expression support")
     add_subdirectory(Utilities/cmlibarchive)
     CMAKE_SET_TARGET_FOLDER(cmlibarchive "Utilities/3rdParty")
     set(CMAKE_TAR_LIBRARIES cmlibarchive ${BZIP2_LIBRARIES})
@@ -671,10 +686,6 @@ if(NOT CMake_TEST_EXTERNAL_CMAKE)
   set(LIBRARY_OUTPUT_PATH "" CACHE INTERNAL
     "Where to put the libraries for CMake")
 
-  # The CMake executables usually do not need any rpath to run in the build or
-  # install tree.
-  set(CMAKE_SKIP_RPATH ON CACHE INTERNAL "CMake does not need RPATHs.")
-
   # Load install destinations.
   include(Source/CMakeInstallDestinations.cmake)
 
@@ -714,19 +725,6 @@ if(NOT CMake_TEST_EXTERNAL_CMAKE)
   # build the utilities (a macro defined in this file)
   CMAKE_BUILD_UTILITIES()
 
-  # On NetBSD ncurses is required, since curses doesn't have the wsyncup()
-  # function. ncurses is installed via pkgsrc, so the library is in /usr/pkg/lib,
-  # which isn't in the default linker search path. So without RPATH ccmake
-  # doesn't run and the build doesn't succeed since ccmake is executed for
-  # generating the documentation.
-  if(BUILD_CursesDialog)
-    get_filename_component(_CURSES_DIR "${CURSES_LIBRARY}" PATH)
-    set(CURSES_NEED_RPATH FALSE)
-    if(NOT "${_CURSES_DIR}" STREQUAL "/lib" AND NOT "${_CURSES_DIR}" STREQUAL "/usr/lib" AND NOT "${_CURSES_DIR}" STREQUAL "/lib64" AND NOT "${_CURSES_DIR}" STREQUAL "/usr/lib64")
-      set(CURSES_NEED_RPATH TRUE)
-    endif()
-  endif()
-
   if(BUILD_QtDialog)
     if(APPLE)
       set(CMAKE_BUNDLE_VERSION
@@ -739,28 +737,15 @@ if(NOT CMake_TEST_EXTERNAL_CMAKE)
       set(CMAKE_INSTALL_PREFIX
         "${CMAKE_INSTALL_PREFIX}CMake.app/Contents")
     endif()
-
-    set(QT_NEED_RPATH FALSE)
-    if(NOT "${QT_LIBRARY_DIR}" STREQUAL "/lib" AND NOT "${QT_LIBRARY_DIR}" STREQUAL "/usr/lib" AND NOT "${QT_LIBRARY_DIR}" STREQUAL "/lib64" AND NOT "${QT_LIBRARY_DIR}" STREQUAL "/usr/lib64")
-      set(QT_NEED_RPATH TRUE)
-    endif()
   endif()
 
-
-  # The same might be true on other systems for other libraries.
-  # Then only enable RPATH if we have are building at least with cmake 2.4,
-  # since this one has much better RPATH features than cmake 2.2.
-  # The executables are then built with the RPATH for the libraries outside
-  # the build tree, which is both the build and the install RPATH.
-  if (UNIX)
-    if(   CMAKE_USE_SYSTEM_CURL   OR  CMAKE_USE_SYSTEM_ZLIB
-          OR  CMAKE_USE_SYSTEM_EXPAT  OR  CURSES_NEED_RPATH  OR  QT_NEED_RPATH)
-      set(CMAKE_SKIP_RPATH OFF CACHE INTERNAL "CMake built with RPATH.")
-      set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
-      set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
-    endif()
-  endif ()
-
+  if(UNIX)
+    # Install executables with the RPATH set for libraries outside the build tree.
+    # This is also suitable for binaries in the build tree.  Avoid re-link on install.
+    set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON CACHE BOOL "Install with RPATH set to find custom-built libraries.")
+    set(CMAKE_BUILD_WITH_INSTALL_RPATH ON CACHE BOOL "Build with RPATH set to match install-tree RPATH.")
+    mark_as_advanced(CMAKE_INSTALL_RPATH_USE_LINK_PATH CMAKE_BUILD_WITH_INSTALL_RPATH)
+  endif()
 
   # add the uninstall support
   configure_file(
@@ -841,6 +826,10 @@ if(NOT CMake_TEST_EXTERNAL_CMAKE)
     PATTERN "*.sh*" PERMISSIONS OWNER_READ OWNER_EXECUTE OWNER_WRITE
                                 GROUP_READ GROUP_EXECUTE
                                 WORLD_READ WORLD_EXECUTE
+    PATTERN "ExportImportList"
+      PERMISSIONS OWNER_READ OWNER_EXECUTE OWNER_WRITE
+                  GROUP_READ GROUP_EXECUTE
+                  WORLD_READ WORLD_EXECUTE
     REGEX "Help/(dev|guide)($|/)" EXCLUDE
     )
 

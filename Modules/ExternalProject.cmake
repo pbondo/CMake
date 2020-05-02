@@ -9,8 +9,11 @@ ExternalProject
 
    .. contents::
 
+Commands
+^^^^^^^^
+
 External Project Definition
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+"""""""""""""""""""""""""""
 
 .. command:: ExternalProject_Add
 
@@ -665,7 +668,7 @@ External Project Definition
   automatic substitutions that are supported for some options.
 
 Obtaining Project Properties
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+""""""""""""""""""""""""""""
 
 .. command:: ExternalProject_Get_Property
 
@@ -686,7 +689,7 @@ Obtaining Project Properties
     message("Source dir of myExtProj = ${SOURCE_DIR}")
 
 Explicit Step Management
-^^^^^^^^^^^^^^^^^^^^^^^^
+""""""""""""""""""""""""
 
 The ``ExternalProject_Add()`` function on its own is often sufficient for
 incorporating an external project into the main build. Certain scenarios
@@ -1096,7 +1099,7 @@ function(_ep_write_gitclone_script script_filename source_dir git_EXECUTABLE git
     list(APPEND git_clone_options --progress)
   endif()
   foreach(config IN LISTS git_config)
-    list(APPEND git_clone_options --config ${config})
+    list(APPEND git_clone_options --config \"${config}\")
   endforeach()
   if(NOT ${git_remote_name} STREQUAL "origin")
     list(APPEND git_clone_options --origin \"${git_remote_name}\")
@@ -1239,7 +1242,7 @@ endif()
 endfunction()
 
 
-function(_ep_write_gitupdate_script script_filename git_EXECUTABLE git_tag git_remote_name init_submodules git_submodules git_repository work_dir)
+function(_ep_write_gitupdate_script script_filename git_EXECUTABLE git_tag git_remote_name init_submodules git_submodules_recurse git_submodules git_repository work_dir)
   if("${git_tag}" STREQUAL "")
     message(FATAL_ERROR "Tag for git checkout should not be empty.")
   endif()
@@ -2279,7 +2282,7 @@ function(ExternalProject_Add_StepDependencies name step)
 
   get_property(steps TARGET ${name} PROPERTY _EP_STEPS)
   list(FIND steps ${step} is_step)
-  if(NOT is_step)
+  if(is_step LESS 0)
     message(FATAL_ERROR "External project \"${name}\" does not have a step \"${step}\".")
   endif()
 
@@ -2336,6 +2339,29 @@ function(_ep_is_dir_empty dir empty_var)
     set(${empty_var} 1 PARENT_SCOPE)
   else()
     set(${empty_var} 0 PARENT_SCOPE)
+  endif()
+endfunction()
+
+function(_ep_get_git_submodules_recurse git_submodules_recurse)
+  # Checks for GIT_SUBMODULES_RECURSE property
+  # Default is ON, which sets git_submodules_recurse output variable to "--recursive"
+  # Otherwise, the output variable is set to an empty value ""
+  get_property(git_submodules_recurse_set TARGET ${name} PROPERTY _EP_GIT_SUBMODULES_RECURSE SET)
+  if(NOT git_submodules_recurse_set)
+    set(recurseFlag "--recursive")
+  else()
+    get_property(git_submodules_recurse_value TARGET ${name} PROPERTY _EP_GIT_SUBMODULES_RECURSE)
+    if(git_submodules_recurse_value)
+      set(recurseFlag "--recursive")
+    else()
+      set(recurseFlag "")
+    endif()
+  endif()
+  set(${git_submodules_recurse} "${recurseFlag}" PARENT_SCOPE)
+
+  # The git submodule update '--recursive' flag requires git >= v1.6.5
+  if(recurseFlag AND GIT_VERSION_STRING VERSION_LESS 1.6.5)
+    message(FATAL_ERROR "error: git version 1.6.5 or later required for --recursive flag with 'git submodule ...': GIT_VERSION_STRING='${GIT_VERSION_STRING}'")
   endif()
 endfunction()
 
@@ -2431,23 +2457,7 @@ function(_ep_add_download_command name)
       message(FATAL_ERROR "error: could not find git for clone of ${name}")
     endif()
 
-    get_property(git_submodules_recurse_set TARGET ${name} PROPERTY _EP_GIT_SUBMODULES_RECURSE SET)
-    if(NOT git_submodules_recurse_set)
-      set(git_submodules_recurse "--recursive")
-    else()
-      get_property(git_submodules_recurse_value TARGET ${name} PROPERTY _EP_GIT_SUBMODULES_RECURSE)
-      if(git_submodules_recurse_value)
-        set(git_submodules_recurse "--recursive")
-      else()
-        set(git_submodules_recurse "")
-      endif()
-    endif()
-
-    # The git submodule update '--recursive' flag requires git >= v1.6.5
-    #
-    if(git_submodules_recurse AND GIT_VERSION_STRING VERSION_LESS 1.6.5)
-      message(FATAL_ERROR "error: git version 1.6.5 or later required for 'git submodule update --recursive': GIT_VERSION_STRING='${GIT_VERSION_STRING}'")
-    endif()
+    _ep_get_git_submodules_recurse(git_submodules_recurse)
 
     get_property(git_tag TARGET ${name} PROPERTY _EP_GIT_TAG)
     if(NOT git_tag)
@@ -2588,7 +2598,7 @@ function(_ep_add_download_command name)
       set(cmd   ${CMAKE_COMMAND} -E rm -rf ${source_dir}
         COMMAND ${CMAKE_COMMAND} -E copy_directory ${abs_dir} ${source_dir})
     else()
-      get_property(no_extract TARGET "${name}" PROPERTY _EP_DOWNLOAD_NO_EXTRACT SET)
+      get_property(no_extract TARGET "${name}" PROPERTY _EP_DOWNLOAD_NO_EXTRACT)
       if("${url}" MATCHES "^[a-z]+://")
         # TODO: Should download and extraction be different steps?
         if("x${fname}" STREQUAL "x")
@@ -2690,6 +2700,15 @@ function(_ep_add_download_command name)
     )
 endfunction()
 
+function(_ep_get_update_disconnected var name)
+  get_property(update_disconnected_set TARGET ${name} PROPERTY _EP_UPDATE_DISCONNECTED SET)
+  if(update_disconnected_set)
+    get_property(update_disconnected TARGET ${name} PROPERTY _EP_UPDATE_DISCONNECTED)
+  else()
+    get_property(update_disconnected DIRECTORY PROPERTY EP_UPDATE_DISCONNECTED)
+  endif()
+  set(${var} "${update_disconnected}" PARENT_SCOPE)
+endfunction()
 
 function(_ep_add_update_command name)
   ExternalProject_Get_Property(${name} source_dir tmp_dir)
@@ -2700,12 +2719,8 @@ function(_ep_add_update_command name)
   get_property(svn_repository TARGET ${name} PROPERTY _EP_SVN_REPOSITORY)
   get_property(git_repository TARGET ${name} PROPERTY _EP_GIT_REPOSITORY)
   get_property(hg_repository  TARGET ${name} PROPERTY _EP_HG_REPOSITORY )
-  get_property(update_disconnected_set TARGET ${name} PROPERTY _EP_UPDATE_DISCONNECTED SET)
-  if(update_disconnected_set)
-    get_property(update_disconnected TARGET ${name} PROPERTY _EP_UPDATE_DISCONNECTED)
-  else()
-    get_property(update_disconnected DIRECTORY PROPERTY EP_UPDATE_DISCONNECTED)
-  endif()
+
+  _ep_get_update_disconnected(update_disconnected ${name})
 
   set(work_dir)
   set(comment)
@@ -2774,8 +2789,10 @@ function(_ep_add_update_command name)
       endif()
     endif()
 
+    _ep_get_git_submodules_recurse(git_submodules_recurse)
+
     _ep_write_gitupdate_script(${tmp_dir}/${name}-gitupdate.cmake
-      ${GIT_EXECUTABLE} ${git_tag} ${git_remote_name} ${git_init_submodules} "${git_submodules}" ${git_repository} ${work_dir}
+      ${GIT_EXECUTABLE} ${git_tag} ${git_remote_name} ${git_init_submodules} "${git_submodules_recurse}" "${git_submodules}" ${git_repository} ${work_dir}
       )
     set(cmd ${CMAKE_COMMAND} -P ${tmp_dir}/${name}-gitupdate.cmake)
     set(always 1)
@@ -2865,10 +2882,17 @@ function(_ep_add_patch_command name)
     set(log "")
   endif()
 
+  _ep_get_update_disconnected(update_disconnected ${name})
+  if(update_disconnected)
+    set(update_dep skip-update)
+  else()
+    set(update_dep update)
+  endif()
+
   ExternalProject_Add_Step(${name} patch
     COMMAND ${cmd}
     WORKING_DIRECTORY ${work_dir}
-    DEPENDEES download
+    DEPENDEES download ${update_dep}
     ${log}
     )
 endfunction()
@@ -3019,12 +3043,7 @@ function(_ep_add_configure_command name)
     set(uses_terminal "")
   endif()
 
-  get_property(update_disconnected_set TARGET ${name} PROPERTY _EP_UPDATE_DISCONNECTED SET)
-  if(update_disconnected_set)
-    get_property(update_disconnected TARGET ${name} PROPERTY _EP_UPDATE_DISCONNECTED)
-  else()
-    get_property(update_disconnected DIRECTORY PROPERTY EP_UPDATE_DISCONNECTED)
-  endif()
+  _ep_get_update_disconnected(update_disconnected ${name})
   if(update_disconnected)
     set(update_dep skip-update)
   else()

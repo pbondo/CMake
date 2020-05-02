@@ -241,6 +241,14 @@ Options
  Print extra information during the cmake run like stack traces with
  :command:`message(SEND_ERROR)` calls.
 
+``--debug-find``
+ Put cmake find commands in a debug mode.
+
+ Print extra find call information during the cmake run to standard
+ error. Output is designed for human consumption and not for parsing.
+ See also the :variable:`CMAKE_FIND_DEBUG_MODE` variable for debugging
+ a more local part of the project.
+
 ``--trace``
  Put cmake in trace mode.
 
@@ -250,6 +258,74 @@ Options
  Put cmake in trace mode.
 
  Like ``--trace``, but with variables expanded.
+
+``--trace-format=<format>``
+ Put cmake in trace mode and sets the trace output format.
+
+ ``<format>`` can be one of the following values.
+
+   ``human``
+     Prints each trace line in a human-readable format. This is the
+     default format.
+
+   ``json-v1``
+     Prints each line as a separate JSON document. Each document is
+     separated by a newline ( ``\n`` ). It is guaranteed that no
+     newline characters will be present inside a JSON document.
+
+     JSON trace format:
+
+     .. code-block:: json
+
+       {
+         "file": "/full/path/to/the/CMake/file.txt",
+         "line": 0,
+         "cmd": "add_executable",
+         "args": ["foo", "bar"],
+         "time": 1579512535.9687231,
+         "frame": 2
+       }
+
+     The members are:
+
+     ``file``
+       The full path to the CMake source file where the function
+       was called.
+
+     ``line``
+       The line in ``file`` of the function call.
+
+     ``cmd``
+       The name of the function that was called.
+
+     ``args``
+       A string list of all function parameters.
+
+     ``time``
+       Timestamp (seconds since epoch) of the function call.
+
+     ``frame``
+       Stack frame depth of the function that was called.
+
+     Additionally, the first JSON document outputted contains the
+     ``version`` key for the current major and minor version of the
+
+     JSON trace format:
+
+     .. code-block:: json
+
+       {
+         "version": {
+           "major": 1,
+           "minor": 0
+         }
+       }
+
+     The members are:
+
+     ``version``
+       Indicates the version of the JSON format. The version has a
+       major and minor components following semantic version conventions.
 
 ``--trace-source=<file>``
  Put cmake in trace mode, but output only lines of a specified file.
@@ -281,6 +357,20 @@ Options
  Normally, unused and uninitialized variables are searched for only
  in :variable:`CMAKE_SOURCE_DIR` and :variable:`CMAKE_BINARY_DIR`.
  This flag tells CMake to warn about other files as well.
+
+``--profiling-output=<path>``
+ Used in conjuction with ``--profiling-format`` to output to a given path.
+
+``--profiling-format=<file>``
+ Enable the output of profiling data of CMake script in the given format.
+
+ This can aid performance analysis of CMake scripts executed. Third party
+ applications should be used to process the output into human readable format.
+
+ Currently supported values are:
+ ``google-trace`` Outputs in Google Trace Format, which can be parsed by the
+ about:tracing tab of Google Chrome or using a plugin for a tool like Trace
+ Compass.
 
 .. _`Build Tool Mode`:
 
@@ -463,6 +553,9 @@ Available commands are:
 
   ``serverMode``
     ``true`` if cmake supports server-mode and ``false`` otherwise.
+
+``cat <files>...``
+  Concatenate files and print on the standard output.
 
 ``chdir <dir> <cmd> [<arg>...]``
   Change the current working directory and run a command.

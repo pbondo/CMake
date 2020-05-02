@@ -194,9 +194,8 @@ namespace {
 bool HandleGlobalMode(cmExecutionStatus& status,
                       const std::set<std::string>& names,
                       const std::string& propertyName,
-                      const std::string& propertyValue,
-                      const bool appendAsString, const bool appendMode,
-                      const bool remove)
+                      const std::string& propertyValue, bool appendAsString,
+                      bool appendMode, bool remove)
 {
   if (!names.empty()) {
     status.SetError("given names for GLOBAL scope.");
@@ -205,14 +204,14 @@ bool HandleGlobalMode(cmExecutionStatus& status,
 
   // Set or append the property.
   cmake* cm = status.GetMakefile().GetCMakeInstance();
-  const char* value = propertyValue.c_str();
-  if (remove) {
-    value = nullptr;
-  }
   if (appendMode) {
-    cm->AppendProperty(propertyName, value ? value : "", appendAsString);
+    cm->AppendProperty(propertyName, propertyValue, appendAsString);
   } else {
-    cm->SetProperty(propertyName, value);
+    if (remove) {
+      cm->SetProperty(propertyName, nullptr);
+    } else {
+      cm->SetProperty(propertyName, propertyValue.c_str());
+    }
   }
 
   return true;
@@ -221,9 +220,8 @@ bool HandleGlobalMode(cmExecutionStatus& status,
 bool HandleDirectoryMode(cmExecutionStatus& status,
                          const std::set<std::string>& names,
                          const std::string& propertyName,
-                         const std::string& propertyValue,
-                         const bool appendAsString, const bool appendMode,
-                         const bool remove)
+                         const std::string& propertyValue, bool appendAsString,
+                         bool appendMode, bool remove)
 {
   if (names.size() > 1) {
     status.SetError("allows at most one name for DIRECTORY scope.");
@@ -237,14 +235,8 @@ bool HandleDirectoryMode(cmExecutionStatus& status,
   if (!names.empty()) {
     // Construct the directory name.  Interpret relative paths with
     // respect to the current directory.
-    std::string dir = *names.begin();
-    if (!cmSystemTools::FileIsFullPath(dir)) {
-      dir = cmStrCat(status.GetMakefile().GetCurrentSourceDirectory(), '/',
-                     *names.begin());
-    }
-
-    // The local generators are associated with collapsed paths.
-    dir = cmSystemTools::CollapseFullPath(dir);
+    std::string dir = cmSystemTools::CollapseFullPath(
+      *names.begin(), status.GetMakefile().GetCurrentSourceDirectory());
 
     mf = status.GetMakefile().GetGlobalGenerator()->FindMakefile(dir);
     if (!mf) {
@@ -258,14 +250,14 @@ bool HandleDirectoryMode(cmExecutionStatus& status,
   }
 
   // Set or append the property.
-  const char* value = propertyValue.c_str();
-  if (remove) {
-    value = nullptr;
-  }
   if (appendMode) {
-    mf->AppendProperty(propertyName, value ? value : "", appendAsString);
+    mf->AppendProperty(propertyName, propertyValue, appendAsString);
   } else {
-    mf->SetProperty(propertyName, value);
+    if (remove) {
+      mf->SetProperty(propertyName, nullptr);
+    } else {
+      mf->SetProperty(propertyName, propertyValue.c_str());
+    }
   }
 
   return true;
@@ -274,9 +266,8 @@ bool HandleDirectoryMode(cmExecutionStatus& status,
 bool HandleTargetMode(cmExecutionStatus& status,
                       const std::set<std::string>& names,
                       const std::string& propertyName,
-                      const std::string& propertyValue,
-                      const bool appendAsString, const bool appendMode,
-                      const bool remove)
+                      const std::string& propertyValue, bool appendAsString,
+                      bool appendMode, bool remove)
 {
   for (std::string const& name : names) {
     if (status.GetMakefile().IsAlias(name)) {
@@ -300,18 +291,18 @@ bool HandleTargetMode(cmExecutionStatus& status,
 
 bool HandleTarget(cmTarget* target, cmMakefile& makefile,
                   const std::string& propertyName,
-                  const std::string& propertyValue, const bool appendAsString,
-                  const bool appendMode, const bool remove)
+                  const std::string& propertyValue, bool appendAsString,
+                  bool appendMode, bool remove)
 {
   // Set or append the property.
-  const char* value = propertyValue.c_str();
-  if (remove) {
-    value = nullptr;
-  }
   if (appendMode) {
-    target->AppendProperty(propertyName, value, appendAsString);
+    target->AppendProperty(propertyName, propertyValue, appendAsString);
   } else {
-    target->SetProperty(propertyName, value);
+    if (remove) {
+      target->SetProperty(propertyName, nullptr);
+    } else {
+      target->SetProperty(propertyName, propertyValue);
+    }
   }
 
   // Check the resulting value.
@@ -323,9 +314,8 @@ bool HandleTarget(cmTarget* target, cmMakefile& makefile,
 bool HandleSourceMode(cmExecutionStatus& status,
                       const std::set<std::string>& names,
                       const std::string& propertyName,
-                      const std::string& propertyValue,
-                      const bool appendAsString, const bool appendMode,
-                      const bool remove)
+                      const std::string& propertyValue, bool appendAsString,
+                      bool appendMode, bool remove)
 {
   for (std::string const& name : names) {
     // Get the source file.
@@ -344,28 +334,26 @@ bool HandleSourceMode(cmExecutionStatus& status,
 }
 
 bool HandleSource(cmSourceFile* sf, const std::string& propertyName,
-                  const std::string& propertyValue, const bool appendAsString,
-                  const bool appendMode, const bool remove)
+                  const std::string& propertyValue, bool appendAsString,
+                  bool appendMode, bool remove)
 {
   // Set or append the property.
-  const char* value = propertyValue.c_str();
-  if (remove) {
-    value = nullptr;
-  }
-
   if (appendMode) {
-    sf->AppendProperty(propertyName, value, appendAsString);
+    sf->AppendProperty(propertyName, propertyValue, appendAsString);
   } else {
-    sf->SetProperty(propertyName, value);
+    if (remove) {
+      sf->SetProperty(propertyName, nullptr);
+    } else {
+      sf->SetProperty(propertyName, propertyValue.c_str());
+    }
   }
   return true;
 }
 
 bool HandleTestMode(cmExecutionStatus& status, std::set<std::string>& names,
                     const std::string& propertyName,
-                    const std::string& propertyValue,
-                    const bool appendAsString, const bool appendMode,
-                    const bool remove)
+                    const std::string& propertyValue, bool appendAsString,
+                    bool appendMode, bool remove)
 {
   // Look for tests with all names given.
   std::set<std::string>::iterator next;
@@ -396,18 +384,18 @@ bool HandleTestMode(cmExecutionStatus& status, std::set<std::string>& names,
 }
 
 bool HandleTest(cmTest* test, const std::string& propertyName,
-                const std::string& propertyValue, const bool appendAsString,
-                const bool appendMode, const bool remove)
+                const std::string& propertyValue, bool appendAsString,
+                bool appendMode, bool remove)
 {
   // Set or append the property.
-  const char* value = propertyValue.c_str();
-  if (remove) {
-    value = nullptr;
-  }
   if (appendMode) {
-    test->AppendProperty(propertyName, value, appendAsString);
+    test->AppendProperty(propertyName, propertyValue, appendAsString);
   } else {
-    test->SetProperty(propertyName, value);
+    if (remove) {
+      test->SetProperty(propertyName, nullptr);
+    } else {
+      test->SetProperty(propertyName, propertyValue.c_str());
+    }
   }
 
   return true;
@@ -416,9 +404,8 @@ bool HandleTest(cmTest* test, const std::string& propertyName,
 bool HandleCacheMode(cmExecutionStatus& status,
                      const std::set<std::string>& names,
                      const std::string& propertyName,
-                     const std::string& propertyValue,
-                     const bool appendAsString, const bool appendMode,
-                     const bool remove)
+                     const std::string& propertyValue, bool appendAsString,
+                     bool appendMode, bool remove)
 {
   if (propertyName == "ADVANCED") {
     if (!remove && !cmIsOn(propertyValue) && !cmIsOff(propertyValue)) {
@@ -445,7 +432,7 @@ bool HandleCacheMode(cmExecutionStatus& status,
   for (std::string const& name : names) {
     // Get the source file.
     cmake* cm = status.GetMakefile().GetCMakeInstance();
-    const char* existingValue = cm->GetState()->GetCacheEntryValue(name);
+    cmProp existingValue = cm->GetState()->GetCacheEntryValue(name);
     if (existingValue) {
       if (!HandleCacheEntry(name, status.GetMakefile(), propertyName,
                             propertyValue, appendAsString, appendMode,
@@ -463,21 +450,19 @@ bool HandleCacheMode(cmExecutionStatus& status,
 
 bool HandleCacheEntry(std::string const& cacheKey, const cmMakefile& makefile,
                       const std::string& propertyName,
-                      const std::string& propertyValue,
-                      const bool appendAsString, const bool appendMode,
-                      const bool remove)
+                      const std::string& propertyValue, bool appendAsString,
+                      bool appendMode, bool remove)
 {
   // Set or append the property.
-  const char* value = propertyValue.c_str();
   cmState* state = makefile.GetState();
   if (remove) {
     state->RemoveCacheEntryProperty(cacheKey, propertyName);
   }
   if (appendMode) {
-    state->AppendCacheEntryProperty(cacheKey, propertyName, value,
+    state->AppendCacheEntryProperty(cacheKey, propertyName, propertyValue,
                                     appendAsString);
   } else {
-    state->SetCacheEntryProperty(cacheKey, propertyName, value);
+    state->SetCacheEntryProperty(cacheKey, propertyName, propertyValue);
   }
 
   return true;
@@ -486,9 +471,8 @@ bool HandleCacheEntry(std::string const& cacheKey, const cmMakefile& makefile,
 bool HandleInstallMode(cmExecutionStatus& status,
                        const std::set<std::string>& names,
                        const std::string& propertyName,
-                       const std::string& propertyValue,
-                       const bool appendAsString, const bool appendMode,
-                       const bool remove)
+                       const std::string& propertyValue, bool appendAsString,
+                       bool appendMode, bool remove)
 {
   cmake* cm = status.GetMakefile().GetCMakeInstance();
 
@@ -510,17 +494,17 @@ bool HandleInstallMode(cmExecutionStatus& status,
 
 bool HandleInstall(cmInstalledFile* file, cmMakefile& makefile,
                    const std::string& propertyName,
-                   const std::string& propertyValue, const bool appendAsString,
-                   const bool appendMode, const bool remove)
+                   const std::string& propertyValue, bool appendAsString,
+                   bool appendMode, bool remove)
 {
   // Set or append the property.
-  const char* value = propertyValue.c_str();
   if (remove) {
     file->RemoveProperty(propertyName);
   } else if (appendMode) {
-    file->AppendProperty(&makefile, propertyName, value, appendAsString);
+    file->AppendProperty(&makefile, propertyName, propertyValue,
+                         appendAsString);
   } else {
-    file->SetProperty(&makefile, propertyName, value);
+    file->SetProperty(&makefile, propertyName, propertyValue);
   }
   return true;
 }

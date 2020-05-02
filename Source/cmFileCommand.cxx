@@ -8,6 +8,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <iterator>
 #include <map>
 #include <set>
 #include <sstream>
@@ -15,13 +16,14 @@
 #include <vector>
 
 #include <cm/memory>
+#include <cmext/algorithm>
+#include <cmext/string_view>
 
 #include "cmsys/FStream.hxx"
 #include "cmsys/Glob.hxx"
 #include "cmsys/RegularExpression.hxx"
 
 #include "cm_kwiml.h"
-#include "cm_static_string_view.hxx"
 #include "cm_sys_stat.h"
 
 #include "cmAlgorithms.h"
@@ -32,12 +34,14 @@
 #include "cmFileInstaller.h"
 #include "cmFileLockPool.h"
 #include "cmFileTimes.h"
+#include "cmGeneratedFileStream.h"
 #include "cmGeneratorExpression.h"
 #include "cmGlobalGenerator.h"
 #include "cmHexFileConverter.h"
 #include "cmListFileCache.h"
 #include "cmMakefile.h"
 #include "cmMessageType.h"
+#include "cmNewLineStyle.h"
 #include "cmPolicies.h"
 #include "cmRange.h"
 #include "cmRuntimeDependencyArchive.h"
@@ -46,6 +50,7 @@
 #include "cmSubcommandTable.h"
 #include "cmSystemTools.h"
 #include "cmTimestamp.h"
+#include "cmWorkingDirectory.h"
 #include "cmake.h"
 
 #if !defined(CMAKE_BOOTSTRAP)
@@ -783,7 +788,7 @@ bool HandleGlobImpl(std::vector<std::string> const& args, bool recurse,
       }
 
       std::vector<std::string>& foundFiles = g.GetFiles();
-      cmAppend(files, foundFiles);
+      cm::append(files, foundFiles);
 
       if (configureDepends) {
         std::sort(foundFiles.begin(), foundFiles.end());
@@ -1394,8 +1399,8 @@ size_t cmWriteToMemoryCallback(void* ptr, size_t size, size_t nmemb,
 {
   int realsize = static_cast<int>(size * nmemb);
   const char* chPtr = static_cast<char*>(ptr);
-  cmAppend(*static_cast<cmFileCommandVectorOfChar*>(data), chPtr,
-           chPtr + realsize);
+  cm::append(*static_cast<cmFileCommandVectorOfChar*>(data), chPtr,
+             chPtr + realsize);
   return realsize;
 }
 
@@ -1408,7 +1413,7 @@ size_t cmFileCommandCurlDebugCallback(CURL*, curl_infotype type, char* chPtr,
     case CURLINFO_TEXT:
     case CURLINFO_HEADER_IN:
     case CURLINFO_HEADER_OUT:
-      cmAppend(vec, chPtr, chPtr + size);
+      cm::append(vec, chPtr, chPtr + size);
       break;
     case CURLINFO_DATA_IN:
     case CURLINFO_DATA_OUT:
@@ -1418,7 +1423,7 @@ size_t cmFileCommandCurlDebugCallback(CURL*, curl_infotype type, char* chPtr,
       int n = sprintf(buf, "[%" KWIML_INT_PRIu64 " bytes data]\n",
                       static_cast<KWIML_INT_uint64_t>(size));
       if (n > 0) {
-        cmAppend(vec, buf, buf + n);
+        cm::append(vec, buf, buf + n);
       }
     } break;
     default:
@@ -1605,7 +1610,7 @@ bool HandleDownloadCommand(std::vector<std::string> const& args,
       if (i != args.end()) {
         tls_verify = cmIsOn(*i);
       } else {
-        status.SetError("TLS_VERIFY missing bool value.");
+        status.SetError("DOWNLOAD missing bool value for TLS_VERIFY.");
         return false;
       }
     } else if (*i == "TLS_CAINFO") {
@@ -1613,7 +1618,7 @@ bool HandleDownloadCommand(std::vector<std::string> const& args,
       if (i != args.end()) {
         cainfo = i->c_str();
       } else {
-        status.SetError("TLS_CAFILE missing file value.");
+        status.SetError("DOWNLOAD missing file value for TLS_CAINFO.");
         return false;
       }
     } else if (*i == "NETRC_FILE") {
@@ -1707,7 +1712,8 @@ bool HandleDownloadCommand(std::vector<std::string> const& args,
   // as we receive downloaded bits from curl...
   //
   std::string dir = cmSystemTools::GetFilenamePath(file);
-  if (!cmSystemTools::FileExists(dir) && !cmSystemTools::MakeDirectory(dir)) {
+  if (!dir.empty() && !cmSystemTools::FileExists(dir) &&
+      !cmSystemTools::MakeDirectory(dir)) {
     std::string errstring = "DOWNLOAD error: cannot create directory '" + dir +
       "' - Specify file by full path name and verify that you "
       "have directory creation and file write privileges.";
@@ -1754,11 +1760,12 @@ bool HandleDownloadCommand(std::vector<std::string> const& args,
   // check to see if TLS verification is requested
   if (tls_verify) {
     res = ::curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1);
-    check_curl_result(res, "Unable to set TLS/SSL Verify on: ");
+    check_curl_result(res, "DOWNLOAD cannot set TLS/SSL Verify on: ");
   } else {
     res = ::curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0);
-    check_curl_result(res, "Unable to set TLS/SSL Verify off: ");
+    check_curl_result(res, "DOWNLOAD cannot set TLS/SSL Verify off: ");
   }
+
   // check to see if a CAINFO file has been specified
   // command arg comes first
   std::string const& cainfo_err = cmCurlSetCAInfo(curl, cainfo);
@@ -1923,6 +1930,8 @@ bool HandleUploadCommand(std::vector<std::string> const& args,
   std::string logVar;
   std::string statusVar;
   bool showProgress = false;
+  bool tls_verify = status.GetMakefile().IsOn("CMAKE_TLS_VERIFY");
+  const char* cainfo = status.GetMakefile().GetDefinition("CMAKE_TLS_CAINFO");
   std::string userpwd;
   std::string netrc_level =
     status.GetMakefile().GetSafeDefinition("CMAKE_NETRC");
@@ -1964,6 +1973,22 @@ bool HandleUploadCommand(std::vector<std::string> const& args,
       statusVar = *i;
     } else if (*i == "SHOW_PROGRESS") {
       showProgress = true;
+    } else if (*i == "TLS_VERIFY") {
+      ++i;
+      if (i != args.end()) {
+        tls_verify = cmIsOn(*i);
+      } else {
+        status.SetError("UPLOAD missing bool value for TLS_VERIFY.");
+        return false;
+      }
+    } else if (*i == "TLS_CAINFO") {
+      ++i;
+      if (i != args.end()) {
+        cainfo = i->c_str();
+      } else {
+        status.SetError("UPLOAD missing file value for TLS_CAINFO.");
+        return false;
+      }
     } else if (*i == "NETRC_FILE") {
       ++i;
       if (i != args.end()) {
@@ -2048,6 +2073,23 @@ bool HandleUploadCommand(std::vector<std::string> const& args,
   res = ::curl_easy_setopt(curl, CURLOPT_DEBUGFUNCTION,
                            cmFileCommandCurlDebugCallback);
   check_curl_result(res, "UPLOAD cannot set debug function: ");
+
+  // check to see if TLS verification is requested
+  if (tls_verify) {
+    res = ::curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1);
+    check_curl_result(res, "UPLOAD cannot set TLS/SSL Verify on: ");
+  } else {
+    res = ::curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0);
+    check_curl_result(res, "UPLOAD cannot set TLS/SSL Verify off: ");
+  }
+
+  // check to see if a CAINFO file has been specified
+  // command arg comes first
+  std::string const& cainfo_err = cmCurlSetCAInfo(curl, cainfo);
+  if (!cainfo_err.empty()) {
+    status.SetError(cainfo_err);
+    return false;
+  }
 
   cmFileCommandVectorOfChar chunkResponse;
   cmFileCommandVectorOfChar chunkDebug;
@@ -2321,12 +2363,9 @@ bool HandleLockCommand(std::vector<std::string> const& args,
     path += "/cmake.lock";
   }
 
-  if (!cmsys::SystemTools::FileIsFullPath(path)) {
-    path = status.GetMakefile().GetCurrentSourceDirectory() + "/" + path;
-  }
-
   // Unify path (remove '//', '/../', ...)
-  path = cmSystemTools::CollapseFullPath(path);
+  path = cmSystemTools::CollapseFullPath(
+    path, status.GetMakefile().GetCurrentSourceDirectory());
 
   // Create file and directories if needed
   std::string parentDir = cmSystemTools::GetParentDirectory(path);
@@ -2673,9 +2712,20 @@ bool HandleGetRuntimeDependenciesCommand(std::vector<std::string> const& args,
     cmSystemTools::SetFatalErrorOccured();
     return false;
   }
-  argIt = keywordsMissingValues.begin();
-  if (argIt != keywordsMissingValues.end()) {
-    status.SetError(cmStrCat("Keyword missing value: ", *argIt));
+
+  const std::vector<std::string> LIST_ARGS = { "DIRECTORIES",
+                                               "EXECUTABLES",
+                                               "LIBRARIES",
+                                               "MODULES",
+                                               "POST_EXCLUDE_REGEXES",
+                                               "POST_INCLUDE_REGEXES",
+                                               "PRE_EXCLUDE_REGEXES",
+                                               "PRE_INCLUDE_REGEXES" };
+  auto kwbegin = keywordsMissingValues.cbegin();
+  auto kwend = cmRemoveMatching(keywordsMissingValues, LIST_ARGS);
+  if (kwend != kwbegin) {
+    status.SetError(cmStrCat("Keywords missing values:\n  ",
+                             cmJoin(cmMakeRange(kwbegin, kwend), "\n  ")));
     cmSystemTools::SetFatalErrorOccured();
     return false;
   }
@@ -2763,6 +2813,325 @@ bool HandleGetRuntimeDependenciesCommand(std::vector<std::string> const& args,
   return true;
 }
 
+bool HandleConfigureCommand(std::vector<std::string> const& args,
+                            cmExecutionStatus& status)
+{
+  if (args.size() < 5) {
+    status.SetError("Incorrect arguments to CONFIGURE subcommand.");
+    return false;
+  }
+  if (args[1] != "OUTPUT") {
+    status.SetError("Incorrect arguments to CONFIGURE subcommand.");
+    return false;
+  }
+  if (args[3] != "CONTENT") {
+    status.SetError("Incorrect arguments to CONFIGURE subcommand.");
+    return false;
+  }
+
+  std::string errorMessage;
+  cmNewLineStyle newLineStyle;
+  if (!newLineStyle.ReadFromArguments(args, errorMessage)) {
+    status.SetError(cmStrCat("CONFIGURE ", errorMessage));
+    return false;
+  }
+
+  bool escapeQuotes = false;
+  bool atOnly = false;
+  for (unsigned int i = 5; i < args.size(); ++i) {
+    if (args[i] == "@ONLY") {
+      atOnly = true;
+    } else if (args[i] == "ESCAPE_QUOTES") {
+      escapeQuotes = true;
+    } else if (args[i] == "NEWLINE_STYLE" || args[i] == "LF" ||
+               args[i] == "UNIX" || args[i] == "CRLF" || args[i] == "WIN32" ||
+               args[i] == "DOS") {
+      /* Options handled by NewLineStyle member above.  */
+    } else {
+      status.SetError(
+        cmStrCat("CONFIGURE Unrecognized argument \"", args[i], "\""));
+      return false;
+    }
+  }
+
+  // Check for generator expressions
+  const std::string input = args[4];
+  std::string outputFile = args[2];
+
+  std::string::size_type pos = input.find_first_of("<>");
+  if (pos != std::string::npos) {
+    status.SetError(cmStrCat("CONFIGURE called with CONTENT containing a \"",
+                             input[pos],
+                             "\".  This character is not allowed."));
+    return false;
+  }
+
+  pos = outputFile.find_first_of("<>");
+  if (pos != std::string::npos) {
+    status.SetError(cmStrCat("CONFIGURE called with OUTPUT containing a \"",
+                             outputFile[pos],
+                             "\".  This character is not allowed."));
+    return false;
+  }
+
+  cmMakefile& makeFile = status.GetMakefile();
+  if (!makeFile.CanIWriteThisFile(outputFile)) {
+    cmSystemTools::Error("Attempt to write file: " + outputFile +
+                         " into a source directory.");
+    return false;
+  }
+
+  cmSystemTools::ConvertToUnixSlashes(outputFile);
+
+  // Re-generate if non-temporary outputs are missing.
+  // when we finalize the configuration we will remove all
+  // output files that now don't exist.
+  makeFile.AddCMakeOutputFile(outputFile);
+
+  // Create output directory
+  const std::string::size_type slashPos = outputFile.rfind('/');
+  if (slashPos != std::string::npos) {
+    const std::string path = outputFile.substr(0, slashPos);
+    cmSystemTools::MakeDirectory(path);
+  }
+
+  std::string newLineCharacters;
+  bool open_with_binary_flag = false;
+  if (newLineStyle.IsValid()) {
+    open_with_binary_flag = true;
+    newLineCharacters = newLineStyle.GetCharacters();
+  }
+
+  cmGeneratedFileStream fout;
+  fout.Open(outputFile, false, open_with_binary_flag);
+  if (!fout) {
+    cmSystemTools::Error("Could not open file for write in copy operation " +
+                         outputFile);
+    cmSystemTools::ReportLastSystemError("");
+    return false;
+  }
+  fout.SetCopyIfDifferent(true);
+
+  // copy intput to output and expand variables from input at the same time
+  std::stringstream sin(input, std::ios::in);
+  std::string inLine;
+  std::string outLine;
+  while (cmSystemTools::GetLineFromStream(sin, inLine)) {
+    outLine.clear();
+    makeFile.ConfigureString(inLine, outLine, atOnly, escapeQuotes);
+    fout << outLine << newLineCharacters;
+  }
+
+  // close file before attempting to copy
+  fout.close();
+
+  return true;
+}
+
+bool HandleArchiveCreateCommand(std::vector<std::string> const& args,
+                                cmExecutionStatus& status)
+{
+  struct Arguments
+  {
+    std::string Output;
+    std::string Format;
+    std::string Type;
+    std::string MTime;
+    bool Verbose = false;
+    std::vector<std::string> Files;
+    std::vector<std::string> Directories;
+  };
+
+  static auto const parser = cmArgumentParser<Arguments>{}
+                               .Bind("OUTPUT"_s, &Arguments::Output)
+                               .Bind("FORMAT"_s, &Arguments::Format)
+                               .Bind("TYPE"_s, &Arguments::Type)
+                               .Bind("MTIME"_s, &Arguments::MTime)
+                               .Bind("VERBOSE"_s, &Arguments::Verbose)
+                               .Bind("FILES"_s, &Arguments::Files)
+                               .Bind("DIRECTORY"_s, &Arguments::Directories);
+
+  std::vector<std::string> unrecognizedArguments;
+  std::vector<std::string> keywordsMissingValues;
+  auto parsedArgs =
+    parser.Parse(cmMakeRange(args).advance(1), &unrecognizedArguments,
+                 &keywordsMissingValues);
+  auto argIt = unrecognizedArguments.begin();
+  if (argIt != unrecognizedArguments.end()) {
+    status.SetError(cmStrCat("Unrecognized argument: \"", *argIt, "\""));
+    cmSystemTools::SetFatalErrorOccured();
+    return false;
+  }
+
+  const std::vector<std::string> LIST_ARGS = {
+    "OUTPUT", "FORMAT", "TYPE", "MTIME", "FILES", "DIRECTORY",
+  };
+  auto kwbegin = keywordsMissingValues.cbegin();
+  auto kwend = cmRemoveMatching(keywordsMissingValues, LIST_ARGS);
+  if (kwend != kwbegin) {
+    status.SetError(cmStrCat("Keywords missing values:\n  ",
+                             cmJoin(cmMakeRange(kwbegin, kwend), "\n  ")));
+    cmSystemTools::SetFatalErrorOccured();
+    return false;
+  }
+
+  const char* knownFormats[] = {
+    "7zip", "gnutar", "pax", "paxr", "raw", "zip"
+  };
+
+  if (!parsedArgs.Format.empty() &&
+      !cm::contains(knownFormats, parsedArgs.Format)) {
+    status.SetError(
+      cmStrCat("archive format ", parsedArgs.Format, " not supported"));
+    cmSystemTools::SetFatalErrorOccured();
+    return false;
+  }
+
+  const char* zipFileFormats[] = { "7zip", "zip" };
+  if (!parsedArgs.Type.empty() &&
+      cm::contains(zipFileFormats, parsedArgs.Format)) {
+    status.SetError(cmStrCat("archive format ", parsedArgs.Format,
+                             " does not support TYPE arguments"));
+    cmSystemTools::SetFatalErrorOccured();
+    return false;
+  }
+
+  static std::map<std::string, cmSystemTools::cmTarCompression>
+    compressionTypeMap = { { "None", cmSystemTools::TarCompressNone },
+                           { "BZip2", cmSystemTools::TarCompressBZip2 },
+                           { "GZip", cmSystemTools::TarCompressGZip },
+                           { "XZ", cmSystemTools::TarCompressXZ },
+                           { "Zstd", cmSystemTools::TarCompressZstd } };
+
+  std::string const& outFile = parsedArgs.Output;
+  std::vector<std::string> files = parsedArgs.Files;
+  std::copy(parsedArgs.Directories.begin(), parsedArgs.Directories.end(),
+            std::back_inserter(files));
+
+  cmSystemTools::cmTarCompression compress = cmSystemTools::TarCompressNone;
+  auto typeIt = compressionTypeMap.find(parsedArgs.Type);
+  if (typeIt != compressionTypeMap.end()) {
+    compress = typeIt->second;
+  } else if (!parsedArgs.Type.empty()) {
+    status.SetError(
+      cmStrCat("compression type ", parsedArgs.Type, " is not supported"));
+    cmSystemTools::SetFatalErrorOccured();
+    return false;
+  }
+
+  if (files.empty()) {
+    status.GetMakefile().IssueMessage(MessageType::AUTHOR_WARNING,
+                                      "No files or directories specified");
+  }
+
+  if (!cmSystemTools::CreateTar(outFile, files, compress, parsedArgs.Verbose,
+                                parsedArgs.MTime, parsedArgs.Format)) {
+    status.SetError(cmStrCat("failed to compress: ", outFile));
+    cmSystemTools::SetFatalErrorOccured();
+    return false;
+  }
+
+  return true;
+}
+
+bool HandleArchiveExtractCommand(std::vector<std::string> const& args,
+                                 cmExecutionStatus& status)
+{
+  struct Arguments
+  {
+    std::string Input;
+    bool Verbose = false;
+    bool ListOnly = false;
+    std::string Destination;
+    std::vector<std::string> Files;
+    std::vector<std::string> Directories;
+  };
+
+  static auto const parser = cmArgumentParser<Arguments>{}
+                               .Bind("INPUT"_s, &Arguments::Input)
+                               .Bind("VERBOSE"_s, &Arguments::Verbose)
+                               .Bind("LIST_ONLY"_s, &Arguments::ListOnly)
+                               .Bind("DESTINATION"_s, &Arguments::Destination)
+                               .Bind("FILES"_s, &Arguments::Files)
+                               .Bind("DIRECTORY"_s, &Arguments::Directories);
+
+  std::vector<std::string> unrecognizedArguments;
+  std::vector<std::string> keywordsMissingValues;
+  auto parsedArgs =
+    parser.Parse(cmMakeRange(args).advance(1), &unrecognizedArguments,
+                 &keywordsMissingValues);
+  auto argIt = unrecognizedArguments.begin();
+  if (argIt != unrecognizedArguments.end()) {
+    status.SetError(cmStrCat("Unrecognized argument: \"", *argIt, "\""));
+    cmSystemTools::SetFatalErrorOccured();
+    return false;
+  }
+
+  const std::vector<std::string> LIST_ARGS = {
+    "INPUT",
+    "DESTINATION",
+    "FILES",
+    "DIRECTORY",
+  };
+  auto kwbegin = keywordsMissingValues.cbegin();
+  auto kwend = cmRemoveMatching(keywordsMissingValues, LIST_ARGS);
+  if (kwend != kwbegin) {
+    status.SetError(cmStrCat("Keywords missing values:\n  ",
+                             cmJoin(cmMakeRange(kwbegin, kwend), "\n  ")));
+    cmSystemTools::SetFatalErrorOccured();
+    return false;
+  }
+
+  std::string inFile = parsedArgs.Input;
+  std::vector<std::string> files = parsedArgs.Files;
+  std::copy(parsedArgs.Directories.begin(), parsedArgs.Directories.end(),
+            std::back_inserter(files));
+
+  if (parsedArgs.ListOnly) {
+    if (!cmSystemTools::ListTar(inFile, files, parsedArgs.Verbose)) {
+      status.SetError(cmStrCat("failed to list: ", inFile));
+      cmSystemTools::SetFatalErrorOccured();
+      return false;
+    }
+  } else {
+    std::string destDir = cmSystemTools::GetCurrentWorkingDirectory();
+    if (!parsedArgs.Destination.empty()) {
+      if (cmSystemTools::FileIsFullPath(parsedArgs.Destination)) {
+        destDir = parsedArgs.Destination;
+      } else {
+        destDir = cmStrCat(destDir, "/", parsedArgs.Destination);
+      }
+
+      if (!cmSystemTools::MakeDirectory(destDir)) {
+        status.SetError(cmStrCat("failed to create directory: ", destDir));
+        cmSystemTools::SetFatalErrorOccured();
+        return false;
+      }
+
+      if (!cmSystemTools::FileIsFullPath(inFile)) {
+        inFile =
+          cmStrCat(cmSystemTools::GetCurrentWorkingDirectory(), "/", inFile);
+      }
+    }
+
+    cmWorkingDirectory workdir(destDir);
+    if (workdir.Failed()) {
+      status.SetError(
+        cmStrCat("failed to change working directory to: ", destDir));
+      cmSystemTools::SetFatalErrorOccured();
+      return false;
+    }
+
+    if (!cmSystemTools::ExtractTar(inFile, files, parsedArgs.Verbose)) {
+      status.SetError(cmStrCat("failed to extract: ", inFile));
+      cmSystemTools::SetFatalErrorOccured();
+      return false;
+    }
+  }
+
+  return true;
+}
+
 } // namespace
 
 bool cmFileCommand(std::vector<std::string> const& args,
@@ -2816,6 +3185,9 @@ bool cmFileCommand(std::vector<std::string> const& args,
     { "READ_SYMLINK"_s, HandleReadSymlinkCommand },
     { "CREATE_LINK"_s, HandleCreateLinkCommand },
     { "GET_RUNTIME_DEPENDENCIES"_s, HandleGetRuntimeDependenciesCommand },
+    { "CONFIGURE"_s, HandleConfigureCommand },
+    { "ARCHIVE_CREATE"_s, HandleArchiveCreateCommand },
+    { "ARCHIVE_EXTRACT"_s, HandleArchiveExtractCommand },
   };
 
   return subcommand(args[0], args, status);
