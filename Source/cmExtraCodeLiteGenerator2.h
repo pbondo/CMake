@@ -43,11 +43,19 @@ public:
 
   void CreateNewProjectFile(const std::vector<cmLocalGenerator*>& lgs, const std::string& filename);
 
-  void AddFolder( const std::vector<std::string>& folder, const std::string& foldername, cmGeneratedFileStream& fout );
+  void AddFolder(const std::vector<std::string>& folder, std::string foldername, cmGeneratedFileStream& fout);
+
+   void LoadSettingFile(std::string filename);
 
 private:
 
+  std::string workspacePath; // The root path where the <project>.workspace file resides
   std::string workspaceProjectName;
+  std::string generator;
+  std::string sourcePath;
+
+   // <project>|<key>=<value>|<key>=<value>
+   std::map<std::string, std::map<std::string, std::string>> mapping;
 
 };
 
