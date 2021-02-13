@@ -28,6 +28,16 @@ This program will run the tests and report results.
 Options
 =======
 
+``--preset <preset>``
+ Use a test preset to specify test options. The project binary directory
+ is inferred from the ``configurePreset`` key. The current working directory
+ must contain CMake preset files.
+ See :manual:`preset <cmake-presets(7)>` for more details.
+
+``--list-presets``
+ Lists the available test presets. The current working directory must contain
+ CMake preset files.
+
 ``-C <cfg>, --build-config <cfg>``
  Choose configuration to test.
 
@@ -323,6 +333,9 @@ Options
 
 ``--build-and-test``
 See `Build and Test Mode`_.
+
+``--test-dir <dir>``
+Specify the directory in which to look for tests.
 
 ``--test-output-size-passed <size>``
  Limit the output for passed tests to ``<size>`` bytes.
@@ -1142,6 +1155,20 @@ Additional configuration settings include:
   * `CTest Script`_ variable: none
   * :module:`CTest` module variable: ``DRMEMORY_COMMAND_OPTIONS``
 
+``CudaSanitizerCommand``
+  Specify a ``MemoryCheckCommand`` that is known to be a command-line
+  compatible with cuda-memcheck or compute-sanitizer.
+
+  * `CTest Script`_ variable: none
+  * :module:`CTest` module variable: ``CUDA_SANITIZER_COMMAND``
+
+``CudaSanitizerCommandOptions``
+  Specify command-line options to the ``CudaSanitizerCommand`` tool.
+  They will be placed prior to the test command line.
+
+  * `CTest Script`_ variable: none
+  * :module:`CTest` module variable: ``CUDA_SANITIZER_COMMAND_OPTIONS``
+
 .. _`CTest Submit Step`:
 
 CTest Submit Step
@@ -1333,7 +1360,7 @@ Resource Allocation
 ===================
 
 CTest provides a mechanism for tests to specify the resources that they need
-in a fine-grained way, and for users to specify the resources availiable on
+in a fine-grained way, and for users to specify the resources available on
 the running machine. This allows CTest to internally keep track of which
 resources are in use and which are free, scheduling tests in a way that
 prevents them from trying to claim resources that are not available.
@@ -1410,9 +1437,16 @@ Resource Specification File
 
 The resource specification file is a JSON file which is passed to CTest, either
 on the :manual:`ctest(1)` command line as ``--resource-spec-file``, or as the
-``RESOURCE_SPEC_FILE`` argument of :command:`ctest_test`. The resource
-specification file must be a JSON object. All examples in this document assume
-the following resource specification file:
+``RESOURCE_SPEC_FILE`` argument of :command:`ctest_test`. If a dashboard script
+is used and ``RESOURCE_SPEC_FILE`` is not specified, the value of
+:variable:`CTEST_RESOURCE_SPEC_FILE` in the dashboard script is used instead.
+If ``--resource-spec-file``, ``RESOURCE_SPEC_FILE``, and
+:variable:`CTEST_RESOURCE_SPEC_FILE` in the dashboard script are not specified,
+the value of :variable:`CTEST_RESOURCE_SPEC_FILE` in the CMake build is used
+instead. If none of these are specified, no resource spec file is used.
+
+The resource specification file must be a JSON object. All examples in this
+document assume the following resource specification file:
 
 .. code-block:: json
 

@@ -10,6 +10,11 @@ set(__COMPILER_CLANG 1)
 
 include(Compiler/CMakeCommonCompilerMacros)
 
+set(__pch_header_C "c-header")
+set(__pch_header_CXX "c++-header")
+set(__pch_header_OBJC "objective-c-header")
+set(__pch_header_OBJCXX "objective-c++-header")
+
 if("x${CMAKE_C_SIMULATE_ID}" STREQUAL "xMSVC"
     OR "x${CMAKE_CXX_SIMULATE_ID}" STREQUAL "xMSVC"
     OR "x${CMAKE_Fortran_SIMULATE_ID}" STREQUAL "xMSVC")
@@ -101,8 +106,11 @@ else()
     if (NOT CMAKE_GENERATOR MATCHES "Xcode")
       set(CMAKE_PCH_PROLOGUE "#pragma clang system_header")
     endif()
+    if(CMAKE_${lang}_COMPILER_VERSION VERSION_GREATER_EQUAL 11.0.0 AND NOT __is_apple_clang)
+      set(CMAKE_${lang}_COMPILE_OPTIONS_INSTANTIATE_TEMPLATES_PCH -fpch-instantiate-templates)
+    endif()
     set(CMAKE_${lang}_COMPILE_OPTIONS_USE_PCH -Xclang -include-pch -Xclang <PCH_FILE> -Xclang -include -Xclang <PCH_HEADER>)
-    set(CMAKE_${lang}_COMPILE_OPTIONS_CREATE_PCH -Xclang -emit-pch -Xclang -include -Xclang <PCH_HEADER>)
+    set(CMAKE_${lang}_COMPILE_OPTIONS_CREATE_PCH -Xclang -emit-pch -Xclang -include -Xclang <PCH_HEADER> -x ${__pch_header_${lang}})
   endmacro()
 endif()
 
@@ -146,12 +154,20 @@ macro(__compiler_clang_cxx_standards lang)
       set(CMAKE_${lang}17_EXTENSION_COMPILE_OPTION "-std=gnu++1z")
     endif()
 
-    if (NOT CMAKE_${lang}_COMPILER_VERSION VERSION_LESS "${_clang_version_std17}")
+    if(NOT CMAKE_${lang}_COMPILER_VERSION VERSION_LESS 11.0)
+      set(CMAKE_${lang}20_STANDARD_COMPILE_OPTION "-std=c++20")
+      set(CMAKE_${lang}20_EXTENSION_COMPILE_OPTION "-std=gnu++20")
+    elseif(NOT CMAKE_${lang}_COMPILER_VERSION VERSION_LESS "${_clang_version_std17}")
       set(CMAKE_${lang}20_STANDARD_COMPILE_OPTION "-std=c++2a")
       set(CMAKE_${lang}20_EXTENSION_COMPILE_OPTION "-std=gnu++2a")
     endif()
 
     unset(_clang_version_std17)
+
+    if(NOT CMAKE_${lang}_COMPILER_VERSION VERSION_LESS 12.0)
+      set(CMAKE_${lang}23_STANDARD_COMPILE_OPTION "-std=c++2b")
+      set(CMAKE_${lang}23_EXTENSION_COMPILE_OPTION "-std=gnu++2b")
+    endif()
 
     if("x${CMAKE_${lang}_SIMULATE_ID}" STREQUAL "xMSVC")
       # The MSVC standard library requires C++14, and MSVC itself has no
@@ -164,8 +180,6 @@ macro(__compiler_clang_cxx_standards lang)
       # This clang++ is missing some features because of MSVC compatibility.
       unset(CMAKE_${lang}11_STANDARD__HAS_FULL_SUPPORT)
       unset(CMAKE_${lang}14_STANDARD__HAS_FULL_SUPPORT)
-      unset(CMAKE_${lang}17_STANDARD__HAS_FULL_SUPPORT)
-      unset(CMAKE_${lang}20_STANDARD__HAS_FULL_SUPPORT)
     endif()
 
     __compiler_check_default_language_standard(${lang} 2.1 98)
@@ -205,6 +219,8 @@ macro(__compiler_clang_cxx_standards lang)
     set(CMAKE_${lang}17_EXTENSION_COMPILE_OPTION "")
     set(CMAKE_${lang}20_STANDARD_COMPILE_OPTION "")
     set(CMAKE_${lang}20_EXTENSION_COMPILE_OPTION "")
+    set(CMAKE_${lang}23_STANDARD_COMPILE_OPTION "")
+    set(CMAKE_${lang}23_EXTENSION_COMPILE_OPTION "")
 
     # There is no meaningful default for this
     set(CMAKE_${lang}_STANDARD_DEFAULT "")
@@ -215,11 +231,12 @@ macro(__compiler_clang_cxx_standards lang)
     # can be attempted.
     macro(cmake_record_${lang}_compile_features)
       list(APPEND CMAKE_${lang}_COMPILE_FEATURES
-        ${lang}_std_98
-        ${lang}_std_11
-        ${lang}_std_14
-        ${lang}_std_17
-        ${lang}_std_20
+        cxx_std_98
+        cxx_std_11
+        cxx_std_14
+        cxx_std_17
+        cxx_std_20
+        cxx_std_23
         )
       _record_compiler_features(${lang} "" CMAKE_${lang}_COMPILE_FEATURES)
     endmacro()

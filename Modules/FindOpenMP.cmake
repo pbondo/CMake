@@ -13,11 +13,15 @@ OpenMP support are returned in variables for the different languages.
 The variables may be empty if the compiler does not need a special
 flag to support OpenMP.
 
+.. versionadded:: 3.5
+  Clang support.
+
 Variables
 ^^^^^^^^^
 
-The module exposes the components ``C``, ``CXX``, and ``Fortran``.
-Each of these controls the various languages to search OpenMP support for.
+.. versionadded:: 3.10
+  The module exposes the components ``C``, ``CXX``, and ``Fortran``.
+  Each of these controls the various languages to search OpenMP support for.
 
 Depending on the enabled components the following variables will be set:
 
@@ -65,6 +69,8 @@ Specifically for Fortran, the module sets the following variables:
 The module will also try to provide the OpenMP version variables:
 
 ``OpenMP_<lang>_SPEC_DATE``
+  .. versionadded:: 3.7
+
   Date of the OpenMP specification implemented by the ``<lang>`` compiler.
 ``OpenMP_<lang>_VERSION_MAJOR``
   Major version of OpenMP implemented by the ``<lang>`` compiler.
@@ -107,10 +113,12 @@ function(_OPENMP_FLAG_CANDIDATES LANG)
     else()
       set(OMP_FLAG_Intel "-qopenmp")
     endif()
+    set(OMP_FLAG_IntelLLVM "-fiopenmp")
     set(OMP_FLAG_MSVC "-openmp")
     set(OMP_FLAG_PathScale "-openmp")
     set(OMP_FLAG_NAG "-openmp")
     set(OMP_FLAG_Absoft "-openmp")
+    set(OMP_FLAG_NVHPC "-mp")
     set(OMP_FLAG_PGI "-mp")
     set(OMP_FLAG_Flang "-fopenmp")
     set(OMP_FLAG_SunPro "-xopenmp")
@@ -509,8 +517,8 @@ foreach(LANG IN LISTS OpenMP_FINDLIST)
       _OPENMP_GET_SPEC_DATE("${LANG}" OpenMP_${LANG}_SPEC_DATE_INTERNAL)
       set(OpenMP_${LANG}_SPEC_DATE "${OpenMP_${LANG}_SPEC_DATE_INTERNAL}" CACHE
         INTERNAL "${LANG} compiler's OpenMP specification date")
-      _OPENMP_SET_VERSION_BY_SPEC_DATE("${LANG}")
     endif()
+    _OPENMP_SET_VERSION_BY_SPEC_DATE("${LANG}")
 
     set(OpenMP_${LANG}_FIND_QUIETLY ${OpenMP_FIND_QUIETLY})
     set(OpenMP_${LANG}_FIND_REQUIRED ${OpenMP_FIND_REQUIRED})

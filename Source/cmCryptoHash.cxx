@@ -4,10 +4,10 @@
 
 #include <cm/memory>
 
-#include "cmsys/FStream.hxx"
+#include <cm3p/kwiml/int.h>
+#include <cm3p/rhash.h>
 
-#include "cm_kwiml.h"
-#include "cm_rhash.h"
+#include "cmsys/FStream.hxx"
 
 static unsigned int const cmCryptoHashAlgoToId[] = {
   /* clang-format needs this comment to break after the opening brace */
@@ -36,7 +36,7 @@ static rhash cmCryptoHash_rhash_init(unsigned int id)
 
 cmCryptoHash::cmCryptoHash(Algo algo)
   : Id(cmCryptoHashAlgoToId[algo])
-  , CTX(cmCryptoHash_rhash_init(Id))
+  , CTX(cmCryptoHash_rhash_init(this->Id))
 {
 }
 

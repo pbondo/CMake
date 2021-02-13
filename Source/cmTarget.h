@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmTarget_h
-#define cmTarget_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
@@ -15,6 +14,7 @@
 #include "cmAlgorithms.h"
 #include "cmListFileCache.h"
 #include "cmPolicies.h"
+#include "cmProperty.h"
 #include "cmStateTypes.h"
 #include "cmStringAlgorithms.h"
 #include "cmTargetLinkLibraryType.h"
@@ -27,8 +27,6 @@ class cmMessenger;
 class cmPropertyMap;
 class cmSourceFile;
 class cmTargetInternals;
-
-using cmProp = const std::string*;
 
 /** \class cmTarget
  * \brief Represent a library or executable target loaded from a makefile.
@@ -45,8 +43,14 @@ public:
     VisibilityImportedGlobally
   };
 
+  enum class PerConfig
+  {
+    Yes,
+    No
+  };
+
   cmTarget(std::string const& name, cmStateEnums::TargetType type,
-           Visibility vis, cmMakefile* mf, bool perConfig);
+           Visibility vis, cmMakefile* mf, PerConfig perConfig);
 
   cmTarget(cmTarget const&) = delete;
   cmTarget(cmTarget&&) noexcept;
@@ -110,7 +114,7 @@ public:
   LinkLibraryVectorType const& GetOriginalLinkLibraries() const;
 
   //! Clear the dependency information recorded for this target, if any.
-  void ClearDependencyInformation(cmMakefile& mf);
+  void ClearDependencyInformation(cmMakefile& mf) const;
 
   void AddLinkLibrary(cmMakefile& mf, std::string const& lib,
                       cmTargetLinkLibraryType llt);
@@ -160,6 +164,7 @@ public:
    */
   void AddUtility(std::string const& name, bool cross,
                   cmMakefile* mf = nullptr);
+  void AddUtility(BT<std::pair<std::string, bool>> util);
   //! Get the utilities used by this target
   std::set<BT<std::pair<std::string, bool>>> const& GetUtilities() const;
 
@@ -167,7 +172,7 @@ public:
   void SetProperty(const std::string& prop, const char* value);
   void SetProperty(const std::string& prop, const std::string& value)
   {
-    SetProperty(prop, value.c_str());
+    this->SetProperty(prop, value.c_str());
   }
   void AppendProperty(const std::string& prop, const std::string& value,
                       bool asString = false);
@@ -191,6 +196,7 @@ public:
   bool IsImported() const;
   bool IsImportedGloballyVisible() const;
   bool IsPerConfig() const;
+  bool CanCompileSources() const;
 
   bool GetMappedConfig(std::string const& desired_config, cmProp& loc,
                        cmProp& imp, std::string& suffix) const;
@@ -203,6 +209,9 @@ public:
 
   //! Return whether this target is an executable Bundle on Apple.
   bool IsAppBundleOnApple() const;
+
+  //! Return whether this target is a GUI executable on Android.
+  bool IsAndroidGuiExecutable() const;
 
   //! Get a backtrace from the creation of the target.
   cmListFileBacktrace const& GetBacktrace() const;
@@ -227,6 +236,13 @@ public:
 
   void AddSystemIncludeDirectories(std::set<std::string> const& incs);
   std::set<std::string> const& GetSystemIncludeDirectories() const;
+
+  BTs<std::string> const* GetLanguageStandardProperty(
+    const std::string& propertyName) const;
+
+  void SetLanguageStandardProperty(std::string const& lang,
+                                   std::string const& value,
+                                   const std::string& feature);
 
   cmStringRange GetIncludeDirectoriesEntries() const;
   cmBacktraceRange GetIncludeDirectoriesBacktraces() const;
@@ -272,8 +288,5 @@ private:
   const char* GetPrefixVariableInternal(
     cmStateEnums::ArtifactType artifact) const;
 
-private:
   std::unique_ptr<cmTargetInternals> impl;
 };
-
-#endif

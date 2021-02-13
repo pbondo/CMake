@@ -140,7 +140,7 @@ const char* CCONV cmGetCurrentOutputDirectory(void* arg)
 const char* CCONV cmGetDefinition(void* arg, const char* def)
 {
   cmMakefile* mf = static_cast<cmMakefile*>(arg);
-  return mf->GetDefinition(def);
+  return cmToCStr(mf->GetDefinition(def));
 }
 
 int CCONV cmIsOn(void* arg, const char* name)
@@ -221,8 +221,8 @@ void CCONV cmAddUtilityCommand(void* arg, const char* utilityName,
 
   // Pass the call to the makefile instance.
   std::vector<std::string> no_byproducts;
-  mf->AddUtilityCommand(utilityName, (all ? false : true), nullptr,
-                        no_byproducts, depends2, commandLines);
+  mf->AddUtilityCommand(utilityName, !all, nullptr, no_byproducts, depends2,
+                        commandLines);
 }
 
 void CCONV cmAddCustomCommand(void* arg, const char* source,
@@ -419,12 +419,15 @@ int CCONV cmExecuteCommand(void* arg, const char* name, int numArgs,
                            const char** args)
 {
   cmMakefile* mf = static_cast<cmMakefile*>(arg);
-  cmListFileFunction lff;
-  lff.Name = name;
+
+  std::vector<cmListFileArgument> lffArgs;
+  lffArgs.reserve(numArgs);
   for (int i = 0; i < numArgs; ++i) {
     // Assume all arguments are quoted.
-    lff.Arguments.emplace_back(args[i], cmListFileArgument::Quoted, 0);
+    lffArgs.emplace_back(args[i], cmListFileArgument::Quoted, 0);
   }
+
+  cmListFileFunction lff{ name, 0, std::move(lffArgs) };
   cmExecutionStatus status(*mf);
   return mf->ExecuteCommand(lff, status);
 }
@@ -547,6 +550,11 @@ void* CCONV cmAddSource(void* arg, void* arg2)
   // Create the real cmSourceFile instance and copy over saved information.
   cmSourceFile* rsf = mf->GetOrCreateSource(osf->FullPath);
   rsf->SetProperties(osf->Properties);
+  // In case the properties contain the GENERATED property,
+  // mark the real cmSourceFile as generated.
+  if (rsf->GetIsGenerated()) {
+    rsf->MarkAsGenerated();
+  }
   for (std::string const& d : osf->Depends) {
     rsf->AddDepend(d);
   }
@@ -559,7 +567,7 @@ void* CCONV cmAddSource(void* arg, void* arg2)
   sf->SourceExtension = osf->SourceExtension;
 
   // Store the proxy in the map so it can be re-used and deleted later.
-  auto value = sf.get();
+  auto* value = sf.get();
   cmCPluginAPISourceFiles[rsf] = std::move(sf);
   return value;
 }
@@ -580,14 +588,12 @@ const char* CCONV cmSourceFileGetProperty(void* arg, const char* prop)
 {
   cmCPluginAPISourceFile* sf = static_cast<cmCPluginAPISourceFile*>(arg);
   if (cmSourceFile* rsf = sf->RealSourceFile) {
-    cmProp p = rsf->GetProperty(prop);
-    return p ? p->c_str() : nullptr;
+    return cmToCStr(rsf->GetProperty(prop));
   }
   if (!strcmp(prop, "LOCATION")) {
     return sf->FullPath.c_str();
   }
-  cmProp retVal = sf->Properties.GetPropertyValue(prop);
-  return retVal ? retVal->c_str() : nullptr;
+  return cmToCStr(sf->Properties.GetPropertyValue(prop));
 }
 
 int CCONV cmSourceFileGetPropertyAsBool(void* arg, const char* prop)

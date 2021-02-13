@@ -1,6 +1,8 @@
 VS_SETTINGS
 -----------
 
+.. versionadded:: 3.18
+
 Set any item metadata on a non-built file.
 
 Takes a list of ``Key=Value`` pairs. Tells the Visual Studio generator to set
@@ -15,4 +17,4 @@ For example:
 will set ``Key`` to ``Value`` and ``Key2`` to ``Value2`` on the
 ``file.hlsl`` item as metadata.
 
-Generator expressions are supported.
+:manual:`Generator expressions <cmake-generator-expressions(7)>` are supported.

@@ -35,6 +35,9 @@ Available features are:
 
 * From ``C++14``:
 
+  * ``<cm/iomanip>``:
+    ``cm::quoted``
+
   * ``<cm/iterator>``:
     ``cm::make_reverse_iterator``, ``cm::cbegin``, ``cm::cend``,
     ``cm::rbegin``, ``cm::rend``, ``cm::crbegin``, ``cm::crend``
@@ -52,6 +55,9 @@ Available features are:
 
   * ``<cm/algorithm>``:
     ``cm::clamp``
+
+  * ``cm/filesystem>``:
+    ``cm::filesystem::path``
 
   * ``<cm/iterator>``:
     ``cm::size``, ``cm::empty``, ``cm::data``
@@ -152,6 +158,9 @@ These are:
   * ``cm::is_unique_ptr``:
     Checks if a type is a ``std::unique_ptr`` type.
 
+CMake assumes the compiler supports ``#pragma once``. Use this for all
+hand-written header files.
+
 Dynamic Memory Management
 =========================
 
@@ -162,6 +171,18 @@ smart pointer such as ``std::unique_ptr`` or ``std::shared_ptr``.
 It is allowed to pass raw pointers between objects to enable objects sharing.
 A raw pointer **must** not be deleted. Only the object(s) owning the smart
 pointer are allowed to delete dynamically allocated memory.
+
+Third Parties
+=============
+
+To build CMake, some third parties are needed. Under ``Utilities``
+directory, are versions of these third parties which can be used as an
+alternate to the ones provided by the system.
+
+To enable the selection of the third parties between the system and CMake ones,
+in CMake sources, third parties headers must be prefixed by ``cm3p/``
+(for example: ``<cm3p/json/reader.h>``). These wrappers are located under
+``Utilities/cm3p`` directory.
 
 Source Tree Layout
 ==================
@@ -207,6 +228,9 @@ The CMake source tree is organized as follows.
 
   * ``Utilities/std/cmext``:
     Extensions to the C++ STL.
+
+  * ``Utilities/cm3p``:
+    Public headers for third parties needed to build CMake.
 
   * ``Utilities/Sphinx/``:
     Sphinx configuration to build CMake user documentation.

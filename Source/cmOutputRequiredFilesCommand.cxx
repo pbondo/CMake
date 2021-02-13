@@ -15,12 +15,11 @@
 #include "cmExecutionStatus.h"
 #include "cmGeneratorExpression.h"
 #include "cmMakefile.h"
+#include "cmProperty.h"
 #include "cmSourceFile.h"
 #include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 #include "cmTarget.h"
-
-using cmProp = const std::string*;
 
 namespace {
 /** \class cmDependInformation
@@ -377,7 +376,7 @@ protected:
     }
     // Didn't find an instance.  Create a new one and save it.
     auto info = cm::make_unique<cmDependInformation>();
-    auto ptr = info.get();
+    auto* ptr = info.get();
     info->FullPath = fullPath;
     info->PathOnly = cmSystemTools::GetFilenamePath(fullPath);
     info->IncludeName = file;

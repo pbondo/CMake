@@ -2,15 +2,44 @@
 
 set -e
 
-readonly version="3.17.2"
-readonly sha256sum="dc57f3cc448ca67fc8776b4ad4c22b087b9c6a8e459938b9622b8c7f4ef6b21e"
-readonly filename="cmake-$version-Linux-x86_64"
+readonly version="3.19.3"
+
+case "$(uname -s)-$(uname -m)" in
+    Linux-x86_64)
+        shatool="sha256sum"
+        sha256sum="c18b65697e9679e5c88dccede08c323cd3d3730648e59048047bba82097e0ffc"
+        platform="Linux-x86_64"
+        ;;
+    Linux-aarch64)
+        shatool="sha256sum"
+        sha256sum="66e507c97ffb586d7ca6567890808b792c8eb004b645706df6fbf27826a395a2"
+        platform="Linux-aarch64"
+        ;;
+    Darwin-*)
+        shatool="shasum -a 256"
+        sha256sum="a6b79ad05f89241a05797510e650354d74ff72cc988981cdd1eb2b3b2bda66ac"
+        platform="macos-universal"
+        ;;
+    *)
+        echo "Unrecognized platform $(uname -s)-$(uname -m)"
+        exit 1
+        ;;
+esac
+readonly shatool
+readonly sha256sum
+readonly platform
+
+readonly filename="cmake-$version-$platform"
 readonly tarball="$filename.tar.gz"
 
 cd .gitlab
 
 echo "$sha256sum  $tarball" > cmake.sha256sum
 curl -OL "https://github.com/Kitware/CMake/releases/download/v$version/$tarball"
-sha256sum --check cmake.sha256sum
+$shatool --check cmake.sha256sum
 tar xf "$tarball"
 mv "$filename" cmake
+
+if [ "$( uname -s )" = "Darwin" ]; then
+    ln -s CMake.app/Contents/bin cmake/bin
+fi

@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmNinjaTargetGenerator_h
-#define cmNinjaTargetGenerator_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
@@ -12,7 +11,7 @@
 #include <utility>
 #include <vector>
 
-#include "cm_jsoncpp_value.h"
+#include <cm3p/json/value.h>
 
 #include "cmCommonTargetGenerator.h"
 #include "cmGlobalNinjaGenerator.h"
@@ -43,8 +42,6 @@ public:
 
   std::string GetTargetName() const;
 
-  bool NeedDepTypeMSVC(const std::string& lang) const;
-
 protected:
   bool SetMsvcTargetPdbVariable(cmNinjaVars&, const std::string& config) const;
 
@@ -68,14 +65,17 @@ protected:
 
   std::string LanguageCompilerRule(const std::string& lang,
                                    const std::string& config) const;
-  std::string LanguagePreprocessRule(std::string const& lang,
-                                     const std::string& config) const;
-  bool NeedExplicitPreprocessing(std::string const& lang) const;
+  std::string LanguagePreprocessAndScanRule(std::string const& lang,
+                                            const std::string& config) const;
+  std::string LanguageScanRule(std::string const& lang,
+                               const std::string& config) const;
   std::string LanguageDyndepRule(std::string const& lang,
                                  const std::string& config) const;
-  bool NeedDyndep(std::string const& lang) const;
-  bool UsePreprocessedSource(std::string const& lang) const;
-  bool CompilePreprocessedSourceWithDefines(std::string const& lang) const;
+  bool NeedDyndep(std::string const& lang, std::string const& config) const;
+  bool NeedExplicitPreprocessing(std::string const& lang) const;
+  bool CompileWithDefines(std::string const& lang) const;
+  bool NeedCxxModuleSupport(std::string const& lang,
+                            std::string const& config) const;
 
   std::string OrderDependsTargetForTarget(const std::string& config);
 
@@ -112,7 +112,8 @@ protected:
 
   /// @return the list of link dependency for the given target @a target.
   cmNinjaDeps ComputeLinkDeps(const std::string& linkLanguage,
-                              const std::string& config) const;
+                              const std::string& config,
+                              bool ignoreType = false) const;
 
   /// @return the source file path for the given @a source.
   std::string GetSourceFilePath(cmSourceFile const* source) const;
@@ -217,5 +218,3 @@ private:
 
   std::map<std::string, ByConfig> Configs;
 };
-
-#endif // ! cmNinjaTargetGenerator_h

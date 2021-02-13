@@ -312,8 +312,9 @@ is specific to the Android development environment to be used.
 
 For :ref:`Visual Studio Generators`, CMake expects :ref:`NVIDIA Nsight Tegra
 Visual Studio Edition <Cross Compiling for Android with NVIDIA Nsight Tegra
-Visual Studio Edition>` to be installed.  See that section for further
-configuration details.
+Visual Studio Edition>` or the :ref:`Visual Studio tools for Android
+<Cross Compiling for Android with the NDK>` to be installed. See those sections
+for further configuration details.
 
 For :ref:`Makefile Generators` and the :generator:`Ninja` generator,
 CMake expects one of these environments:
@@ -363,8 +364,9 @@ CMake uses the following steps to select one of the environments:
 Cross Compiling for Android with the NDK
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-A toolchain file may configure :ref:`Makefile Generators` or the
-:generator:`Ninja` generator to target Android for cross-compiling.
+A toolchain file may configure :ref:`Makefile Generators`,
+:ref:`Ninja Generators`, or :ref:`Visual Studio Generators` to target
+Android for cross-compiling.
 
 Configure use of an Android NDK with the following variables:
 
@@ -384,7 +386,8 @@ Configure use of an Android NDK with the following variables:
 
 :variable:`CMAKE_ANDROID_ARCH_ABI`
   Set to the Android ABI (architecture).  If not specified, this
-  variable will default to ``armeabi``.
+  variable will default to the first supported ABI in the list of
+  ``armeabi``, ``armeabi-v7a`` and ``arm64-v8a``.
   The :variable:`CMAKE_ANDROID_ARCH` variable will be computed
   from ``CMAKE_ANDROID_ARCH_ABI`` automatically.
   Also see the :variable:`CMAKE_ANDROID_ARM_MODE` and
@@ -392,7 +395,6 @@ Configure use of an Android NDK with the following variables:
 
 :variable:`CMAKE_ANDROID_NDK`
   Set to the absolute path to the Android NDK root directory.
-  A ``${CMAKE_ANDROID_NDK}/platforms`` directory must exist.
   If not specified, a default for this variable will be chosen
   as specified :ref:`above <Cross Compiling for Android>`.
 

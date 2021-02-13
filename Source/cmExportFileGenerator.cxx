@@ -21,6 +21,7 @@
 #include "cmMessageType.h"
 #include "cmOutputConverter.h"
 #include "cmPolicies.h"
+#include "cmProperty.h"
 #include "cmPropertyMap.h"
 #include "cmStateTypes.h"
 #include "cmStringAlgorithms.h"
@@ -564,10 +565,9 @@ void cmExportFileGenerator::PopulateCompatibleInterfaceProperties(
                       ifaceProperties);
 
   if (gtarget->GetType() != cmStateEnums::INTERFACE_LIBRARY) {
-    getCompatibleInterfaceProperties(gtarget, ifaceProperties, "");
-
-    std::vector<std::string> configNames;
-    gtarget->Target->GetMakefile()->GetConfigurations(configNames);
+    std::vector<std::string> configNames =
+      gtarget->Target->GetMakefile()->GetGeneratorConfigs(
+        cmMakefile::IncludeEmptyConfig);
 
     for (std::string const& cn : configNames) {
       getCompatibleInterfaceProperties(gtarget, ifaceProperties, cn);
@@ -707,7 +707,7 @@ void cmExportFileGenerator::ResolveTargetsInGeneratorExpression(
       break;
     }
     input.replace(pos, endPos - pos + 1, targetName);
-    lastPos = endPos;
+    lastPos = pos + targetName.size();
   }
 
   pos = 0;
@@ -923,12 +923,14 @@ void cmExportFileGenerator::GeneratePolicyHeaderCode(std::ostream& os)
   /* clang-format on */
 
   // Isolate the file policy level.
-  // We use 2.6 here instead of the current version because newer
-  // versions of CMake should be able to export files imported by 2.6
-  // until the import format changes.
+  // Support CMake versions as far back as 2.6 but also support using NEW
+  // policy settings for up to CMake 3.19 (this upper limit may be reviewed
+  // and increased from time to time). This reduces the opportunity for CMake
+  // warnings when an older export file is later used with newer CMake
+  // versions.
   /* clang-format off */
   os << "cmake_policy(PUSH)\n"
-     << "cmake_policy(VERSION 2.6)\n";
+     << "cmake_policy(VERSION 2.6...3.19)\n";
   /* clang-format on */
 }
 
@@ -1212,7 +1214,7 @@ bool cmExportFileGenerator::PopulateExportProperties(
   cmGeneratorTarget* gte, ImportPropertyMap& properties,
   std::string& errorMessage)
 {
-  auto& targetProperties = gte->Target->GetProperties();
+  const auto& targetProperties = gte->Target->GetProperties();
   if (cmProp exportProperties =
         targetProperties.GetPropertyValue("EXPORT_PROPERTIES")) {
     for (auto& prop : cmExpandedList(*exportProperties)) {

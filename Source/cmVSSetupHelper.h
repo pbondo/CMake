@@ -1,19 +1,17 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmVSSetupHelper_h
-#define cmVSSetupHelper_h
+#pragma once
 
 #ifndef NOMINMAX
 #  define NOMINMAX // Undefine min and max defined by windows.h
 #endif
 
 // Published by Visual Studio Setup team
+#include <cm3p/Setup.Configuration.h>
 #include <string>
 #include <vector>
 
 #include <windows.h>
-
-#include "cmvssetup/Setup.Configuration.h"
 
 template <class T>
 class SmartCOMPtr
@@ -107,6 +105,7 @@ public:
 
   bool IsVSInstalled();
   bool GetVSInstanceInfo(std::string& vsInstallLocation);
+  bool GetVSInstanceVersion(unsigned long long& vsInstanceVersion);
   bool GetVCToolsetVersion(std::string& vsToolsetVersion);
   bool IsWin10SDKInstalled();
   bool IsWin81SDKInstalled();
@@ -136,5 +135,3 @@ private:
 
   std::string SpecifiedVSInstallLocation;
 };
-
-#endif

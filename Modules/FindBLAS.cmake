@@ -27,6 +27,7 @@ The following variables may be set to influence this module's behavior:
   possibilities.  List of vendors valid in this module:
 
   * ``Goto``
+  * ``FlexiBLAS``
   * ``OpenBLAS``
   * ``FLAME``
   * ``ATLAS PhiPACK``
@@ -36,7 +37,7 @@ The following variables may be set to influence this module's behavior:
   * ``SCSL``
   * ``SGIMATH``
   * ``IBMESSL``
-  * ``Intel10_32`` (intel mkl v10 32 bit)
+  * ``Intel10_32`` (intel mkl v10 32 bit, threaded code)
   * ``Intel10_64lp`` (intel mkl v10+ 64 bit, threaded code, lp64 model)
   * ``Intel10_64lp_seq`` (intel mkl v10+ 64 bit, sequential code, lp64 model)
   * ``Intel10_64ilp`` (intel mkl v10+ 64 bit, threaded code, ilp64 model)
@@ -52,17 +53,45 @@ The following variables may be set to influence this module's behavior:
   * ``Arm_mp``
   * ``Arm_ilp64``
   * ``Arm_ilp64_mp``
+  * ``EML``
+  * ``EML_mt``
   * ``Generic``
+
+  .. versionadded:: 3.6
+    ``OpenBLAS`` support.
+
+  .. versionadded:: 3.11
+    ``FLAME`` support.
+
+  .. versionadded:: 3.13
+    Added ILP64 MKL variants (``Intel10_64ilp``, ``Intel10_64ilp_seq``).
+
+  .. versionadded:: 3.17
+    Added single dynamic library MKL variant (``Intel10_64_dyn``).
+
+  .. versionadded:: 3.18
+    Arm Performance Libraries support (``Arm``, ``Arm_mp``, ``Arm_ilp64``,
+    ``Arm_ilp64_mp``).
+
+  .. versionadded:: 3.19
+    ``FlexiBLAS`` support.
+
+  .. versionadded:: 3.20
+    Elbrus Math Library support (``EML``, ``EML_mt``).
 
 ``BLA_F95``
   if ``ON`` tries to find the BLAS95 interfaces
 
 ``BLA_PREFER_PKGCONFIG``
+  .. versionadded:: 3.11
+
   if set ``pkg-config`` will be used to search for a BLAS library first
   and if one is found that is preferred
 
 Imported targets
 ^^^^^^^^^^^^^^^^
+
+.. versionadded:: 3.18
 
 This module defines the following :prop_tgt:`IMPORTED` target:
 
@@ -103,10 +132,13 @@ This module defines the following variables:
 Hints
 ^^^^^
 
-Set the ``MKLROOT`` environment variable to a directory that contains an MKL
-installation, or add the directory to the dynamic library loader environment
-variable for your platform (``LIB``, ``DYLD_LIBRARY_PATH`` or
-``LD_LIBRARY_PATH``).
+``MKLROOT``
+  .. versionadded:: 3.15
+
+  Set this environment variable to a directory that contains an MKL
+  installation, or add the directory to the dynamic library loader environment
+  variable for your platform (``LIB``, ``DYLD_LIBRARY_PATH`` or
+  ``LD_LIBRARY_PATH``).
 
 #]=======================================================================]
 
@@ -208,6 +240,7 @@ macro(CHECK_BLAS_LIBRARIES LIBRARIES _prefix _name _flags _list _threadlibs _add
       if(_libraries_work)
         find_library(${_prefix}_${_library}_LIBRARY
           NAMES ${_library}
+          NAMES_PER_DIR
           PATHS ${_extaddlibdir}
           PATH_SUFFIXES ${_subdirs}
         )
@@ -397,6 +430,10 @@ if(BLA_VENDOR MATCHES "Intel" OR BLA_VENDOR STREQUAL "All")
 
           # Add threading/sequential libs
           set(BLAS_SEARCH_LIBS_WIN_THREAD "")
+          if(BLA_VENDOR STREQUAL "Intel10_32" OR BLA_VENDOR STREQUAL "All")
+            list(APPEND BLAS_SEARCH_LIBS_WIN_THREAD
+              "libiomp5md mkl_intel_thread${BLAS_mkl_DLL_SUFFIX}")
+          endif()
           if(BLA_VENDOR MATCHES "^Intel10_64i?lp$" OR BLA_VENDOR STREQUAL "All")
             # old version
             list(APPEND BLAS_SEARCH_LIBS_WIN_THREAD
@@ -441,7 +478,7 @@ if(BLA_VENDOR MATCHES "Intel" OR BLA_VENDOR STREQUAL "All")
               "${BLAS_mkl_START_GROUP} mkl_${BLAS_mkl_INTFACE}_${BLAS_mkl_ILP_MODE} mkl_sequential mkl_core ${BLAS_mkl_END_GROUP}")
           endif()
 
-          #older vesions of intel mkl libs
+          #older versions of intel mkl libs
           if(BLA_VENDOR STREQUAL "Intel" OR BLA_VENDOR STREQUAL "All")
             list(APPEND BLAS_SEARCH_LIBS
               "mkl")
@@ -473,7 +510,7 @@ if(BLA_VENDOR MATCHES "Intel" OR BLA_VENDOR STREQUAL "All")
         set(BLAS_mkl_OS_NAME "lin")
       endif()
       if(DEFINED ENV{MKLROOT})
-        set(BLAS_mkl_MKLROOT "$ENV{MKLROOT}")
+        file(TO_CMAKE_PATH "$ENV{MKLROOT}" BLAS_mkl_MKLROOT)
         # If MKLROOT points to the subdirectory 'mkl', use the parent directory instead
         # so we can better detect other relevant libraries in 'compiler' or 'tbb':
         get_filename_component(BLAS_mkl_MKLROOT_LAST_DIR "${BLAS_mkl_MKLROOT}" NAME)
@@ -483,7 +520,9 @@ if(BLA_VENDOR MATCHES "Intel" OR BLA_VENDOR STREQUAL "All")
       endif()
       set(BLAS_mkl_LIB_PATH_SUFFIXES
           "compiler/lib" "compiler/lib/${BLAS_mkl_ARCH_NAME}_${BLAS_mkl_OS_NAME}"
+          "compiler/lib/${BLAS_mkl_ARCH_NAME}"
           "mkl/lib" "mkl/lib/${BLAS_mkl_ARCH_NAME}_${BLAS_mkl_OS_NAME}"
+          "mkl/lib/${BLAS_mkl_ARCH_NAME}"
           "lib/${BLAS_mkl_ARCH_NAME}_${BLAS_mkl_OS_NAME}")
 
       foreach(IT ${BLAS_SEARCH_LIBS})
@@ -542,6 +581,22 @@ if(BLA_VENDOR STREQUAL "Goto" OR BLA_VENDOR STREQUAL "All")
   endif()
 endif()
 
+# FlexiBLAS? (http://www.mpi-magdeburg.mpg.de/mpcsc/software/FlexiBLAS/)
+if(BLA_VENDOR STREQUAL "FlexiBLAS" OR BLA_VENDOR STREQUAL "All")
+  if(NOT BLAS_LIBRARIES)
+    check_blas_libraries(
+      BLAS_LIBRARIES
+      BLAS
+      sgemm
+      ""
+      "flexiblas"
+      ""
+      ""
+      ""
+      )
+  endif()
+endif()
+
 # OpenBLAS? (http://www.openblas.net)
 if(BLA_VENDOR STREQUAL "OpenBLAS" OR BLA_VENDOR STREQUAL "All")
   if(NOT BLAS_LIBRARIES)
@@ -562,16 +617,22 @@ if(BLA_VENDOR STREQUAL "OpenBLAS" OR BLA_VENDOR STREQUAL "All")
     else()
       find_package(Threads REQUIRED)
     endif()
+    set(_threadlibs "${CMAKE_THREAD_LIBS_INIT}")
+    if(BLA_STATIC)
+      find_package(OpenMP COMPONENTS C)
+      list(PREPEND _threadlibs "${OpenMP_C_LIBRARIES}")
+    endif()
     check_blas_libraries(
       BLAS_LIBRARIES
       BLAS
       sgemm
       ""
       "openblas"
-      "${CMAKE_THREAD_LIBS_INIT}"
+      "${_threadlibs}"
       ""
       ""
       )
+    unset(_threadlibs)
   endif()
 endif()
 
@@ -781,6 +842,9 @@ if(BLA_VENDOR MATCHES "ACML" OR BLA_VENDOR STREQUAL "All")
     if(CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
       set(_ACML_COMPILER32 "ifort32")
       set(_ACML_COMPILER64 "ifort64")
+    elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "IntelLLVM")
+      # 32-bit not supported
+      set(_ACML_COMPILER64 "ifx")
     elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "SunPro")
       set(_ACML_COMPILER32 "sun32")
       set(_ACML_COMPILER64 "sun64")
@@ -925,6 +989,31 @@ if(BLA_VENDOR STREQUAL "NAS" OR BLA_VENDOR STREQUAL "All")
       ""
       )
   endif()
+endif()
+
+# Elbrus Math Library?
+if(BLA_VENDOR MATCHES "EML" OR BLA_VENDOR STREQUAL "All")
+
+   set(BLAS_EML_LIB "eml")
+
+   # Check for OpenMP support, VIA BLA_VENDOR of eml_mt
+   if(BLA_VENDOR MATCHES "_mt")
+     set(BLAS_EML_LIB "${BLAS_EML_LIB}_mt")
+   endif()
+
+   if(NOT BLAS_LIBRARIES)
+    check_blas_libraries(
+      BLAS_LIBRARIES
+      BLAS
+      sgemm
+      ""
+      "${BLAS_EML_LIB}"
+      ""
+      ""
+      ""
+      )
+  endif()
+
 endif()
 
 # Generic BLAS library?

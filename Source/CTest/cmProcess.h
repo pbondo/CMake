@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmProcess_h
-#define cmProcess_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
@@ -11,10 +10,9 @@
 #include <utility>
 #include <vector>
 
+#include <cm3p/uv.h>
 #include <stddef.h>
 #include <stdint.h>
-
-#include "cm_uv.h"
 
 #include "cmDuration.h"
 #include "cmProcessOutput.h"
@@ -69,8 +67,8 @@ public:
     Other
   };
 
-  Exception GetExitException();
-  std::string GetExitExceptionString();
+  Exception GetExitException() const;
+  std::string GetExitExceptionString() const;
 
   std::unique_ptr<cmCTestRunTest> GetRunner()
   {
@@ -133,5 +131,3 @@ private:
   int Id;
   int64_t ExitValue;
 };
-
-#endif

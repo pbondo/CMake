@@ -3,8 +3,7 @@
 
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmext_memory
-#define cmext_memory
+#pragma once
 
 #include <typeinfo>
 
@@ -12,18 +11,19 @@
 
 namespace cm {
 
-template <typename T, typename O,
-          cm::enable_if_t<
-            std::is_pointer<cm::invoke_result_t<decltype(&O::get), O>>::value,
-            int> = 0>
+template <
+  typename T, typename O,
+  cm::enable_if_t<std::is_pointer<decltype(std::declval<O>().get())>::value,
+                  int> = 0>
 T& static_reference_cast(O& item)
 {
   return *(static_cast<T*>(item.get()));
 }
-template <typename T, typename O,
-          cm::enable_if_t<
-            std::is_pointer<cm::invoke_result_t<decltype(&O::get), O>>::value,
-            int> = 0>
+
+template <
+  typename T, typename O,
+  cm::enable_if_t<std::is_pointer<decltype(std::declval<O>().get())>::value,
+                  int> = 0>
 T& dynamic_reference_cast(O& item)
 {
   auto p = dynamic_cast<T*>(item.get());
@@ -36,5 +36,3 @@ T& dynamic_reference_cast(O& item)
 }
 
 } // namespace cm
-
-#endif

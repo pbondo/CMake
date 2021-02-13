@@ -112,6 +112,7 @@ void cmGlobalVisualStudioGenerator::WriteSLNHeader(std::ostream& fout)
 {
   char utf8bom[] = { char(0xEF), char(0xBB), char(0xBF) };
   fout.write(utf8bom, 3);
+  fout << '\n';
 
   switch (this->Version) {
     case cmGlobalVisualStudioGenerator::VS9:
@@ -166,7 +167,7 @@ void cmGlobalVisualStudioGenerator::WriteSLNHeader(std::ostream& fout)
       if (this->ExpressEdition) {
         fout << "# Visual Studio Express 16 for Windows Desktop\n";
       } else {
-        fout << "# Visual Studio 16\n";
+        fout << "# Visual Studio Version 16\n";
       }
       break;
   }
@@ -367,7 +368,7 @@ cmGlobalVisualStudioGenerator::GetTargetLinkClosure(cmGeneratorTarget* target)
 void cmGlobalVisualStudioGenerator::FollowLinkDepends(
   const cmGeneratorTarget* target, std::set<const cmGeneratorTarget*>& linked)
 {
-  if (target->GetType() == cmStateEnums::INTERFACE_LIBRARY) {
+  if (!target->IsInBuildSystem()) {
     return;
   }
   if (linked.insert(target).second &&
@@ -508,7 +509,7 @@ std::string cmGlobalVisualStudioGenerator::GetStartupProjectName(
   cmLocalGenerator const* root) const
 {
   cmProp n = root->GetMakefile()->GetProperty("VS_STARTUP_PROJECT");
-  if (n && !n->empty()) {
+  if (cmNonempty(n)) {
     std::string startup = *n;
     if (this->FindTarget(startup)) {
       return startup;
@@ -809,7 +810,7 @@ bool cmGlobalVisualStudioGenerator::TargetIsFortranOnly(
   // a target with none of its own sources, e.g. when also using
   // object libraries.
   cmProp linkLang = gt->GetProperty("LINKER_LANGUAGE");
-  if (linkLang && !linkLang->empty()) {
+  if (cmNonempty(linkLang)) {
     languages.insert(*linkLang);
   }
 

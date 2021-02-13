@@ -13,6 +13,7 @@
 #include "cmGlobalGenerator.h"
 #include "cmMakefile.h"
 #include "cmMessageType.h"
+#include "cmProperty.h"
 #include "cmState.h"
 #include "cmStateTypes.h"
 #include "cmStringAlgorithms.h"
@@ -30,7 +31,7 @@ cmFindLibraryCommand::cmFindLibraryCommand(cmExecutionStatus& status)
 // cmFindLibraryCommand
 bool cmFindLibraryCommand::InitialPass(std::vector<std::string> const& argsIn)
 {
-  this->DebugMode = ComputeIfDebugModeWanted();
+  this->DebugMode = this->ComputeIfDebugModeWanted();
   this->VariableDocumentation = "Path to a library.";
   this->CMakePathName = "LIBRARY";
   if (!this->ParseArguments(argsIn)) {
@@ -50,9 +51,9 @@ bool cmFindLibraryCommand::InitialPass(std::vector<std::string> const& argsIn)
 
   // add custom lib<qual> paths instead of using fixed lib32, lib64 or
   // libx32
-  if (const char* customLib = this->Makefile->GetDefinition(
+  if (cmProp customLib = this->Makefile->GetDefinition(
         "CMAKE_FIND_LIBRARY_CUSTOM_LIB_SUFFIX")) {
-    this->AddArchitecturePaths(customLib);
+    this->AddArchitecturePaths(customLib->c_str());
   }
   // add special 32 bit paths if this is a 32 bit compile.
   else if (this->Makefile->PlatformIs32Bit() &&
@@ -433,7 +434,8 @@ bool cmFindLibraryHelper::CheckDirectoryForName(std::string const& path,
 #endif
     if (name.Regex.find(testName)) {
       this->TestPath = cmStrCat(path, origName);
-      if (!cmSystemTools::FileIsDirectory(this->TestPath)) {
+      // Make sure the path is readable and is not a directory.
+      if (cmSystemTools::FileExists(this->TestPath, true)) {
         this->DebugLibraryFound(name.Raw, dir);
 
         // This is a matching file.  Check if it is better than the

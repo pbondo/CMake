@@ -3,6 +3,7 @@
 
 #include "cmLinkLineDeviceComputer.h"
 
+#include <algorithm>
 #include <set>
 #include <utility>
 
@@ -15,6 +16,7 @@
 #include "cmListFileCache.h"
 #include "cmLocalGenerator.h"
 #include "cmMakefile.h"
+#include "cmProperty.h"
 #include "cmStateDirectory.h"
 #include "cmStateSnapshot.h"
 #include "cmStateTypes.h"
@@ -56,17 +58,15 @@ bool cmLinkLineDeviceComputer::ComputeRequiresDeviceLinking(
   using ItemVector = cmComputeLinkInformation::ItemVector;
   ItemVector const& items = cli.GetItems();
   std::string config = cli.GetConfig();
-  for (auto const& item : items) {
-    if (item.Target &&
-        item.Target->GetType() == cmStateEnums::STATIC_LIBRARY) {
-      if ((!item.Target->GetPropertyAsBool("CUDA_RESOLVE_DEVICE_SYMBOLS")) &&
-          item.Target->GetPropertyAsBool("CUDA_SEPARABLE_COMPILATION")) {
+  return std::any_of(
+    items.begin(), items.end(),
+    [](cmComputeLinkInformation::Item const& item) -> bool {
+      return item.Target &&
+        item.Target->GetType() == cmStateEnums::STATIC_LIBRARY &&
         // this dependency requires us to device link it
-        return true;
-      }
-    }
-  }
-  return false;
+        !item.Target->GetPropertyAsBool("CUDA_RESOLVE_DEVICE_SYMBOLS") &&
+        item.Target->GetPropertyAsBool("CUDA_SEPARABLE_COMPILATION");
+    });
 }
 
 void cmLinkLineDeviceComputer::ComputeLinkLibraries(
@@ -190,21 +190,18 @@ bool requireDeviceLinking(cmGeneratorTarget& target, cmLocalGenerator& lg,
     target.GetLinkClosure(config);
 
   if (cm::contains(closure->Languages, "CUDA")) {
-    if (cmProp separableCompilation =
-          target.GetProperty("CUDA_SEPARABLE_COMPILATION")) {
-      if (cmIsOn(*separableCompilation)) {
-        bool doDeviceLinking = false;
-        switch (target.GetType()) {
-          case cmStateEnums::SHARED_LIBRARY:
-          case cmStateEnums::MODULE_LIBRARY:
-          case cmStateEnums::EXECUTABLE:
-            doDeviceLinking = true;
-            break;
-          default:
-            break;
-        }
-        return doDeviceLinking;
+    if (cmIsOn(target.GetProperty("CUDA_SEPARABLE_COMPILATION"))) {
+      bool doDeviceLinking = false;
+      switch (target.GetType()) {
+        case cmStateEnums::SHARED_LIBRARY:
+        case cmStateEnums::MODULE_LIBRARY:
+        case cmStateEnums::EXECUTABLE:
+          doDeviceLinking = true;
+          break;
+        default:
+          break;
       }
+      return doDeviceLinking;
     }
 
     cmComputeLinkInformation* pcli = target.GetLinkInformation(config);

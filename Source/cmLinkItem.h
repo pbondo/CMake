@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmLinkItem_h
-#define cmLinkItem_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
@@ -54,6 +53,9 @@ struct cmLinkImplementationLibraries
   // Libraries linked directly in other configurations.
   // Needed only for OLD behavior of CMP0003.
   std::vector<cmLinkItem> WrongConfigLibraries;
+
+  // Whether the list depends on a genex referencing the configuration.
+  bool HadContextSensitiveCondition = false;
 };
 
 struct cmLinkInterfaceLibraries
@@ -63,6 +65,9 @@ struct cmLinkInterfaceLibraries
 
   // Whether the list depends on a genex referencing the head target.
   bool HadHeadSensitiveCondition = false;
+
+  // Whether the list depends on a genex referencing the configuration.
+  bool HadContextSensitiveCondition = false;
 };
 
 struct cmLinkInterface : public cmLinkInterfaceLibraries
@@ -134,5 +139,3 @@ inline cmTargetLinkLibraryType CMP0003_ComputeLinkType(
   // The current configuration is not a debug configuration.
   return OPTIMIZED_LibraryType;
 }
-
-#endif

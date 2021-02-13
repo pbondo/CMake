@@ -26,8 +26,6 @@
 #include "cmSystemTools.h"
 #include "cmake.h"
 
-using cmProp = const std::string*;
-
 cmState::cmState()
 {
   this->CacheManager = cm::make_unique<cmCacheManager>();
@@ -112,12 +110,9 @@ bool cmState::StringToCacheEntryType(const std::string& s,
 
 bool cmState::IsCacheEntryType(std::string const& key)
 {
-  for (const std::string& i : cmCacheEntryTypes) {
-    if (key == i) {
-      return true;
-    }
-  }
-  return false;
+  return std::any_of(
+    cmCacheEntryTypes.begin(), cmCacheEntryTypes.end(),
+    [&key](std::string const& i) -> bool { return key == i; });
 }
 
 bool cmState::LoadCache(const std::string& path, bool internal,
@@ -135,6 +130,11 @@ bool cmState::SaveCache(const std::string& path, cmMessenger* messenger)
 bool cmState::DeleteCache(const std::string& path)
 {
   return this->CacheManager->DeleteCache(path);
+}
+
+bool cmState::IsCacheLoaded() const
+{
+  return this->CacheManager->IsCacheLoaded();
 }
 
 std::vector<std::string> cmState::GetCacheEntryKeys() const
@@ -265,7 +265,7 @@ void cmState::RemoveCacheEntryProperty(std::string const& key,
 cmStateSnapshot cmState::Reset()
 {
   this->GlobalProperties.Clear();
-  this->PropertyDefinitions.clear();
+  this->PropertyDefinitions = {};
   this->GlobVerificationManager->Reset();
 
   cmStateDetail::PositionType pos = this->SnapshotData.Truncate();
@@ -331,39 +331,23 @@ void cmState::DefineProperty(const std::string& name,
                              const std::string& ShortDescription,
                              const std::string& FullDescription, bool chained)
 {
-  this->PropertyDefinitions[scope].DefineProperty(
-    name, scope, ShortDescription, FullDescription, chained);
+  this->PropertyDefinitions.DefineProperty(name, scope, ShortDescription,
+                                           FullDescription, chained);
 }
 
 cmPropertyDefinition const* cmState::GetPropertyDefinition(
   const std::string& name, cmProperty::ScopeType scope) const
 {
-  if (this->IsPropertyDefined(name, scope)) {
-    cmPropertyDefinitionMap const& defs =
-      this->PropertyDefinitions.find(scope)->second;
-    return &defs.find(name)->second;
-  }
-  return nullptr;
-}
-
-bool cmState::IsPropertyDefined(const std::string& name,
-                                cmProperty::ScopeType scope) const
-{
-  auto it = this->PropertyDefinitions.find(scope);
-  if (it == this->PropertyDefinitions.end()) {
-    return false;
-  }
-  return it->second.IsPropertyDefined(name);
+  return this->PropertyDefinitions.GetPropertyDefinition(name, scope);
 }
 
 bool cmState::IsPropertyChained(const std::string& name,
                                 cmProperty::ScopeType scope) const
 {
-  auto it = this->PropertyDefinitions.find(scope);
-  if (it == this->PropertyDefinitions.end()) {
-    return false;
+  if (const auto* def = this->GetPropertyDefinition(name, scope)) {
+    return def->IsChained();
   }
-  return it->second.IsPropertyChained(name);
+  return false;
 }
 
 void cmState::SetLanguageEnabled(std::string const& l)
@@ -454,6 +438,19 @@ void cmState::AddBuiltinCommand(std::string const& name,
     });
 }
 
+void cmState::AddFlowControlCommand(std::string const& name, Command command)
+{
+  this->FlowControlCommands.insert(name);
+  this->AddBuiltinCommand(name, std::move(command));
+}
+
+void cmState::AddFlowControlCommand(std::string const& name,
+                                    BuiltinCommand command)
+{
+  this->FlowControlCommands.insert(name);
+  this->AddBuiltinCommand(name, command);
+}
+
 void cmState::AddDisallowedCommand(std::string const& name,
                                    BuiltinCommand command,
                                    cmPolicies::PolicyID policy,
@@ -483,13 +480,14 @@ void cmState::AddDisallowedCommand(std::string const& name,
 
 void cmState::AddUnexpectedCommand(std::string const& name, const char* error)
 {
-  this->AddBuiltinCommand(
+  this->AddFlowControlCommand(
     name,
     [name, error](std::vector<cmListFileArgument> const&,
                   cmExecutionStatus& status) -> bool {
-      const char* versionValue =
+      cmProp versionValue =
         status.GetMakefile().GetDefinition("CMAKE_MINIMUM_REQUIRED_VERSION");
-      if (name == "endif" && (!versionValue || atof(versionValue) <= 1.4)) {
+      if (name == "endif" &&
+          (!versionValue || atof(versionValue->c_str()) <= 1.4)) {
         return true;
       }
       status.SetError(error);
@@ -497,21 +495,33 @@ void cmState::AddUnexpectedCommand(std::string const& name, const char* error)
     });
 }
 
-void cmState::AddScriptedCommand(std::string const& name, Command command)
+bool cmState::AddScriptedCommand(std::string const& name, BT<Command> command,
+                                 cmMakefile& mf)
 {
   std::string sName = cmSystemTools::LowerCase(name);
+
+  if (this->FlowControlCommands.count(sName)) {
+    mf.GetCMakeInstance()->IssueMessage(
+      MessageType::FATAL_ERROR,
+      cmStrCat("Built-in flow control command \"", sName,
+               "\" cannot be overridden."),
+      command.Backtrace);
+    cmSystemTools::SetFatalErrorOccured();
+    return false;
+  }
 
   // if the command already exists, give a new name to the old command.
   if (Command oldCmd = this->GetCommandByExactName(sName)) {
     this->ScriptedCommands["_" + sName] = oldCmd;
   }
 
-  this->ScriptedCommands[sName] = std::move(command);
+  this->ScriptedCommands[sName] = std::move(command.Value);
+  return true;
 }
 
 cmState::Command cmState::GetCommand(std::string const& name) const
 {
-  return GetCommandByExactName(cmSystemTools::LowerCase(name));
+  return this->GetCommandByExactName(cmSystemTools::LowerCase(name));
 }
 
 cmState::Command cmState::GetCommandByExactName(std::string const& name) const
@@ -641,8 +651,7 @@ cmProp cmState::GetGlobalProperty(const std::string& prop)
 
 bool cmState::GetGlobalPropertyAsBool(const std::string& prop)
 {
-  cmProp p = this->GetGlobalProperty(prop);
-  return p && cmIsOn(*p);
+  return cmIsOn(this->GetGlobalProperty(prop));
 }
 
 void cmState::SetSourceDirectory(std::string const& sourceDirectory)
@@ -853,6 +862,21 @@ cmStateSnapshot cmState::CreateBuildsystemDirectorySnapshot(
   snapshot.InitializeFromParent();
   snapshot.SetDirectoryDefinitions();
   return snapshot;
+}
+
+cmStateSnapshot cmState::CreateDeferCallSnapshot(
+  cmStateSnapshot const& originSnapshot, std::string const& fileName)
+{
+  cmStateDetail::PositionType pos =
+    this->SnapshotData.Push(originSnapshot.Position, *originSnapshot.Position);
+  pos->SnapshotType = cmStateEnums::DeferCallType;
+  pos->Keep = false;
+  pos->ExecutionListFile = this->ExecutionListFiles.Push(
+    originSnapshot.Position->ExecutionListFile, fileName);
+  assert(originSnapshot.Position->Vars.IsValid());
+  pos->BuildSystemDirectory->DirectoryEnd = pos;
+  pos->PolicyScope = originSnapshot.Position->Policies;
+  return { this, pos };
 }
 
 cmStateSnapshot cmState::CreateFunctionCallSnapshot(

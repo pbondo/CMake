@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmCTestRunTest_h
-#define cmCTestRunTest_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
@@ -119,7 +118,7 @@ private:
   // Run post processing of the process output for MemCheck
   void MemCheckPostProcess();
 
-  void SetupResourcesEnvironment();
+  void SetupResourcesEnvironment(std::vector<std::string>* log = nullptr);
 
   // Returns "completed/total Test #Index: "
   std::string GetTestPrefix(size_t completed, size_t total) const;
@@ -159,5 +158,3 @@ inline int getNumWidth(size_t n)
   }
   return w;
 }
-
-#endif

@@ -5,11 +5,10 @@
 #include "cmExecutionStatus.h"
 #include "cmGlobalGenerator.h"
 #include "cmMakefile.h"
+#include "cmProperty.h"
 #include "cmStateTypes.h"
 #include "cmTarget.h"
 #include "cmake.h"
-
-using cmProp = const std::string*;
 
 cmTargetPropCommandBase::cmTargetPropCommandBase(cmExecutionStatus& status)
   : Makefile(&status.GetMakefile())
@@ -46,15 +45,26 @@ bool cmTargetPropCommandBase::HandleArguments(
     this->HandleMissingTarget(args[0]);
     return false;
   }
-  if ((this->Target->GetType() != cmStateEnums::EXECUTABLE) &&
-      (this->Target->GetType() != cmStateEnums::STATIC_LIBRARY) &&
-      (this->Target->GetType() != cmStateEnums::SHARED_LIBRARY) &&
-      (this->Target->GetType() != cmStateEnums::MODULE_LIBRARY) &&
-      (this->Target->GetType() != cmStateEnums::OBJECT_LIBRARY) &&
-      (this->Target->GetType() != cmStateEnums::INTERFACE_LIBRARY) &&
-      (this->Target->GetType() != cmStateEnums::UNKNOWN_LIBRARY)) {
-    this->SetError("called with non-compilable target type");
-    return false;
+  const bool isRegularTarget =
+    (this->Target->GetType() == cmStateEnums::EXECUTABLE) ||
+    (this->Target->GetType() == cmStateEnums::STATIC_LIBRARY) ||
+    (this->Target->GetType() == cmStateEnums::SHARED_LIBRARY) ||
+    (this->Target->GetType() == cmStateEnums::MODULE_LIBRARY) ||
+    (this->Target->GetType() == cmStateEnums::OBJECT_LIBRARY) ||
+    (this->Target->GetType() == cmStateEnums::INTERFACE_LIBRARY) ||
+    (this->Target->GetType() == cmStateEnums::UNKNOWN_LIBRARY);
+  const bool isCustomTarget = this->Target->GetType() == cmStateEnums::UTILITY;
+
+  if (prop == "SOURCES") {
+    if (!isRegularTarget && !isCustomTarget) {
+      this->SetError("called with non-compilable target type");
+      return false;
+    }
+  } else {
+    if (!isRegularTarget) {
+      this->SetError("called with non-compilable target type");
+      return false;
+    }
   }
 
   bool system = false;
@@ -76,6 +86,13 @@ bool cmTargetPropCommandBase::HandleArguments(
       return false;
     }
     prepend = true;
+    ++argIndex;
+  } else if ((flags & PROCESS_AFTER) && args[argIndex] == "AFTER") {
+    if (args.size() < 3) {
+      this->SetError("called with incorrect number of arguments");
+      return false;
+    }
+    prepend = false;
     ++argIndex;
   }
 
@@ -124,12 +141,17 @@ bool cmTargetPropCommandBase::ProcessContentArgs(
   }
   if (!content.empty()) {
     if (this->Target->GetType() == cmStateEnums::INTERFACE_LIBRARY &&
-        scope != "INTERFACE") {
+        scope != "INTERFACE" && this->Property != "SOURCES") {
       this->SetError("may only set INTERFACE properties on INTERFACE targets");
       return false;
     }
     if (this->Target->IsImported() && scope != "INTERFACE") {
       this->SetError("may only set INTERFACE properties on IMPORTED targets");
+      return false;
+    }
+    if (this->Target->GetType() == cmStateEnums::UTILITY &&
+        scope != "PRIVATE") {
+      this->SetError("may only set PRIVATE properties on custom targets");
       return false;
     }
   }

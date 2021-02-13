@@ -1,15 +1,15 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmState_h
-#define cmState_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
 #include <functional>
-#include <map>
 #include <memory>
 #include <set>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "cmDefinitions.h"
@@ -17,7 +17,7 @@
 #include "cmListFileCache.h"
 #include "cmPolicies.h"
 #include "cmProperty.h"
-#include "cmPropertyDefinitionMap.h"
+#include "cmPropertyDefinition.h"
 #include "cmPropertyMap.h"
 #include "cmStatePrivate.h"
 #include "cmStateTypes.h"
@@ -25,12 +25,10 @@
 class cmCacheManager;
 class cmCommand;
 class cmGlobVerificationManager;
-class cmPropertyDefinition;
+class cmMakefile;
 class cmStateSnapshot;
 class cmMessenger;
 class cmExecutionStatus;
-
-using cmProp = const std::string*;
 
 class cmState
 {
@@ -59,6 +57,8 @@ public:
   cmStateSnapshot CreateBaseSnapshot();
   cmStateSnapshot CreateBuildsystemDirectorySnapshot(
     cmStateSnapshot const& originSnapshot);
+  cmStateSnapshot CreateDeferCallSnapshot(
+    cmStateSnapshot const& originSnapshot, std::string const& fileName);
   cmStateSnapshot CreateFunctionCallSnapshot(
     cmStateSnapshot const& originSnapshot, std::string const& fileName);
   cmStateSnapshot CreateMacroCallSnapshot(
@@ -89,13 +89,14 @@ public:
 
   bool DeleteCache(const std::string& path);
 
+  bool IsCacheLoaded() const;
+
   std::vector<std::string> GetCacheEntryKeys() const;
   cmProp GetCacheEntryValue(std::string const& key) const;
   std::string GetSafeCacheEntryValue(std::string const& key) const;
   cmProp GetInitializedCacheValue(std::string const& key) const;
   cmStateEnums::CacheEntryType GetCacheEntryType(std::string const& key) const;
   void SetCacheEntryValue(std::string const& key, std::string const& value);
-  void SetCacheValue(std::string const& key, std::string const& value);
 
   void RemoveCacheEntry(std::string const& key);
 
@@ -131,9 +132,6 @@ public:
   cmPropertyDefinition const* GetPropertyDefinition(
     const std::string& name, cmProperty::ScopeType scope) const;
 
-  // Is a property defined?
-  bool IsPropertyDefined(const std::string& name,
-                         cmProperty::ScopeType scope) const;
   bool IsPropertyChained(const std::string& name,
                          cmProperty::ScopeType scope) const;
 
@@ -163,10 +161,13 @@ public:
                          std::unique_ptr<cmCommand> command);
   void AddBuiltinCommand(std::string const& name, Command command);
   void AddBuiltinCommand(std::string const& name, BuiltinCommand command);
+  void AddFlowControlCommand(std::string const& name, Command command);
+  void AddFlowControlCommand(std::string const& name, BuiltinCommand command);
   void AddDisallowedCommand(std::string const& name, BuiltinCommand command,
                             cmPolicies::PolicyID policy, const char* message);
   void AddUnexpectedCommand(std::string const& name, const char* error);
-  void AddScriptedCommand(std::string const& name, Command command);
+  bool AddScriptedCommand(std::string const& name, BT<Command> command,
+                          cmMakefile& mf);
   void RemoveBuiltinCommand(std::string const& name);
   void RemoveUserDefinedCommands();
   std::vector<std::string> GetCommandNames() const;
@@ -225,10 +226,11 @@ private:
                          const std::string& variable,
                          cmListFileBacktrace const& bt);
 
-  std::map<cmProperty::ScopeType, cmPropertyDefinitionMap> PropertyDefinitions;
+  cmPropertyDefinitionMap PropertyDefinitions;
   std::vector<std::string> EnabledLanguages;
-  std::map<std::string, Command> BuiltinCommands;
-  std::map<std::string, Command> ScriptedCommands;
+  std::unordered_map<std::string, Command> BuiltinCommands;
+  std::unordered_map<std::string, Command> ScriptedCommands;
+  std::unordered_set<std::string> FlowControlCommands;
   cmPropertyMap GlobalProperties;
   std::unique_ptr<cmCacheManager> CacheManager;
   std::unique_ptr<cmGlobVerificationManager> GlobVerificationManager;
@@ -256,5 +258,3 @@ private:
   bool NinjaMulti = false;
   Mode CurrentMode = Unknown;
 };
-
-#endif

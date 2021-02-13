@@ -2,17 +2,20 @@
    file Copyright.txt or https://cmake.org/licensing for details.  */
 #include "cmArchiveWrite.h"
 
+#include <cstdio>
 #include <cstring>
 #include <ctime>
 #include <iostream>
 #include <sstream>
+
+#include <cm3p/archive.h>
+#include <cm3p/archive_entry.h>
 
 #include "cmsys/Directory.hxx"
 #include "cmsys/Encoding.hxx"
 #include "cmsys/FStream.hxx"
 
 #include "cm_get_date.h"
-#include "cm_libarchive.h"
 
 #include "cmLocale.h"
 #include "cmStringAlgorithms.h"
@@ -79,7 +82,8 @@ struct cmArchiveWrite::Callback
 };
 
 cmArchiveWrite::cmArchiveWrite(std::ostream& os, Compress c,
-                               std::string const& format)
+                               std::string const& format, int compressionLevel,
+                               int numThreads)
   : Stream(os)
   , Archive(archive_write_new())
   , Disk(archive_read_disk_new())
@@ -140,6 +144,18 @@ cmArchiveWrite::cmArchiveWrite(std::ostream& os, Compress c,
                                cm_archive_error_string(this->Archive));
         return;
       }
+      {
+        char sNumThreads[8];
+        snprintf(sNumThreads, sizeof(sNumThreads), "%d", numThreads);
+        sNumThreads[7] = '\0'; // for safety
+        if (archive_write_set_filter_option(this->Archive, "xz", "threads",
+                                            sNumThreads) != ARCHIVE_OK) {
+          this->Error = cmStrCat("archive_compressor_xz_options: ",
+                                 cm_archive_error_string(this->Archive));
+          return;
+        }
+      }
+
       break;
     case CompressZstd:
       if (archive_write_add_filter_zstd(this->Archive) != ARCHIVE_OK) {
@@ -149,6 +165,41 @@ cmArchiveWrite::cmArchiveWrite(std::ostream& os, Compress c,
       }
       break;
   }
+
+  if (compressionLevel != 0) {
+    std::string compressionLevelStr = std::to_string(compressionLevel);
+    std::string archiveFilterName;
+    switch (c) {
+      case CompressNone:
+      case CompressCompress:
+        break;
+      case CompressGZip:
+        archiveFilterName = "gzip";
+        break;
+      case CompressBZip2:
+        archiveFilterName = "bzip2";
+        break;
+      case CompressLZMA:
+        archiveFilterName = "lzma";
+        break;
+      case CompressXZ:
+        archiveFilterName = "xz";
+        break;
+      case CompressZstd:
+        archiveFilterName = "zstd";
+        break;
+    }
+    if (!archiveFilterName.empty()) {
+      if (archive_write_set_filter_option(
+            this->Archive, archiveFilterName.c_str(), "compression-level",
+            compressionLevelStr.c_str()) != ARCHIVE_OK) {
+        this->Error = cmStrCat("archive_write_set_filter_option: ",
+                               cm_archive_error_string(this->Archive));
+        return;
+      }
+    }
+  }
+
 #if !defined(_WIN32) || defined(__CYGWIN__)
   if (archive_read_disk_set_standard_lookup(this->Disk) != ARCHIVE_OK) {
     this->Error = cmStrCat("archive_read_disk_set_standard_lookup: ",
@@ -280,7 +331,12 @@ bool cmArchiveWrite::AddFile(const char* file, size_t skip, const char* prefix)
       time_t epochTime;
       iss >> epochTime;
       if (iss.eof() && !iss.fail()) {
+        // Set all of the file times to the epoch time to handle archive
+        // formats that include creation/access time.
         archive_entry_set_mtime(e, epochTime, 0);
+        archive_entry_set_atime(e, epochTime, 0);
+        archive_entry_set_ctime(e, epochTime, 0);
+        archive_entry_set_birthtime(e, epochTime, 0);
       }
     }
   }

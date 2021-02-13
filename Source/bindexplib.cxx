@@ -276,8 +276,9 @@ public:
               symbol.compare(0, 4, vectorPrefix)) {
             SectChar = this->SectionHeaders[pSymbolTable->SectionNumber - 1]
                          .Characteristics;
-            // skip symbols containing a dot
-            if (symbol.find('.') == std::string::npos) {
+            // skip symbols containing a dot or are from managed code
+            if (symbol.find('.') == std::string::npos &&
+                !SymbolIsFromManagedCode(symbol)) {
               if (!pSymbolTable->Type && (SectChar & IMAGE_SCN_MEM_WRITE)) {
                 // Read only (i.e. constants) must be excluded
                 this->DataSymbols.insert(symbol);
@@ -302,6 +303,13 @@ public:
   }
 
 private:
+  bool SymbolIsFromManagedCode(std::string const& symbol)
+  {
+    return symbol == "__t2m" || symbol == "__m2mep" || symbol == "__mep" ||
+      symbol.find("$$F") != std::string::npos ||
+      symbol.find("$$J") != std::string::npos;
+  }
+
   std::set<std::string>& Symbols;
   std::set<std::string>& DataSymbols;
   DWORD_PTR SymbolCount;
@@ -459,7 +467,7 @@ bool DumpFile(std::string const& nmPath, const char* filename,
 
 bool bindexplib::AddObjectFile(const char* filename)
 {
-  return DumpFile(NmPath, filename, this->Symbols, this->DataSymbols);
+  return DumpFile(this->NmPath, filename, this->Symbols, this->DataSymbols);
 }
 
 bool bindexplib::AddDefinitionFile(const char* filename)
@@ -503,5 +511,5 @@ void bindexplib::WriteFile(FILE* file)
 
 void bindexplib::SetNmPath(std::string const& nm)
 {
-  NmPath = nm;
+  this->NmPath = nm;
 }

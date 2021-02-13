@@ -1,6 +1,8 @@
 CUDA_RUNTIME_LIBRARY
 --------------------
 
+.. versionadded:: 3.17
+
 Select the CUDA runtime library for use by compilers targeting the CUDA language.
 
 The allowed case insensitive values are:
@@ -10,8 +12,8 @@ The allowed case insensitive values are:
 Contents of ``CUDA_RUNTIME_LIBRARY`` may use
 :manual:`generator expressions <cmake-generator-expressions(7)>`.
 
-If this property is not set then CMake uses the default value
-``Static`` to select the CUDA runtime library.
+If that property is not set then CMake uses an appropriate default
+value based on the compiler to select the CUDA runtime library.
 
 .. note::
 

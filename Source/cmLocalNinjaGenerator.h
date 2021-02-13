@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmLocalNinjaGenerator_h
-#define cmLocalNinjaGenerator_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
@@ -11,6 +10,7 @@
 #include <string>
 #include <vector>
 
+#include "cmListFileCache.h"
 #include "cmLocalCommonGenerator.h"
 #include "cmNinjaTypes.h"
 #include "cmOutputConverter.h"
@@ -66,10 +66,17 @@ public:
 
   void AppendTargetOutputs(cmGeneratorTarget* target, cmNinjaDeps& outputs,
                            const std::string& config);
-  void AppendTargetDepends(
-    cmGeneratorTarget* target, cmNinjaDeps& outputs, const std::string& config,
-    const std::string& fileConfig,
-    cmNinjaTargetDepends depends = DependOnTargetArtifact);
+  void AppendTargetDepends(cmGeneratorTarget* target, cmNinjaDeps& outputs,
+                           const std::string& config,
+                           const std::string& fileConfig,
+                           cmNinjaTargetDepends depends);
+
+  std::string CreateUtilityOutput(std::string const& targetName,
+                                  std::vector<std::string> const& byproducts,
+                                  cmListFileBacktrace const& bt) override;
+
+  std::vector<cmCustomCommandGenerator> MakeCustomCommandGenerators(
+    cmCustomCommand const& cc, std::string const& config) override;
 
   void AddCustomCommandTarget(cmCustomCommand const* cc,
                               cmGeneratorTarget* target);
@@ -78,6 +85,9 @@ public:
   void AppendCustomCommandDeps(cmCustomCommandGenerator const& ccg,
                                cmNinjaDeps& ninjaDeps,
                                const std::string& config);
+
+  bool HasUniqueByproducts(std::vector<std::string> const& byproducts,
+                           cmListFileBacktrace const& bt);
 
 protected:
   std::string ConvertToIncludeReference(
@@ -100,9 +110,9 @@ private:
   void WriteProcessedMakefile(std::ostream& os);
   void WritePools(std::ostream& os);
 
-  void WriteCustomCommandBuildStatement(cmCustomCommand const* cc,
-                                        const cmNinjaDeps& orderOnlyDeps,
-                                        const std::string& config);
+  void WriteCustomCommandBuildStatement(
+    cmCustomCommand const* cc, const std::set<cmGeneratorTarget*>& targets,
+    const std::string& config);
 
   void WriteCustomCommandBuildStatements(const std::string& config);
 
@@ -121,5 +131,3 @@ private:
   CustomCommandTargetMap CustomCommandTargets;
   std::vector<cmCustomCommand const*> CustomCommands;
 };
-
-#endif // ! cmLocalNinjaGenerator_h

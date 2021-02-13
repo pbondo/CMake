@@ -3,10 +3,13 @@
 
 #if !defined(_WIN32) && !defined(__sun)
 // POSIX APIs are needed
+// NOLINTNEXTLINE(bugprone-reserved-identifier)
 #  define _POSIX_C_SOURCE 200809L
 #endif
-#if defined(__OpenBSD__) || defined(__FreeBSD__) || defined(__NetBSD__)
+#if defined(__OpenBSD__) || defined(__FreeBSD__) || defined(__NetBSD__) ||    \
+  defined(__QNX__)
 // For isascii
+// NOLINTNEXTLINE(bugprone-reserved-identifier)
 #  define _XOPEN_SOURCE 700
 #endif
 
@@ -14,7 +17,7 @@
 
 #include <cmext/algorithm>
 
-#include "cm_uv.h"
+#include <cm3p/uv.h>
 
 #include "cmDuration.h"
 #include "cmProcessOutput.h"
@@ -22,7 +25,8 @@
 #include "cmStringAlgorithms.h"
 
 #if !defined(CMAKE_BOOTSTRAP)
-#  include "cm_libarchive.h"
+#  include <cm3p/archive.h>
+#  include <cm3p/archive_entry.h>
 
 #  include "cmArchiveWrite.h"
 #  include "cmLocale.h"
@@ -41,12 +45,16 @@
 #  include "cmCryptoHash.h"
 #endif
 
-#if defined(CMAKE_USE_ELF_PARSER)
+#if defined(CMake_USE_ELF_PARSER)
 #  include "cmELF.h"
 #endif
 
-#if defined(CMAKE_USE_MACH_PARSER)
+#if defined(CMake_USE_MACH_PARSER)
 #  include "cmMachO.h"
+#endif
+
+#if defined(CMake_USE_XCOFF_PARSER)
+#  include "cmXCOFF.h"
 #endif
 
 #include <algorithm>
@@ -748,33 +756,140 @@ std::string cmSystemTools::FileExistsInParentDirectories(
 }
 
 #ifdef _WIN32
+namespace {
+
+/* Helper class to save and restore the specified file (or directory)
+   attribute bits. Instantiate this class as an automatic variable on the
+   stack. Its constructor saves a copy of the file attributes, and then its
+   destructor restores the original attribute settings.  */
+class SaveRestoreFileAttributes
+{
+public:
+  SaveRestoreFileAttributes(std::wstring const& path,
+                            uint32_t file_attrs_to_set);
+  ~SaveRestoreFileAttributes();
+
+  SaveRestoreFileAttributes(SaveRestoreFileAttributes const&) = delete;
+  SaveRestoreFileAttributes& operator=(SaveRestoreFileAttributes const&) =
+    delete;
+
+  void SetPath(std::wstring const& path) { path_ = path; }
+
+private:
+  std::wstring path_;
+  uint32_t original_attr_bits_;
+};
+
+SaveRestoreFileAttributes::SaveRestoreFileAttributes(
+  std::wstring const& path, uint32_t file_attrs_to_set)
+  : path_(path)
+  , original_attr_bits_(0)
+{
+  // Set the specified attributes for the source file/directory.
+  original_attr_bits_ = GetFileAttributesW(path_.c_str());
+  if ((INVALID_FILE_ATTRIBUTES != original_attr_bits_) &&
+      ((file_attrs_to_set & original_attr_bits_) != file_attrs_to_set)) {
+    SetFileAttributesW(path_.c_str(), original_attr_bits_ | file_attrs_to_set);
+  }
+}
+
+// We set attribute bits.  Now we need to restore their original state.
+SaveRestoreFileAttributes::~SaveRestoreFileAttributes()
+{
+  DWORD last_error = GetLastError();
+  // Verify or restore the original attributes.
+  const DWORD source_attr_bits = GetFileAttributesW(path_.c_str());
+  if (INVALID_FILE_ATTRIBUTES != source_attr_bits) {
+    if (original_attr_bits_ != source_attr_bits) {
+      // The file still exists, and its attributes aren't our saved values.
+      // Time to restore them.
+      SetFileAttributesW(path_.c_str(), original_attr_bits_);
+    }
+  }
+  SetLastError(last_error);
+}
+
+struct WindowsFileRetryInit
+{
+  cmSystemTools::WindowsFileRetry Retry;
+  bool Explicit;
+};
+
+WindowsFileRetryInit InitWindowsFileRetry(wchar_t const* const values[2],
+                                          unsigned int const defaults[2])
+{
+  unsigned int data[2] = { 0, 0 };
+  HKEY const keys[2] = { HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE };
+  for (int k = 0; k < 2; ++k) {
+    HKEY hKey;
+    if (RegOpenKeyExW(keys[k], L"Software\\Kitware\\CMake\\Config", 0,
+                      KEY_QUERY_VALUE, &hKey) == ERROR_SUCCESS) {
+      for (int v = 0; v < 2; ++v) {
+        DWORD dwData, dwType, dwSize = 4;
+        if (!data[v] &&
+            RegQueryValueExW(hKey, values[v], 0, &dwType, (BYTE*)&dwData,
+                             &dwSize) == ERROR_SUCCESS &&
+            dwType == REG_DWORD && dwSize == 4) {
+          data[v] = static_cast<unsigned int>(dwData);
+        }
+      }
+      RegCloseKey(hKey);
+    }
+  }
+  WindowsFileRetryInit init;
+  init.Explicit = data[0] || data[1];
+  init.Retry.Count = data[0] ? data[0] : defaults[0];
+  init.Retry.Delay = data[1] ? data[1] : defaults[1];
+  return init;
+}
+
+WindowsFileRetryInit InitWindowsFileRetry()
+{
+  static wchar_t const* const values[2] = { L"FilesystemRetryCount",
+                                            L"FilesystemRetryDelay" };
+  static unsigned int const defaults[2] = { 5, 500 };
+  return InitWindowsFileRetry(values, defaults);
+}
+
+WindowsFileRetryInit InitWindowsDirectoryRetry()
+{
+  static wchar_t const* const values[2] = { L"FilesystemDirectoryRetryCount",
+                                            L"FilesystemDirectoryRetryDelay" };
+  static unsigned int const defaults[2] = { 120, 500 };
+  WindowsFileRetryInit dirInit = InitWindowsFileRetry(values, defaults);
+  if (dirInit.Explicit) {
+    return dirInit;
+  }
+  WindowsFileRetryInit fileInit = InitWindowsFileRetry();
+  if (fileInit.Explicit) {
+    return fileInit;
+  }
+  return dirInit;
+}
+
+cmSystemTools::WindowsFileRetry GetWindowsRetry(std::wstring const& path)
+{
+  // If we are performing a directory operation, then try and get the
+  // appropriate timing info.
+  DWORD const attrs = GetFileAttributesW(path.c_str());
+  if (attrs != INVALID_FILE_ATTRIBUTES && (attrs & FILE_ATTRIBUTE_DIRECTORY)) {
+    return cmSystemTools::GetWindowsDirectoryRetry();
+  }
+  return cmSystemTools::GetWindowsFileRetry();
+}
+
+} // end of anonymous namespace
+
 cmSystemTools::WindowsFileRetry cmSystemTools::GetWindowsFileRetry()
 {
-  static WindowsFileRetry retry = { 0, 0 };
-  if (!retry.Count) {
-    unsigned int data[2] = { 0, 0 };
-    HKEY const keys[2] = { HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE };
-    wchar_t const* const values[2] = { L"FilesystemRetryCount",
-                                       L"FilesystemRetryDelay" };
-    for (int k = 0; k < 2; ++k) {
-      HKEY hKey;
-      if (RegOpenKeyExW(keys[k], L"Software\\Kitware\\CMake\\Config", 0,
-                        KEY_QUERY_VALUE, &hKey) == ERROR_SUCCESS) {
-        for (int v = 0; v < 2; ++v) {
-          DWORD dwData, dwType, dwSize = 4;
-          if (!data[v] &&
-              RegQueryValueExW(hKey, values[v], 0, &dwType, (BYTE*)&dwData,
-                               &dwSize) == ERROR_SUCCESS &&
-              dwType == REG_DWORD && dwSize == 4) {
-            data[v] = static_cast<unsigned int>(dwData);
-          }
-        }
-        RegCloseKey(hKey);
-      }
-    }
-    retry.Count = data[0] ? data[0] : 5;
-    retry.Delay = data[1] ? data[1] : 500;
-  }
+  static WindowsFileRetry retry = InitWindowsFileRetry().Retry;
+  return retry;
+}
+
+cmSystemTools::WindowsFileRetry cmSystemTools::GetWindowsDirectoryRetry()
+{
+  static cmSystemTools::WindowsFileRetry retry =
+    InitWindowsDirectoryRetry().Retry;
   return retry;
 }
 #endif
@@ -822,7 +937,9 @@ void cmSystemTools::InitializeLibUV()
   // Perform libuv one-time initialization now, and then un-do its
   // global _fmode setting so that using libuv does not change the
   // default file text/binary mode.  See libuv issue 840.
-  uv_loop_close(uv_default_loop());
+  if (uv_loop_t* loop = uv_default_loop()) {
+    uv_loop_close(loop);
+  }
 #  ifdef _MSC_VER
   _set_fmode(_O_TEXT);
 #  else
@@ -833,6 +950,20 @@ void cmSystemTools::InitializeLibUV()
 #endif
 }
 
+#ifdef _WIN32
+namespace {
+bool cmMoveFile(std::wstring const& oldname, std::wstring const& newname)
+{
+  // Not only ignore any previous error, but clear any memory of it.
+  SetLastError(0);
+
+  // Use MOVEFILE_REPLACE_EXISTING to replace an existing destination file.
+  return MoveFileExW(oldname.c_str(), newname.c_str(),
+                     MOVEFILE_REPLACE_EXISTING);
+}
+}
+#endif
+
 bool cmSystemTools::RenameFile(const std::string& oldname,
                                const std::string& newname)
 {
@@ -840,35 +971,63 @@ bool cmSystemTools::RenameFile(const std::string& oldname,
 #  ifndef INVALID_FILE_ATTRIBUTES
 #    define INVALID_FILE_ATTRIBUTES ((DWORD)-1)
 #  endif
+  std::wstring const oldname_wstr =
+    SystemTools::ConvertToWindowsExtendedPath(oldname);
+  std::wstring const newname_wstr =
+    SystemTools::ConvertToWindowsExtendedPath(newname);
+
   /* Windows MoveFileEx may not replace read-only or in-use files.  If it
      fails then remove the read-only attribute from any existing destination.
      Try multiple times since we may be racing against another process
      creating/opening the destination file just before our MoveFileEx.  */
-  WindowsFileRetry retry = cmSystemTools::GetWindowsFileRetry();
-  while (
-    !MoveFileExW(SystemTools::ConvertToWindowsExtendedPath(oldname).c_str(),
-                 SystemTools::ConvertToWindowsExtendedPath(newname).c_str(),
-                 MOVEFILE_REPLACE_EXISTING) &&
-    --retry.Count) {
-    DWORD last_error = GetLastError();
+  WindowsFileRetry retry = GetWindowsRetry(oldname_wstr);
+
+  // Use RAII to set the attribute bit blocking Microsoft Search Indexing,
+  // and restore the previous value upon return.
+  SaveRestoreFileAttributes save_restore_file_attributes(
+    oldname_wstr, FILE_ATTRIBUTE_NOT_CONTENT_INDEXED);
+
+  DWORD move_last_error = 0;
+  while (!cmMoveFile(oldname_wstr, newname_wstr) && --retry.Count) {
+    move_last_error = GetLastError();
+
+    // There was no error ==> the operation is not yet complete.
+    if (move_last_error == NO_ERROR) {
+      break;
+    }
+
     // Try again only if failure was due to access/sharing permissions.
-    if (last_error != ERROR_ACCESS_DENIED &&
-        last_error != ERROR_SHARING_VIOLATION) {
+    // Most often ERROR_ACCESS_DENIED (a.k.a. I/O error) for a directory, and
+    // ERROR_SHARING_VIOLATION for a file, are caused by one of the following:
+    // 1) Anti-Virus Software
+    // 2) Windows Search Indexer
+    // 3) Windows Explorer has an associated directory already opened.
+    if (move_last_error != ERROR_ACCESS_DENIED &&
+        move_last_error != ERROR_SHARING_VIOLATION) {
       return false;
     }
-    DWORD attrs = GetFileAttributesW(
-      SystemTools::ConvertToWindowsExtendedPath(newname).c_str());
+
+    DWORD const attrs = GetFileAttributesW(newname_wstr.c_str());
     if ((attrs != INVALID_FILE_ATTRIBUTES) &&
-        (attrs & FILE_ATTRIBUTE_READONLY)) {
+        (attrs & FILE_ATTRIBUTE_READONLY) &&
+        // FILE_ATTRIBUTE_READONLY is not honored on directories.
+        !(attrs & FILE_ATTRIBUTE_DIRECTORY)) {
       // Remove the read-only attribute from the destination file.
-      SetFileAttributesW(
-        SystemTools::ConvertToWindowsExtendedPath(newname).c_str(),
-        attrs & ~FILE_ATTRIBUTE_READONLY);
+      SetFileAttributesW(newname_wstr.c_str(),
+                         attrs & ~FILE_ATTRIBUTE_READONLY);
     } else {
       // The file may be temporarily in use so wait a bit.
       cmSystemTools::Delay(retry.Delay);
     }
   }
+
+  // If we were successful, then there was no error.
+  if (retry.Count > 0) {
+    move_last_error = 0;
+    // Restore the attributes on the new name.
+    save_restore_file_attributes.SetPath(newname_wstr);
+  }
+  SetLastError(move_last_error);
   return retry.Count > 0;
 #else
   /* On UNIX we have an OS-provided call to do this atomically.  */
@@ -1102,6 +1261,30 @@ void cmSystemTools::ConvertToOutputSlashes(std::string& path)
 #endif
 }
 
+void cmSystemTools::ConvertToLongPath(std::string& path)
+{
+#if defined(_WIN32) && !defined(__CYGWIN__)
+  // Try to convert path to a long path only if the path contains character '~'
+  if (path.find('~') == std::string::npos) {
+    return;
+  }
+
+  std::wstring wPath = cmsys::Encoding::ToWide(path);
+  DWORD ret = GetLongPathNameW(wPath.c_str(), nullptr, 0);
+  std::vector<wchar_t> buffer(ret);
+  if (ret != 0) {
+    ret = GetLongPathNameW(wPath.c_str(), buffer.data(),
+                           static_cast<DWORD>(buffer.size()));
+  }
+
+  if (ret != 0) {
+    path = cmsys::Encoding::ToNarrow(buffer.data());
+  }
+#else
+  static_cast<void>(path);
+#endif
+}
+
 std::string cmSystemTools::ConvertToRunCommandPath(const std::string& path)
 {
 #if defined(_WIN32) && !defined(__CYGWIN__)
@@ -1210,7 +1393,7 @@ bool cmSystemTools::UnsetEnv(const char* value)
 {
 #  if !defined(HAVE_UNSETENV)
   std::string var = cmStrCat(value, '=');
-  return cmSystemTools::PutEnv(var.c_str());
+  return cmSystemTools::PutEnv(var);
 #  else
   unsetenv(value);
   return true;
@@ -1289,7 +1472,7 @@ bool cmSystemTools::CreateTar(const std::string& outFileName,
                               const std::vector<std::string>& files,
                               cmTarCompression compressType, bool verbose,
                               std::string const& mtime,
-                              std::string const& format)
+                              std::string const& format, int compressionLevel)
 {
 #if !defined(CMAKE_BOOTSTRAP)
   std::string cwd = cmSystemTools::GetCurrentWorkingDirectory();
@@ -1319,7 +1502,8 @@ bool cmSystemTools::CreateTar(const std::string& outFileName,
       break;
   }
 
-  cmArchiveWrite a(fout, compress, format.empty() ? "paxr" : format);
+  cmArchiveWrite a(fout, compress, format.empty() ? "paxr" : format,
+                   compressionLevel);
 
   a.Open();
   a.SetMTime(mtime);
@@ -1922,6 +2106,7 @@ static std::string cmSystemToolsCMakeCursesCommand;
 static std::string cmSystemToolsCMakeGUICommand;
 static std::string cmSystemToolsCMClDepsCommand;
 static std::string cmSystemToolsCMakeRoot;
+static std::string cmSystemToolsHTMLDoc;
 void cmSystemTools::FindCMakeResources(const char* argv0)
 {
   std::string exe_dir;
@@ -2011,18 +2196,23 @@ void cmSystemTools::FindCMakeResources(const char* argv0)
   // Install tree has
   // - "<prefix><CMAKE_BIN_DIR>/cmake"
   // - "<prefix><CMAKE_DATA_DIR>"
-  if (cmHasSuffix(exe_dir, CMAKE_BIN_DIR)) {
+  // - "<prefix><CMAKE_DOC_DIR>"
+  if (cmHasLiteralSuffix(exe_dir, CMAKE_BIN_DIR)) {
     std::string const prefix =
-      exe_dir.substr(0, exe_dir.size() - strlen(CMAKE_BIN_DIR));
-    cmSystemToolsCMakeRoot = prefix + CMAKE_DATA_DIR;
+      exe_dir.substr(0, exe_dir.size() - cmStrLen(CMAKE_BIN_DIR));
+    cmSystemToolsCMakeRoot = cmStrCat(prefix, CMAKE_DATA_DIR);
+    if (cmSystemTools::FileExists(
+          cmStrCat(prefix, CMAKE_DOC_DIR "/html/index.html"))) {
+      cmSystemToolsHTMLDoc = cmStrCat(prefix, CMAKE_DOC_DIR "/html");
+    }
   }
   if (cmSystemToolsCMakeRoot.empty() ||
       !cmSystemTools::FileExists(
-        (cmSystemToolsCMakeRoot + "/Modules/CMake.cmake"))) {
+        cmStrCat(cmSystemToolsCMakeRoot, "/Modules/CMake.cmake"))) {
     // Build tree has "<build>/bin[/<config>]/cmake" and
     // "<build>/CMakeFiles/CMakeSourceDir.txt".
     std::string dir = cmSystemTools::GetFilenamePath(exe_dir);
-    std::string src_dir_txt = dir + "/CMakeFiles/CMakeSourceDir.txt";
+    std::string src_dir_txt = cmStrCat(dir, "/CMakeFiles/CMakeSourceDir.txt");
     cmsys::ifstream fin(src_dir_txt.c_str());
     std::string src_dir;
     if (fin && cmSystemTools::GetLineFromStream(fin, src_dir) &&
@@ -2030,12 +2220,17 @@ void cmSystemTools::FindCMakeResources(const char* argv0)
       cmSystemToolsCMakeRoot = src_dir;
     } else {
       dir = cmSystemTools::GetFilenamePath(dir);
-      src_dir_txt = dir + "/CMakeFiles/CMakeSourceDir.txt";
+      src_dir_txt = cmStrCat(dir, "/CMakeFiles/CMakeSourceDir.txt");
       cmsys::ifstream fin2(src_dir_txt.c_str());
       if (fin2 && cmSystemTools::GetLineFromStream(fin2, src_dir) &&
           cmSystemTools::FileIsDirectory(src_dir)) {
         cmSystemToolsCMakeRoot = src_dir;
       }
+    }
+    if (!cmSystemToolsCMakeRoot.empty() && cmSystemToolsHTMLDoc.empty() &&
+        cmSystemTools::FileExists(
+          cmStrCat(dir, "/Utilities/Sphinx/html/index.html"))) {
+      cmSystemToolsHTMLDoc = cmStrCat(dir, "/Utilities/Sphinx/html");
     }
   }
 #else
@@ -2079,6 +2274,17 @@ std::string const& cmSystemTools::GetCMakeRoot()
   return cmSystemToolsCMakeRoot;
 }
 
+std::string const& cmSystemTools::GetHTMLDoc()
+{
+  return cmSystemToolsHTMLDoc;
+}
+
+std::string cmSystemTools::GetCurrentWorkingDirectory()
+{
+  return cmSystemTools::CollapseFullPath(
+    cmsys::SystemTools::GetCurrentWorkingDirectory());
+}
+
 void cmSystemTools::MakefileColorEcho(int color, const char* message,
                                       bool newline, bool enabled)
 {
@@ -2115,7 +2321,7 @@ bool cmSystemTools::GuessLibrarySOName(std::string const& fullPath,
 {
 // For ELF shared libraries use a real parser to get the correct
 // soname.
-#if defined(CMAKE_USE_ELF_PARSER)
+#if defined(CMake_USE_ELF_PARSER)
   cmELF elf(fullPath.c_str());
   if (elf) {
     return elf.GetSOName(soname);
@@ -2145,7 +2351,7 @@ bool cmSystemTools::GuessLibrarySOName(std::string const& fullPath,
 bool cmSystemTools::GuessLibraryInstallName(std::string const& fullPath,
                                             std::string& soname)
 {
-#if defined(CMAKE_USE_MACH_PARSER)
+#if defined(CMake_USE_MACH_PARSER)
   cmMachO macho(fullPath.c_str());
   if (macho) {
     return macho.GetInstallName(soname);
@@ -2158,9 +2364,9 @@ bool cmSystemTools::GuessLibraryInstallName(std::string const& fullPath,
   return false;
 }
 
-#if defined(CMAKE_USE_ELF_PARSER)
-std::string::size_type cmSystemToolsFindRPath(std::string const& have,
-                                              std::string const& want)
+#if defined(CMake_USE_ELF_PARSER) || defined(CMake_USE_XCOFF_PARSER)
+std::string::size_type cmSystemToolsFindRPath(cm::string_view const& have,
+                                              cm::string_view const& want)
 {
   std::string::size_type pos = 0;
   while (pos < have.size()) {
@@ -2192,7 +2398,7 @@ std::string::size_type cmSystemToolsFindRPath(std::string const& have,
 }
 #endif
 
-#if defined(CMAKE_USE_ELF_PARSER)
+#if defined(CMake_USE_ELF_PARSER)
 struct cmSystemToolsRPathInfo
 {
   unsigned long Position;
@@ -2202,7 +2408,8 @@ struct cmSystemToolsRPathInfo
 };
 #endif
 
-#if defined(CMAKE_USE_ELF_PARSER)
+// FIXME: Dispatch if multiple formats are supported.
+#if defined(CMake_USE_ELF_PARSER)
 bool cmSystemTools::ChangeRPath(std::string const& file,
                                 std::string const& oldRPath,
                                 std::string const& newRPath,
@@ -2374,6 +2581,75 @@ bool cmSystemTools::ChangeRPath(std::string const& file,
   }
   return true;
 }
+#elif defined(CMake_USE_XCOFF_PARSER)
+bool cmSystemTools::ChangeRPath(std::string const& file,
+                                std::string const& oldRPath,
+                                std::string const& newRPath,
+                                bool removeEnvironmentRPath, std::string* emsg,
+                                bool* changed)
+{
+  if (changed) {
+    *changed = false;
+  }
+
+  bool chg = false;
+  cmXCOFF xcoff(file.c_str(), cmXCOFF::Mode::ReadWrite);
+  if (cm::optional<cm::string_view> maybeLibPath = xcoff.GetLibPath()) {
+    cm::string_view libPath = *maybeLibPath;
+    // Make sure the current rpath contains the old rpath.
+    std::string::size_type pos = cmSystemToolsFindRPath(libPath, oldRPath);
+    if (pos == std::string::npos) {
+      // If it contains the new rpath instead then it is okay.
+      if (cmSystemToolsFindRPath(libPath, newRPath) != std::string::npos) {
+        return true;
+      }
+      if (emsg) {
+        std::ostringstream e;
+        /* clang-format off */
+        e << "The current RPATH is:\n"
+          << "  " << libPath << "\n"
+          << "which does not contain:\n"
+          << "  " << oldRPath << "\n"
+          << "as was expected.";
+        /* clang-format on */
+        *emsg = e.str();
+      }
+      return false;
+    }
+
+    // The prefix is either empty or ends in a ':'.
+    cm::string_view prefix = libPath.substr(0, pos);
+    if (newRPath.empty() && !prefix.empty()) {
+      prefix.remove_suffix(1);
+    }
+
+    // The suffix is either empty or starts in a ':'.
+    cm::string_view suffix = libPath.substr(pos + oldRPath.length());
+
+    // Construct the new value which preserves the part of the path
+    // not being changed.
+    std::string newLibPath;
+    if (!removeEnvironmentRPath) {
+      newLibPath = std::string(prefix);
+    }
+    newLibPath += newRPath;
+    newLibPath += suffix;
+
+    chg = xcoff.SetLibPath(newLibPath);
+  }
+  if (!xcoff) {
+    if (emsg) {
+      *emsg = xcoff.GetErrorMessage();
+    }
+    return false;
+  }
+
+  // Everything was updated successfully.
+  if (changed) {
+    *changed = chg;
+  }
+  return true;
+}
 #else
 bool cmSystemTools::ChangeRPath(std::string const& /*file*/,
                                 std::string const& /*oldRPath*/,
@@ -2518,7 +2794,8 @@ int cmSystemTools::strverscmp(std::string const& lhs, std::string const& rhs)
   return cm_strverscmp(lhs.c_str(), rhs.c_str());
 }
 
-#if defined(CMAKE_USE_ELF_PARSER)
+// FIXME: Dispatch if multiple formats are supported.
+#if defined(CMake_USE_ELF_PARSER)
 bool cmSystemTools::RemoveRPath(std::string const& file, std::string* emsg,
                                 bool* removed)
 {
@@ -2659,6 +2936,28 @@ bool cmSystemTools::RemoveRPath(std::string const& file, std::string* emsg,
   }
   return true;
 }
+#elif defined(CMake_USE_XCOFF_PARSER)
+bool cmSystemTools::RemoveRPath(std::string const& file, std::string* emsg,
+                                bool* removed)
+{
+  if (removed) {
+    *removed = false;
+  }
+
+  cmXCOFF xcoff(file.c_str(), cmXCOFF::Mode::ReadWrite);
+  bool rm = xcoff.RemoveLibPath();
+  if (!xcoff) {
+    if (emsg) {
+      *emsg = xcoff.GetErrorMessage();
+    }
+    return false;
+  }
+
+  if (removed) {
+    *removed = rm;
+  }
+  return true;
+}
 #else
 bool cmSystemTools::RemoveRPath(std::string const& /*file*/,
                                 std::string* /*emsg*/, bool* /*removed*/)
@@ -2667,10 +2966,11 @@ bool cmSystemTools::RemoveRPath(std::string const& /*file*/,
 }
 #endif
 
+// FIXME: Dispatch if multiple formats are supported.
 bool cmSystemTools::CheckRPath(std::string const& file,
                                std::string const& newRPath)
 {
-#if defined(CMAKE_USE_ELF_PARSER)
+#if defined(CMake_USE_ELF_PARSER)
   // Parse the ELF binary.
   cmELF elf(file.c_str());
 
@@ -2688,6 +2988,15 @@ bool cmSystemTools::CheckRPath(std::string const& file,
   } else {
     if (se &&
         cmSystemToolsFindRPath(se->Value, newRPath) != std::string::npos) {
+      return true;
+    }
+  }
+  return false;
+#elif defined(CMake_USE_XCOFF_PARSER)
+  // Parse the XCOFF binary.
+  cmXCOFF xcoff(file.c_str());
+  if (cm::optional<cm::string_view> libPath = xcoff.GetLibPath()) {
+    if (cmSystemToolsFindRPath(*libPath, newRPath) != std::string::npos) {
       return true;
     }
   }

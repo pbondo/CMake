@@ -42,14 +42,15 @@ can be invoked through any of
   foo()
   Foo()
   FOO()
-  cmake_command(INVOKE foo)
+  cmake_language(CALL foo)
 
 and so on. However, it is strongly recommended to stay with the
 case chosen in the macro definition.  Typically macros use
 all-lowercase names.
 
-The :command:`cmake_command(INVOKE ...)` command can also be used to invoke the
-macro.
+.. versionadded:: 3.18
+  The :command:`cmake_language(CALL ...)` command can also be used to
+  invoke the macro.
 
 Arguments
 ^^^^^^^^^

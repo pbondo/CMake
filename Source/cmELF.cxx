@@ -3,6 +3,7 @@
 #include "cmELF.h"
 
 #include <cstddef>
+#include <cstdint>
 #include <map>
 #include <memory>
 #include <sstream>
@@ -12,14 +13,13 @@
 #include <cm/memory>
 #include <cmext/algorithm>
 
-#include "cmsys/FStream.hxx"
+#include <cm3p/kwiml/abi.h>
 
-#include "cm_kwiml.h"
+#include "cmsys/FStream.hxx"
 
 // Include the ELF format information system header.
 #if defined(__OpenBSD__)
 #  include <elf_abi.h>
-#  include <stdint.h>
 #elif defined(__HAIKU__)
 #  include <elf32.h>
 #  include <elf64.h>
@@ -379,7 +379,7 @@ private:
 
     // Fix the byte order of the header.
     if (this->NeedSwap) {
-      ByteSwap(x);
+      this->ByteSwap(x);
     }
     return true;
   }
@@ -387,7 +387,7 @@ private:
   {
     if (this->Stream->read(reinterpret_cast<char*>(&x), sizeof(x)) &&
         this->NeedSwap) {
-      ByteSwap(x);
+      this->ByteSwap(x);
     }
     return !this->Stream->fail();
   }
@@ -395,7 +395,7 @@ private:
   {
     if (this->Stream->read(reinterpret_cast<char*>(&x), sizeof(x)) &&
         this->NeedSwap) {
-      ByteSwap(x);
+      this->ByteSwap(x);
     }
     return !this->Stream->fail();
   }
@@ -573,7 +573,7 @@ std::vector<char> cmELFInternalImpl<Types>::EncodeDynamicEntries(
     dyn.d_un.d_val = static_cast<tagtype>(entry.second);
 
     if (this->NeedSwap) {
-      ByteSwap(dyn);
+      this->ByteSwap(dyn);
     }
 
     char* pdyn = reinterpret_cast<char*>(&dyn);

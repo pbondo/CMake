@@ -17,6 +17,7 @@
 #include "cmCursesStandardIncludes.h"
 #include "cmCursesStringWidget.h"
 #include "cmCursesWidget.h"
+#include "cmProperty.h"
 #include "cmState.h"
 #include "cmStateTypes.h"
 #include "cmStringAlgorithms.h"
@@ -404,7 +405,7 @@ void cmCursesMainForm::UpdateStatusBar(cm::optional<std::string> message)
 
     // Get the help string of the current entry
     // and add it to the help string
-    auto cmakeState = this->CMakeInstance->GetState();
+    auto* cmakeState = this->CMakeInstance->GetState();
     cmProp existingValue = cmakeState->GetCacheEntryValue(labelValue);
     if (existingValue) {
       cmProp help =
@@ -853,11 +854,7 @@ void cmCursesMainForm::HandleInput()
       }
       // switch advanced on/off
       else if (key == 't') {
-        if (this->AdvancedMode) {
-          this->AdvancedMode = false;
-        } else {
-          this->AdvancedMode = true;
-        }
+        this->AdvancedMode = !this->AdvancedMode;
         getmaxyx(stdscr, y, x);
         this->RePost();
         this->Render(1, 1, x, y);
@@ -1003,7 +1000,7 @@ void cmCursesMainForm::DisplayOutputs(std::string const& newOutput)
   getmaxyx(stdscr, yi, xi);
 
   if (CurrentForm != this->LogForm.get()) {
-    auto newLogForm = new cmCursesLongMessageForm(
+    auto* newLogForm = new cmCursesLongMessageForm(
       this->Outputs, this->LastProgress.c_str(),
       cmCursesLongMessageForm::ScrollBehavior::ScrollDown);
     CurrentForm = newLogForm;

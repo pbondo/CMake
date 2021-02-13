@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmInstallGenerator_h
-#define cmInstallGenerator_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
@@ -10,6 +9,7 @@
 #include <vector>
 
 #include "cmInstallType.h"
+#include "cmListFileCache.h"
 #include "cmScriptGenerator.h"
 
 class cmLocalGenerator;
@@ -33,7 +33,7 @@ public:
   cmInstallGenerator(std::string destination,
                      std::vector<std::string> const& configurations,
                      std::string component, MessageLevel message,
-                     bool exclude_from_all);
+                     bool exclude_from_all, cmListFileBacktrace backtrace);
   ~cmInstallGenerator() override;
 
   cmInstallGenerator(cmInstallGenerator const&) = delete;
@@ -62,6 +62,12 @@ public:
 
   virtual bool Compute(cmLocalGenerator*) { return true; }
 
+  std::string const& GetComponent() const { return this->Component; }
+
+  bool GetExcludeFromAll() const { return this->ExcludeFromAll; }
+
+  cmListFileBacktrace const& GetBacktrace() const { return this->Backtrace; }
+
 protected:
   void GenerateScript(std::ostream& os) override;
 
@@ -73,6 +79,5 @@ protected:
   std::string const Component;
   MessageLevel const Message;
   bool const ExcludeFromAll;
+  cmListFileBacktrace const Backtrace;
 };
-
-#endif

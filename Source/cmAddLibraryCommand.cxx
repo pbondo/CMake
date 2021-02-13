@@ -2,13 +2,12 @@
    file Copyright.txt or https://cmake.org/licensing for details.  */
 #include "cmAddLibraryCommand.h"
 
-#include <cmext/algorithm>
-
 #include "cmExecutionStatus.h"
 #include "cmGeneratorExpression.h"
 #include "cmGlobalGenerator.h"
 #include "cmMakefile.h"
 #include "cmMessageType.h"
+#include "cmPolicies.h"
 #include "cmState.h"
 #include "cmStateTypes.h"
 #include "cmStringAlgorithms.h"
@@ -110,20 +109,10 @@ bool cmAddLibraryCommand(std::vector<std::string> const& args,
           "INTERFACE library specified with conflicting ALIAS type.");
         return false;
       }
-      if (excludeFromAll) {
-        status.SetError(
-          "INTERFACE library may not be used with EXCLUDE_FROM_ALL.");
-        return false;
-      }
       ++s;
       type = cmStateEnums::INTERFACE_LIBRARY;
       haveSpecifiedType = true;
     } else if (*s == "EXCLUDE_FROM_ALL") {
-      if (type == cmStateEnums::INTERFACE_LIBRARY) {
-        status.SetError(
-          "INTERFACE library may not be used with EXCLUDE_FROM_ALL.");
-        return false;
-      }
       ++s;
       excludeFromAll = true;
     } else if (*s == "IMPORTED") {
@@ -142,10 +131,6 @@ bool cmAddLibraryCommand(std::vector<std::string> const& args,
   }
 
   if (type == cmStateEnums::INTERFACE_LIBRARY) {
-    if (s != args.end()) {
-      status.SetError("INTERFACE library requires no source arguments.");
-      return false;
-    }
     if (importGlobal && !importTarget) {
       status.SetError(
         "INTERFACE library specified as GLOBAL, but not as IMPORTED.");
@@ -181,6 +166,16 @@ bool cmAddLibraryCommand(std::vector<std::string> const& args,
       return false;
     }
 
+    if (mf.GetPolicyStatus(cmPolicies::CMP0107) == cmPolicies::NEW) {
+      // Make sure the target does not already exist.
+      if (mf.FindTargetToUse(libName)) {
+        status.SetError(cmStrCat(
+          "cannot create ALIAS target \"", libName,
+          "\" because another target with the same name already exists."));
+        return false;
+      }
+    }
+
     std::string const& aliasedName = *s;
     if (mf.IsAlias(aliasedName)) {
       status.SetError(cmStrCat("cannot create ALIAS target \"", libName,
@@ -208,14 +203,9 @@ bool cmAddLibraryCommand(std::vector<std::string> const& args,
                                "\" is not a library."));
       return false;
     }
-    if (aliasedTarget->IsImported() &&
-        !aliasedTarget->IsImportedGloballyVisible()) {
-      status.SetError(cmStrCat("cannot create ALIAS target \"", libName,
-                               "\" because target \"", aliasedName,
-                               "\" is imported but not globally visible."));
-      return false;
-    }
-    mf.AddAlias(libName, aliasedName);
+    mf.AddAlias(libName, aliasedName,
+                !aliasedTarget->IsImported() ||
+                  aliasedTarget->IsImportedGloballyVisible());
     return true;
   }
 
@@ -247,16 +237,6 @@ bool cmAddLibraryCommand(std::vector<std::string> const& args,
     if (!haveSpecifiedType) {
       status.SetError("called with IMPORTED argument but no library type.");
       return false;
-    }
-    if (type == cmStateEnums::OBJECT_LIBRARY) {
-      std::string reason;
-      if (!mf.GetGlobalGenerator()->HasKnownObjectFileLocation(&reason)) {
-        mf.IssueMessage(
-          MessageType::FATAL_ERROR,
-          "The OBJECT library type may not be used for IMPORTED libraries" +
-            reason + ".");
-        return true;
-      }
     }
     if (type == cmStateEnums::INTERFACE_LIBRARY) {
       if (!cmGeneratorExpression::IsValidTargetName(libName)) {
@@ -296,8 +276,6 @@ bool cmAddLibraryCommand(std::vector<std::string> const& args,
     }
   }
 
-  std::vector<std::string> srclists;
-
   if (type == cmStateEnums::INTERFACE_LIBRARY) {
     if (!cmGeneratorExpression::IsValidTargetName(libName) ||
         libName.find("::") != std::string::npos) {
@@ -305,14 +283,10 @@ bool cmAddLibraryCommand(std::vector<std::string> const& args,
         cmStrCat("Invalid name for INTERFACE library target: ", libName));
       return false;
     }
-
-    mf.AddLibrary(libName, type, srclists, excludeFromAll);
-    return true;
   }
 
-  cm::append(srclists, s, args.end());
-
-  mf.AddLibrary(libName, type, srclists, excludeFromAll);
+  std::vector<std::string> srcs(s, args.end());
+  mf.AddLibrary(libName, type, srcs, excludeFromAll);
 
   return true;
 }

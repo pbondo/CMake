@@ -3,6 +3,8 @@ cmake_minimum_required(VERSION 3.1)
 include(RunCMake)
 
 run_cmake_command(NoArgs ${CMAKE_COMMAND})
+run_cmake_command(InvalidArg1 ${CMAKE_COMMAND} -invalid)
+run_cmake_command(InvalidArg2 ${CMAKE_COMMAND} --invalid)
 run_cmake_command(Wizard ${CMAKE_COMMAND} -i)
 run_cmake_command(C-no-arg ${CMAKE_COMMAND} -B DummyBuildDir -C)
 run_cmake_command(C-no-file ${CMAKE_COMMAND} -B DummyBuildDir -C nosuchcachefile.txt)
@@ -22,10 +24,10 @@ run_cmake_command(E_compare_files-different-eol ${CMAKE_COMMAND} -E compare_file
 run_cmake_command(E_compare_files-ignore-eol-same ${CMAKE_COMMAND} -E compare_files --ignore-eol ${RunCMake_SOURCE_DIR}/compare_files/lf ${RunCMake_SOURCE_DIR}/compare_files/crlf)
 run_cmake_command(E_compare_files-ignore-eol-empty ${CMAKE_COMMAND} -E compare_files --ignore-eol ${RunCMake_SOURCE_DIR}/compare_files/empty1 ${RunCMake_SOURCE_DIR}/compare_files/empty2)
 run_cmake_command(E_compare_files-ignore-eol-nonexistent ${CMAKE_COMMAND} -E compare_files --ignore-eol nonexistent_a nonexistent_b)
+run_cmake_command(E_compare_files-invalid-arguments ${CMAKE_COMMAND} -E compare_files file1.txt file2.txt file3.txt)
 run_cmake_command(E_echo_append ${CMAKE_COMMAND} -E echo_append)
 run_cmake_command(E_rename-no-arg ${CMAKE_COMMAND} -E rename)
-run_cmake_command(E_server-arg ${CMAKE_COMMAND} -E server --extra-arg)
-run_cmake_command(E_server-pipe ${CMAKE_COMMAND} -E server --pipe=)
+run_cmake_command(E_server ${CMAKE_COMMAND} -E server)
 run_cmake_command(E_true ${CMAKE_COMMAND} -E true)
 run_cmake_command(E_true-extraargs ${CMAKE_COMMAND} -E true ignored)
 run_cmake_command(E_false ${CMAKE_COMMAND} -E false)
@@ -46,6 +48,7 @@ run_cmake_command(G_no-arg ${CMAKE_COMMAND} -B DummyBuildDir -G)
 run_cmake_command(G_bad-arg ${CMAKE_COMMAND} -B DummyBuildDir -G NoSuchGenerator)
 run_cmake_command(P_no-arg ${CMAKE_COMMAND} -P)
 run_cmake_command(P_no-file ${CMAKE_COMMAND} -P nosuchscriptfile.cmake)
+run_cmake_command(P_arbitrary_args ${CMAKE_COMMAND} -P "${RunCMake_SOURCE_DIR}/P_arbitrary_args.cmake" -- -DFOO)
 
 run_cmake_command(build-no-dir
   ${CMAKE_COMMAND} --build)
@@ -65,6 +68,32 @@ run_cmake_command(install-bad-dir
 run_cmake_command(install-options-to-vars
   ${CMAKE_COMMAND} --install ${RunCMake_SOURCE_DIR}/dir-install-options-to-vars
   --strip --prefix /var/test --config sample --component pack)
+run_cmake_command(install-default-dir-permissions-all
+  ${CMAKE_COMMAND} --install ${RunCMake_SOURCE_DIR}/dir-permissions-install-options-to-vars
+  --default-directory-permissions u=rwx,g=rx,o=rx)
+run_cmake_command(install-default-dir-permissions-afew
+  ${CMAKE_COMMAND} --install ${RunCMake_SOURCE_DIR}/dir-permissions-install-options-to-vars
+  --default-directory-permissions u=rwx,g=rx)
+run_cmake_command(install-default-dir-permissions-none
+  ${CMAKE_COMMAND} --install ${RunCMake_SOURCE_DIR}/dir-permissions-install-options-to-vars)
+run_cmake_command(install-default-dir-permissions-invalid-comma1
+  ${CMAKE_COMMAND} --install ${RunCMake_SOURCE_DIR}/dir-permissions-install-options-to-vars
+  --default-directory-permissions u=rwxg=,x)
+run_cmake_command(install-default-dir-permissions-invalid-comma2
+  ${CMAKE_COMMAND} --install ${RunCMake_SOURCE_DIR}/dir-permissions-install-options-to-vars
+  --default-directory-permissions u=rwxg,=x)
+run_cmake_command(install-default-dir-permissions-comma-at-the-end
+  ${CMAKE_COMMAND} --install ${RunCMake_SOURCE_DIR}/dir-permissions-install-options-to-vars
+  --default-directory-permissions u=rwx,)
+run_cmake_command(install-default-dir-permissions-invalid-assignment
+  ${CMAKE_COMMAND} --install ${RunCMake_SOURCE_DIR}/dir-permissions-install-options-to-vars
+  --default-directory-permissions u=rwx,=x)
+run_cmake_command(install-default-dir-permissions-assignment-at-the-end
+  ${CMAKE_COMMAND} --install ${RunCMake_SOURCE_DIR}/dir-permissions-install-options-to-vars
+  --default-directory-permissions u=rwx,g=)
+run_cmake_command(install-default-dir-permissions-assignment-at-the-beginning
+  ${CMAKE_COMMAND} --install ${RunCMake_SOURCE_DIR}/dir-permissions-install-options-to-vars
+  --default-directory-permissions =u=rwx,g=rx)
 
 run_cmake_command(cache-bad-entry
   ${CMAKE_COMMAND} --build ${RunCMake_SOURCE_DIR}/cache-bad-entry/)
@@ -133,6 +162,8 @@ function(run_BuildDir)
     ${CMAKE_COMMAND} --build BuildDir-build --target CustomTarget)
   run_cmake_command(BuildDir--build-multiple-targets ${CMAKE_COMMAND} -E chdir ..
     ${CMAKE_COMMAND} --build BuildDir-build -t CustomTarget2 --target CustomTarget3)
+  run_cmake_command(BuildDir--build-multiple-targets-fail ${CMAKE_COMMAND} -E chdir ..
+    ${CMAKE_COMMAND} --build BuildDir-build -t CustomTargetFail --target CustomTarget3)
   run_cmake_command(BuildDir--build-multiple-targets-jobs ${CMAKE_COMMAND} -E chdir ..
     ${CMAKE_COMMAND} --build BuildDir-build --target CustomTarget CustomTarget2 -j2 --target CustomTarget3)
   run_cmake_command(BuildDir--build-multiple-targets-with-clean-first ${CMAKE_COMMAND} -E chdir ..
@@ -172,8 +203,8 @@ function(run_BuildDir)
   run_cmake_command(BuildDir--build--parallel-large ${CMAKE_COMMAND} -E chdir ..
     ${CMAKE_COMMAND} --build BuildDir-build --parallel 4294967293)
 
-  # No default jobs for Xcode and FreeBSD build command
-  if(NOT RunCMake_GENERATOR MATCHES "Xcode" AND NOT CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
+  # No default jobs for FreeBSD build command
+  if(NOT CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
     run_cmake_command(BuildDir--build-jobs-no-number ${CMAKE_COMMAND} -E chdir ..
       ${CMAKE_COMMAND} --build BuildDir-build -j)
     run_cmake_command(BuildDir--build-jobs-no-number-trailing--target ${CMAKE_COMMAND} -E chdir ..
@@ -317,6 +348,42 @@ unset(RunCMake_DEFAULT_stderr)
 run_cmake_command(E_create_symlink-no-replace-dir
   ${CMAKE_COMMAND} -E create_symlink T .
   )
+
+#create hard link tests
+run_cmake_command(E_create_hardlink-no-arg
+  ${CMAKE_COMMAND} -E create_hardlink
+  )
+
+set(dir ${RunCMake_BINARY_DIR}/hardlink_tests)
+file(REMOVE_RECURSE "${dir}")
+file(MAKE_DIRECTORY ${dir})
+
+run_cmake_command(E_create_hardlink-non-existent-source
+  ${CMAKE_COMMAND} -E create_hardlink ${dir}/I_dont_exist ${dir}/link
+  )
+
+file(TOUCH ${dir}/1)
+
+run_cmake_command(E_create_hardlink-ok
+  ${CMAKE_COMMAND} -E create_hardlink ${dir}/1 ${dir}/1-link
+  )
+
+run_cmake_command(E_create_hardlink-no-directory
+  ${CMAKE_COMMAND} -E create_hardlink ${dir}/1 ${dir}/a/1-link
+  )
+
+#On Windows, if the user does not have sufficient privileges
+#don't fail this test
+set(RunCMake_DEFAULT_stderr "(operation not permitted)?")
+run_cmake_command(E_create_hardlink-unresolved-symlink-prereq
+  ${CMAKE_COMMAND} -E create_symlink ${dir}/1 ${dir}/1-symlink
+  )
+file(REMOVE ${dir}/1)
+
+run_cmake_command(E_create_hardlink-unresolved-symlink
+  ${CMAKE_COMMAND} -E create_hardlink ${dir}/1-symlink ${dir}/1s-link
+  )
+unset(RunCMake_DEFAULT_stderr)
 
 set(in ${RunCMake_SOURCE_DIR}/copy_input)
 set(out ${RunCMake_BINARY_DIR}/copy_output)
@@ -497,6 +564,9 @@ run_cmake_command(E_cat_good_cat
   ${CMAKE_COMMAND} -E cat "${out}/first_file.txt" "${out}/second_file.txt" "${out}/unicode_file.txt")
 unset(out)
 
+run_cmake_command(E_cat_good_binary_cat
+  ${CMAKE_COMMAND} -E cat "${RunCMake_SOURCE_DIR}/E_cat_binary_files/binary.obj" "${RunCMake_SOURCE_DIR}/E_cat_binary_files/binary.obj")
+
 run_cmake_command(E_env-no-command0 ${CMAKE_COMMAND} -E env)
 run_cmake_command(E_env-no-command1 ${CMAKE_COMMAND} -E env TEST_ENV=1)
 run_cmake_command(E_env-bad-arg1 ${CMAKE_COMMAND} -E env -bad-arg1)
@@ -600,6 +670,10 @@ run_cmake(Werror_deprecated)
 unset(RunCMake_TEST_OPTIONS)
 
 set(RunCMake_TEST_OPTIONS -Wno-error=deprecated)
+run_cmake(Wno-error_deprecated)
+unset(RunCMake_TEST_OPTIONS)
+
+set(RunCMake_TEST_OPTIONS -Werror=deprecated -Wno-error=deprecated)
 run_cmake(Wno-error_deprecated)
 unset(RunCMake_TEST_OPTIONS)
 
@@ -713,15 +787,15 @@ function(run_llvm_rc)
   file(MAKE_DIRECTORY "${RunCMake_TEST_BINARY_DIR}")
   run_cmake_command(llvm_rc_no_args ${CMAKE_COMMAND} -E cmake_llvm_rc)
   run_cmake_command(llvm_rc_no_-- ${CMAKE_COMMAND} -E cmake_llvm_rc ${RunCMake_TEST_BINARY_DIR}/source_file test.tmp ${CMAKE_COMMAND} -E echo "This is a test")
-  run_cmake_command(llvm_rc_empty_preprocessor ${CMAKE_COMMAND} -E cmake_llvm_rc ${RunCMake_TEST_BINARY_DIR}/source_file test.tmp -- ${CMAKE_COMMAND} -E echo "This is a test")
-  run_cmake_command(llvm_rc_failing_first_command ${CMAKE_COMMAND} -E cmake_llvm_rc ${RunCMake_TEST_BINARY_DIR}/source_file test.tmp ${CMAKE_COMMAND} -P FailedProgram.cmake -- ${CMAKE_COMMAND} -E echo "This is a test")
-  run_cmake_command(llvm_rc_failing_second_command ${CMAKE_COMMAND} -E cmake_llvm_rc ${RunCMake_TEST_BINARY_DIR}/source_file test.tmp ${CMAKE_COMMAND} -E echo "This is a test" -- ${CMAKE_COMMAND} -P FailedProgram.cmake )
+  run_cmake_command(llvm_rc_empty_preprocessor ${CMAKE_COMMAND} -E cmake_llvm_rc ${RunCMake_TEST_BINARY_DIR}/source_file test.tmp ++ ${CMAKE_COMMAND} -E echo "This is a test")
+  run_cmake_command(llvm_rc_failing_first_command ${CMAKE_COMMAND} -E cmake_llvm_rc ${RunCMake_TEST_BINARY_DIR}/source_file test.tmp ${CMAKE_COMMAND} -P FailedProgram.cmake ++ ${CMAKE_COMMAND} -E echo "This is a test")
+  run_cmake_command(llvm_rc_failing_second_command ${CMAKE_COMMAND} -E cmake_llvm_rc ${RunCMake_TEST_BINARY_DIR}/source_file test.tmp ${CMAKE_COMMAND} -E echo "This is a test" ++ ${CMAKE_COMMAND} -P FailedProgram.cmake )
   if(EXISTS ${RunCMake_TEST_BINARY_DIR}/test.tmp)
       message(SEND_ERROR "${test} - FAILED:\n"
         "test.tmp was not deleted")
   endif()
   file(MAKE_DIRECTORY "${RunCMake_TEST_BINARY_DIR}/ExpandSourceDir")
-  run_cmake_command(llvm_rc_full_run ${CMAKE_COMMAND} -E cmake_llvm_rc ${RunCMake_TEST_BINARY_DIR}/ExpandSourceDir/source_file test.tmp ${CMAKE_COMMAND} -E echo "This is a test" -- ${CMAKE_COMMAND} -E copy test.tmp SOURCE_DIR/llvmrc.result )
+  run_cmake_command(llvm_rc_full_run ${CMAKE_COMMAND} -E cmake_llvm_rc ${RunCMake_TEST_BINARY_DIR}/ExpandSourceDir/source_file test.tmp ${CMAKE_COMMAND} -E echo "This is a test" ++ ${LLVM_RC} -bad /FO SOURCE_DIR/llvmrc.result test.tmp )
   if(EXISTS ${RunCMake_TEST_BINARY_DIR}/ExpandSourceDir/test.tmp)
       message(SEND_ERROR "${test} - FAILED:\n"
         "test.tmp was not deleted")

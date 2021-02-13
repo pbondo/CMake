@@ -3,7 +3,7 @@
 
 if(NOT CMake_SOURCE_DIR)
   set(CMakeHelp_STANDALONE 1)
-  cmake_minimum_required(VERSION 3.1...3.15 FATAL_ERROR)
+  cmake_minimum_required(VERSION 3.1...3.19 FATAL_ERROR)
   get_filename_component(tmp "${CMAKE_CURRENT_SOURCE_DIR}" PATH)
   get_filename_component(CMake_SOURCE_DIR "${tmp}" PATH)
   include(${CMake_SOURCE_DIR}/Modules/CTestUseLaunchers.cmake)
@@ -89,7 +89,7 @@ if(SPHINX_QTHELP)
   find_package(PythonInterp REQUIRED)
 
   find_program(QCOLLECTIONGENERATOR_EXECUTABLE
-    NAMES qcollectiongenerator
+    NAMES qcollectiongenerator-qt5 qcollectiongenerator
     DOC "qcollectiongenerator tool"
     )
   if (NOT QCOLLECTIONGENERATOR_EXECUTABLE)

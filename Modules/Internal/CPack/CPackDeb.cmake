@@ -83,6 +83,16 @@ function(cpack_deb_format_package_description TEXT OUTPUT_VAR)
   string(REPLACE "\n" ";" _lines "${_text}")
   list(POP_FRONT _lines _summary)
 
+  # If the description ends with a newline (e.g. typically if it was read
+  # from a file) the last line will be empty. We drop it here, otherwise
+  # it would be replaced by a `.` which would lead to the package violating
+  # the extended-description-contains-empty-paragraph debian policy
+  list(POP_BACK _lines _last_line)
+  string(STRIP "${_last_line}" _last_line_strip)
+  if(_last_line_strip)
+    list(APPEND _lines "${_last_line_strip}")
+  endif()
+
   # Check if reformatting required
   cpack_deb_check_description("${_summary}" "${_lines}" _result)
   if(_result)
@@ -300,10 +310,23 @@ function(cpack_deb_prepare_package_vars)
           set(IGNORE_MISSING_INFO_FLAG "--ignore-missing-info")
         endif()
 
+        if(CPACK_DEBIAN_PACKAGE_SHLIBDEPS_PRIVATE_DIRS)
+          unset(PRIVATE_SEARCH_DIR_OPTIONS)
+          # Add -l option if the tool supports it
+          if(DEFINED SHLIBDEPS_EXECUTABLE_VERSION AND SHLIBDEPS_EXECUTABLE_VERSION VERSION_GREATER_EQUAL 1.17.0)
+            foreach(dir IN LISTS CPACK_DEBIAN_PACKAGE_SHLIBDEPS_PRIVATE_DIRS)
+              list(APPEND PRIVATE_SEARCH_DIR_OPTIONS "-l${dir}")
+            endforeach()
+          else()
+            message(WARNING "CPackDeb: dkpg-shlibdeps is too old. \"CPACK_DEBIAN_PACKAGE_SHLIBDEPS_PRIVATE_DIRS\" is therefore ignored.")
+          endif()
+        endif()
+
         # Execute dpkg-shlibdeps
         # --ignore-missing-info : allow dpkg-shlibdeps to run even if some libs do not belong to a package
+        # -l<dir>: make dpkg-shlibdeps also search in this directory for (private) shared library dependencies
         # -O : print to STDOUT
-        execute_process(COMMAND ${SHLIBDEPS_EXECUTABLE} ${IGNORE_MISSING_INFO_FLAG} -O ${CPACK_DEB_BINARY_FILES}
+        execute_process(COMMAND ${SHLIBDEPS_EXECUTABLE} ${PRIVATE_SEARCH_DIR_OPTIONS} ${IGNORE_MISSING_INFO_FLAG} -O ${CPACK_DEB_BINARY_FILES}
           WORKING_DIRECTORY "${CPACK_TEMPORARY_DIRECTORY}"
           OUTPUT_VARIABLE SHLIBDEPS_OUTPUT
           RESULT_VARIABLE SHLIBDEPS_RESULT
@@ -315,7 +338,7 @@ function(cpack_deb_prepare_package_vars)
         endif()
         if(NOT SHLIBDEPS_RESULT EQUAL 0)
           message(FATAL_ERROR "CPackDeb: dpkg-shlibdeps: '${SHLIBDEPS_ERROR}';\n"
-              "executed command: '${SHLIBDEPS_EXECUTABLE} ${IGNORE_MISSING_INFO_FLAG} -O ${CPACK_DEB_BINARY_FILES}';\n"
+              "executed command: '${SHLIBDEPS_EXECUTABLE} ${PRIVATE_SEARCH_DIR_OPTIONS} ${IGNORE_MISSING_INFO_FLAG} -O ${CPACK_DEB_BINARY_FILES}';\n"
               "found files: '${INSTALL_FILE_}';\n"
               "files info: '${CPACK_DEB_INSTALL_FILES}';\n"
               "binary files: '${CPACK_DEB_BINARY_FILES}'")
@@ -537,8 +560,8 @@ function(cpack_deb_prepare_package_vars)
       message(FATAL_ERROR _description_failure_message)
     endif()
 
-  # Ok, description has set. According to the `Debian Policy Manual`_ the frist
-  # line is a pacakge summary.  Try to get it as well...
+  # Ok, description has set. According to the `Debian Policy Manual`_ the first
+  # line is a package summary.  Try to get it as well...
   # See also: https://www.debian.org/doc/debian-policy/ch-controlfields.html#description
   elseif(CPACK_PACKAGE_DESCRIPTION_SUMMARY AND
          NOT CPACK_PACKAGE_DESCRIPTION_SUMMARY STREQUAL CPACK_DEFAULT_PACKAGE_DESCRIPTION_SUMMARY)
@@ -758,6 +781,10 @@ function(cpack_deb_prepare_package_vars)
     set(GEN_CPACK_DBGSYM_OUTPUT_FILE_NAME "${CPACK_DBGSYM_OUTPUT_FILE_NAME}" PARENT_SCOPE)
     list(JOIN BUILD_IDS " " BUILD_IDS)
     set(GEN_BUILD_IDS "${BUILD_IDS}" PARENT_SCOPE)
+  else()
+    unset(GEN_DBGSYMDIR PARENT_SCOPE)
+    unset(GEN_CPACK_DBGSYM_OUTPUT_FILE_NAME PARENT_SCOPE)
+    unset(GEN_BUILD_IDS PARENT_SCOPE)
   endif()
 endfunction()
 

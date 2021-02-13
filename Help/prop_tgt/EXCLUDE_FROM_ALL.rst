@@ -13,9 +13,16 @@ included in the "all" target of its ancestor directories unless the
 
 With ``EXCLUDE_FROM_ALL`` set to false or not set at all, the target
 will be brought up to date as part of doing a ``make install`` or its
-equivalent for the CMake generator being used.  If a target has
-``EXCLUDE_FROM_ALL`` set to true, then any attempt to install that
-target has undefined behavior.  Note that such a target can still safely
-be listed in an :command:`install(TARGETS)` command as long as the install
-components the target belongs to are not part of the set of components
-that anything tries to install.
+equivalent for the CMake generator being used.
+
+If a target has ``EXCLUDE_FROM_ALL`` set to true, it may still be listed
+in an :command:`install(TARGETS)` command, but the user is responsible for
+ensuring that the target's build artifacts are not missing or outdated when
+an install is performed.
+
+This property may use "generator expressions" with the syntax ``$<...>``. See
+the :manual:`cmake-generator-expressions(7)` manual for available expressions.
+
+Only the "Ninja Multi-Config" generator supports a property value that varies by
+configuration.  For all other generators the value of this property must be the
+same for all configurations.

@@ -1,4 +1,27 @@
+/***************************************************************************
+ *                                  _   _ ____  _
+ *  Project                     ___| | | |  _ \| |
+ *                             / __| | | | |_) | |
+ *                            | (__| |_| |  _ <| |___
+ *                             \___|\___/|_| \_\_____|
+ *
+ * Copyright (C) 1998 - 2021, Daniel Stenberg, <daniel@haxx.se>, et al.
+ *
+ * This software is licensed as described in the file COPYING, which
+ * you should have received as part of this distribution. The terms
+ * are also available at https://curl.se/docs/copyright.html.
+ *
+ * You may opt to use, copy, modify, merge, publish, distribute and/or sell
+ * copies of the Software, and permit persons to whom the Software is
+ * furnished to do so, under the terms of the COPYING file.
+ *
+ * This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
+ * KIND, either express or implied.
+ *
+ ***************************************************************************/
 /* lib/curl_config.h.in.  Generated somehow by cmake.  */
+
+#include <cm3p/kwiml/abi.h>
 
 /* when building libcurl itself */
 #cmakedefine BUILDING_LIBCURL 1
@@ -32,6 +55,9 @@
 
 /* to disable LDAPS */
 #cmakedefine CURL_DISABLE_LDAPS 1
+
+/* to disable MQTT */
+#cmakedefine CURL_DISABLE_MQTT 1
 
 /* to disable POP3 */
 #cmakedefine CURL_DISABLE_POP3 1
@@ -135,9 +161,6 @@
 
 /* Define to 1 if you have the <crypto.h> header file. */
 #cmakedefine HAVE_CRYPTO_H 1
-
-/* Define to 1 if you have the <des.h> header file. */
-#cmakedefine HAVE_DES_H 1
 
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #cmakedefine HAVE_DLFCN_H 1
@@ -365,8 +388,11 @@
 /* Define to 1 if you have the <libgen.h> header file. */
 #cmakedefine HAVE_LIBGEN_H 1
 
-/* Define to 1 if you have the `idn' library (-lidn). */
-#cmakedefine HAVE_LIBIDN 1
+/* Define to 1 if you have the `idn2' library (-lidn2). */
+#cmakedefine HAVE_LIBIDN2 1
+
+/* Define to 1 if you have the idn2.h header file. */
+#cmakedefine HAVE_IDN2_H 1
 
 /* Define to 1 if you have the `resolv' library (-lresolv). */
 #cmakedefine HAVE_LIBRESOLV 1
@@ -398,14 +424,17 @@
 /* Define to 1 if you have the <libssh2.h> header file. */
 #cmakedefine HAVE_LIBSSH2_H 1
 
+/* Define to 1 if you have the <libssh/libssh.h> header file. */
+#cmakedefine HAVE_LIBSSH_LIBSSH_H 1
+
 /* if zlib is available */
 #cmakedefine HAVE_LIBZ 1
 
 /* if brotli is available */
 #cmakedefine HAVE_BROTLI 1
 
-/* if your compiler supports LL */
-#cmakedefine HAVE_LL 1
+/* if zstd is available */
+#cmakedefine HAVE_ZSTD 1
 
 /* Define to 1 if you have the <locale.h> header file. */
 #cmakedefine HAVE_LOCALE_H 1
@@ -414,7 +443,9 @@
 #cmakedefine HAVE_LOCALTIME_R 1
 
 /* Define to 1 if the compiler supports the 'long long' data type. */
-#cmakedefine HAVE_LONGLONG 1
+#if KWIML_ABI_SIZEOF_LONG_LONG
+#  define HAVE_LONGLONG 1
+#endif
 
 /* Define to 1 if you have the malloc.h header file. */
 #cmakedefine HAVE_MALLOC_H 1
@@ -433,6 +464,9 @@
 
 /* Define to 1 if you have the <netinet/tcp.h> header file. */
 #cmakedefine HAVE_NETINET_TCP_H 1
+
+/* Define to 1 if you have the <linux/tcp.h> header file. */
+#cmakedefine HAVE_LINUX_TCP_H 1
 
 /* Define to 1 if you have the <net/if.h> header file. */
 #cmakedefine HAVE_NET_IF_H 1
@@ -883,19 +917,21 @@
 */
 
 /* The size of `int', as computed by sizeof. */
-${SIZEOF_INT_CODE}
+#define SIZEOF_INT KWIML_ABI_SIZEOF_INT
 
 /* The size of `short', as computed by sizeof. */
-${SIZEOF_SHORT_CODE}
+#define SIZEOF_SHORT KWIML_ABI_SIZEOF_SHORT
 
 /* The size of `long', as computed by sizeof. */
-${SIZEOF_LONG_CODE}
+#define SIZEOF_LONG KWIML_ABI_SIZEOF_LONG
 
 /* The size of `long long', as computed by sizeof. */
-${SIZEOF_LONG_LONG_CODE}
+#define SIZEOF_LONG_LONG KWIML_ABI_SIZEOF_LONG_LONG
 
 /* The size of `__int64', as computed by sizeof. */
-${SIZEOF___INT64_CODE}
+#if KWIML_ABI_SIZEOF___INT64
+#  define SIZEOF___INT64 KWIML_ABI_SIZEOF___INT64
+#endif
 
 /* The size of `off_t', as computed by sizeof. */
 ${SIZEOF_OFF_T_CODE}
@@ -945,6 +981,12 @@ ${SIZEOF_TIME_T_CODE}
 /* if BearSSL is enabled */
 #cmakedefine USE_BEARSSL 1
 
+/* if WolfSSL is enabled */
+#cmakedefine USE_WOLFSSL 1
+
+/* if libSSH is in use */
+#cmakedefine USE_LIBSSH 1
+
 /* if libSSH2 is in use */
 #cmakedefine USE_LIBSSH2 1
 
@@ -963,11 +1005,30 @@ ${SIZEOF_TIME_T_CODE}
 /* if OpenSSL is in use */
 #cmakedefine USE_OPENSSL 1
 
+/* Define to 1 if you don't want the OpenSSL configuration to be loaded
+   automatically */
+#cmakedefine CURL_DISABLE_OPENSSL_AUTO_LOAD_CONFIG 1
+
 /* to enable NGHTTP2  */
 #cmakedefine USE_NGHTTP2 1
 
+/* to enable NGTCP2 */
+#cmakedefine USE_NGTCP2 1
+
+/* to enable NGHTTP3  */
+#cmakedefine USE_NGHTTP3 1
+
+/* to enable quiche */
+#cmakedefine USE_QUICHE 1
+
+/* Define to 1 if you have the quiche_conn_set_qlog_fd function. */
+#cmakedefine HAVE_QUICHE_CONN_SET_QLOG_FD 1
+
 /* if Unix domain sockets are enabled  */
 #cmakedefine USE_UNIX_SOCKETS
+
+/* to disable alt-svc */
+#cmakedefine CURL_DISABLE_ALTSVC 1
 
 /* to enable SSPI support */
 #cmakedefine USE_WINDOWS_SSPI 1

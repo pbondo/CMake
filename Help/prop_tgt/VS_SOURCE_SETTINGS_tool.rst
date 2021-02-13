@@ -1,6 +1,8 @@
 VS_SOURCE_SETTINGS_<tool>
 -------------------------
 
+.. versionadded:: 3.18
+
 Set any item metadata on all non-built files that use <tool>.
 
 Takes a list of ``Key=Value`` pairs. Tells the Visual Studio generator
@@ -16,4 +18,4 @@ For example:
 will set ``Key`` to ``Value`` and ``Key2`` to ``Value2`` for all
 non-built files that use ``FXCompile``.
 
-Generator expressions are supported.
+:manual:`Generator expressions <cmake-generator-expressions(7)>` are supported.

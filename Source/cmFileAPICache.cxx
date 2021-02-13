@@ -7,9 +7,10 @@
 #include <utility>
 #include <vector>
 
-#include "cm_jsoncpp_value.h"
+#include <cm3p/json/value.h>
 
 #include "cmFileAPI.h"
+#include "cmProperty.h"
 #include "cmState.h"
 #include "cmake.h"
 
@@ -43,7 +44,7 @@ Cache::Cache(cmFileAPI& fileAPI, unsigned long version)
 Json::Value Cache::Dump()
 {
   Json::Value cache = Json::objectValue;
-  cache["entries"] = DumpEntries();
+  cache["entries"] = this->DumpEntries();
   return cache;
 }
 

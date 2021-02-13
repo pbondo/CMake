@@ -10,6 +10,7 @@
 #include <cmext/algorithm>
 
 #include "cmMakefile.h"
+#include "cmProperty.h"
 #include "cmRange.h"
 #include "cmSearchPath.h"
 #include "cmState.h"
@@ -293,11 +294,10 @@ void cmFindBase::FillUserGuessPath()
 
 bool cmFindBase::CheckForVariableInCache()
 {
-  if (const char* cacheValue =
-        this->Makefile->GetDefinition(this->VariableName)) {
+  if (cmProp cacheValue = this->Makefile->GetDefinition(this->VariableName)) {
     cmState* state = this->Makefile->GetState();
     cmProp cacheEntry = state->GetCacheEntryValue(this->VariableName);
-    bool found = !cmIsNOTFOUND(cacheValue);
+    bool found = !cmIsNOTFOUND(*cacheValue);
     bool cached = cacheEntry != nullptr;
     if (found) {
       // If the user specifies the entry on the command line without a

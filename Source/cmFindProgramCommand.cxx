@@ -2,8 +2,12 @@
    file Copyright.txt or https://cmake.org/licensing for details.  */
 #include "cmFindProgramCommand.h"
 
+#include <algorithm>
+#include <string>
+
 #include "cmMakefile.h"
 #include "cmMessageType.h"
+#include "cmPolicies.h"
 #include "cmStateTypes.h"
 #include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
@@ -19,6 +23,7 @@ struct cmFindProgramHelper
   cmFindProgramHelper(cmMakefile* makefile, cmFindBase const* base)
     : DebugSearches("find_program", base)
     , Makefile(makefile)
+    , PolicyCMP0109(makefile->GetPolicyStatus(cmPolicies::CMP0109))
   {
 #if defined(_WIN32) || defined(__CYGWIN__) || defined(__MINGW32__)
     // Consider platform-specific extensions.
@@ -48,6 +53,8 @@ struct cmFindProgramHelper
   cmFindBaseDebugState DebugSearches;
   cmMakefile* Makefile;
 
+  cmPolicies::PolicyStatus PolicyCMP0109;
+
   void AddName(std::string const& name) { this->Names.push_back(name); }
   void SetName(std::string const& name)
   {
@@ -56,44 +63,84 @@ struct cmFindProgramHelper
   }
   bool CheckCompoundNames()
   {
-    for (std::string const& n : this->Names) {
-      // Only perform search relative to current directory if the file name
-      // contains a directory separator.
-      if (n.find('/') != std::string::npos) {
-        if (this->CheckDirectoryForName("", n)) {
-          return true;
-        }
-      }
-    }
-    return false;
+    return std::any_of(this->Names.begin(), this->Names.end(),
+                       [this](std::string const& n) -> bool {
+                         // Only perform search relative to current directory
+                         // if the file name contains a directory separator.
+                         return n.find('/') != std::string::npos &&
+                           this->CheckDirectoryForName("", n);
+                       });
   }
   bool CheckDirectory(std::string const& path)
   {
-    for (std::string const& n : this->Names) {
-      if (this->CheckDirectoryForName(path, n)) {
-        return true;
-      }
-    }
-    return false;
+    return std::any_of(this->Names.begin(), this->Names.end(),
+                       [this, &path](std::string const& n) -> bool {
+                         // Only perform search relative to current directory
+                         // if the file name contains a directory separator.
+                         return this->CheckDirectoryForName(path, n);
+                       });
   }
   bool CheckDirectoryForName(std::string const& path, std::string const& name)
   {
-    for (std::string const& ext : this->Extensions) {
-      if (!ext.empty() && cmHasSuffix(name, ext)) {
-        continue;
-      }
-      this->TestNameExt = cmStrCat(name, ext);
-      this->TestPath =
-        cmSystemTools::CollapseFullPath(this->TestNameExt, path);
-      bool exists = cmSystemTools::FileIsExecutable(this->TestPath);
-      exists ? this->DebugSearches.FoundAt(this->TestPath)
-             : this->DebugSearches.FailedAt(this->TestPath);
-      if (exists) {
-        this->BestPath = this->TestPath;
-        return true;
-      }
+    return std::any_of(this->Extensions.begin(), this->Extensions.end(),
+                       [this, &path, &name](std::string const& ext) -> bool {
+                         if (!ext.empty() && cmHasSuffix(name, ext)) {
+                           return false;
+                         }
+                         this->TestNameExt = cmStrCat(name, ext);
+                         this->TestPath = cmSystemTools::CollapseFullPath(
+                           this->TestNameExt, path);
+                         bool exists = this->FileIsExecutable(this->TestPath);
+                         exists ? this->DebugSearches.FoundAt(this->TestPath)
+                                : this->DebugSearches.FailedAt(this->TestPath);
+                         if (exists) {
+                           this->BestPath = this->TestPath;
+                           return true;
+                         }
+                         return false;
+                       });
+  }
+  bool FileIsExecutable(std::string const& file) const
+  {
+    switch (this->PolicyCMP0109) {
+      case cmPolicies::OLD:
+        return cmSystemTools::FileExists(file, true);
+      case cmPolicies::NEW:
+      case cmPolicies::REQUIRED_ALWAYS:
+      case cmPolicies::REQUIRED_IF_USED:
+        return cmSystemTools::FileIsExecutable(file);
+      default:
+        break;
     }
-    return false;
+    bool const isExeOld = cmSystemTools::FileExists(file, true);
+    bool const isExeNew = cmSystemTools::FileIsExecutable(file);
+    if (isExeNew == isExeOld) {
+      return isExeNew;
+    }
+    if (isExeNew) {
+      this->Makefile->IssueMessage(
+        MessageType::AUTHOR_WARNING,
+        cmStrCat(cmPolicies::GetPolicyWarning(cmPolicies::CMP0109),
+                 "\n"
+                 "The file\n"
+                 "  ",
+                 file,
+                 "\n"
+                 "is executable but not readable.  "
+                 "CMake is ignoring it for compatibility."));
+    } else {
+      this->Makefile->IssueMessage(
+        MessageType::AUTHOR_WARNING,
+        cmStrCat(cmPolicies::GetPolicyWarning(cmPolicies::CMP0109),
+                 "\n"
+                 "The file\n"
+                 "  ",
+                 file,
+                 "\n"
+                 "is readable but not executable.  "
+                 "CMake is using it for compatibility."));
+    }
+    return isExeOld;
   }
 };
 
@@ -106,7 +153,7 @@ cmFindProgramCommand::cmFindProgramCommand(cmExecutionStatus& status)
 // cmFindProgramCommand
 bool cmFindProgramCommand::InitialPass(std::vector<std::string> const& argsIn)
 {
-  this->DebugMode = ComputeIfDebugModeWanted();
+  this->DebugMode = this->ComputeIfDebugModeWanted();
   this->VariableDocumentation = "Path to a program.";
   this->CMakePathName = "PROGRAM";
   // call cmFindBase::ParseArguments
@@ -125,7 +172,7 @@ bool cmFindProgramCommand::InitialPass(std::vector<std::string> const& argsIn)
     return true;
   }
 
-  std::string const result = FindProgram();
+  std::string const result = this->FindProgram();
   if (!result.empty()) {
     // Save the value in the cache
     this->Makefile->AddCacheDefinition(this->VariableName, result,
@@ -152,7 +199,7 @@ std::string cmFindProgramCommand::FindProgram()
   std::string program;
 
   if (this->SearchAppBundleFirst || this->SearchAppBundleOnly) {
-    program = FindAppBundle();
+    program = this->FindAppBundle();
   }
   if (program.empty() && !this->SearchAppBundleOnly) {
     program = this->FindNormalProgram();
@@ -228,7 +275,7 @@ std::string cmFindProgramCommand::FindAppBundle()
       cmSystemTools::FindDirectory(appName, this->SearchPaths, true);
 
     if (!appPath.empty()) {
-      std::string executable = GetBundleExecutable(appPath);
+      std::string executable = this->GetBundleExecutable(appPath);
       if (!executable.empty()) {
         return cmSystemTools::CollapseFullPath(executable);
       }
@@ -266,14 +313,13 @@ std::string cmFindProgramCommand::GetBundleExecutable(
 
   if (executableURL != nullptr) {
     const int MAX_OSX_PATH_SIZE = 1024;
-    char buffer[MAX_OSX_PATH_SIZE];
+    UInt8 buffer[MAX_OSX_PATH_SIZE];
 
-    // Convert the CFString to a C string
-    CFStringGetCString(CFURLGetString(executableURL), buffer,
-                       MAX_OSX_PATH_SIZE, kCFStringEncodingUTF8);
-
-    // And finally to a c++ string
-    executable = bundlePath + "/Contents/MacOS/" + std::string(buffer);
+    if (CFURLGetFileSystemRepresentation(executableURL, false, buffer,
+                                         MAX_OSX_PATH_SIZE)) {
+      executable = bundlePath + "/Contents/MacOS/" +
+        std::string(reinterpret_cast<char*>(buffer));
+    }
     // Only release CFURLRef if it's not null
     CFRelease(executableURL);
   }

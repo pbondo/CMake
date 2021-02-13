@@ -295,6 +295,11 @@ Options
      ``line``
        The line in ``file`` of the function call.
 
+     ``defer``
+       Optional member that is present when the function call was deferred
+       by :command:`cmake_language(DEFER)`.  If present, its value is a
+       string containing the deferred call ``<id>``.
+
      ``cmd``
        The name of the function that was called.
 
@@ -317,7 +322,7 @@ Options
        {
          "version": {
            "major": 1,
-           "minor": 0
+           "minor": 1
          }
        }
 
@@ -341,9 +346,9 @@ Options
  Print a warning when an uninitialized variable is used.
 
 ``--warn-unused-vars``
- Warn about unused variables.
-
- Find variables that are declared or set, but not used.
+ Does nothing.  In CMake versions 3.2 and below this enabled warnings about
+ unused variables.  In CMake versions 3.3 through 3.18 the option was broken.
+ In CMake 3.19 and above the option has been removed.
 
 ``--no-warn-unused-cli``
  Don't warn about command line options.
@@ -359,7 +364,7 @@ Options
  This flag tells CMake to warn about other files as well.
 
 ``--profiling-output=<path>``
- Used in conjuction with ``--profiling-format`` to output to a given path.
+ Used in conjunction with ``--profiling-format`` to output to a given path.
 
 ``--profiling-format=<file>``
  Enable the output of profiling data of CMake script in the given format.
@@ -372,6 +377,26 @@ Options
  about:tracing tab of Google Chrome or using a plugin for a tool like Trace
  Compass.
 
+``--preset=<preset>``
+ Reads a :manual:`preset <cmake-presets(7)>` from
+ ``<path-to-source>/CMakePresets.json`` and
+ ``<path-to-source>/CMakeUserPresets.json``. The preset specifies the
+ generator and the build directory, and optionally a list of variables and
+ other arguments to pass to CMake. The current working directory must contain
+ CMake preset files. The :manual:`CMake GUI <cmake-gui(1)>` can
+ also recognize ``CMakePresets.json`` and ``CMakeUserPresets.json`` files. For
+ full details on these files, see :manual:`cmake-presets(7)`.
+
+ The presets are read before all other command line options. The options
+ specified by the preset (variables, generator, etc.) can all be overridden by
+ manually specifying them on the command line. For example, if the preset sets
+ a variable called ``MYVAR`` to ``1``, but the user sets it to ``2`` with a
+ ``-D`` argument, the value ``2`` is preferred.
+
+``--list-presets, --list-presets=<[configure | build | test | all]>``
+ Lists the available presets. If no option is specified only configure presets
+ will be listed. The current working directory must contain CMake preset files.
+
 .. _`Build Tool Mode`:
 
 Build a Project
@@ -382,13 +407,24 @@ project binary tree:
 
 .. code-block:: shell
 
-  cmake --build <dir> [<options>] [-- <build-tool-options>]
+  cmake --build [<dir> | --preset <preset>] [<options>] [-- <build-tool-options>]
 
 This abstracts a native build tool's command-line interface with the
 following options:
 
 ``--build <dir>``
-  Project binary directory to be built.  This is required and must be first.
+  Project binary directory to be built.  This is required (unless a preset
+  is specified) and must be first.
+
+``--preset <preset>``
+  Use a build preset to specify build options. The project binary directory
+  is inferred from the ``configurePreset`` key. The current working directory
+  must contain CMake preset files.
+  See :manual:`preset <cmake-presets(7)>` for more details.
+
+``--list-presets``
+  Lists the available build presets. The current working directory must
+  contain CMake preset files.
 
 ``--parallel [<jobs>], -j [<jobs>]``
   The maximum number of concurrent processes to use when building.
@@ -450,6 +486,9 @@ The options are:
 ``--component <comp>``
   Component-based install. Only install component ``<comp>``.
 
+``--default-directory-permissions <permissions>``
+  Default directory install permissions. Permissions in format ``<u=rwx,g=rx,o=rx>``.
+
 ``--prefix <prefix>``
   Override the installation prefix, :variable:`CMAKE_INSTALL_PREFIX`.
 
@@ -481,12 +520,16 @@ Run a Script
 
 .. code-block:: shell
 
-  cmake [{-D <var>=<value>}...] -P <cmake-script-file>
+  cmake [{-D <var>=<value>}...] -P <cmake-script-file> [-- <unparsed-options>...]
 
 Process the given cmake file as a script written in the CMake
 language.  No configure or generate step is performed and the cache
 is not modified.  If variables are defined using ``-D``, this must be
 done before the ``-P`` argument.
+
+Any options after ``--`` are not parsed by CMake, but they are still included
+in the set of :variable:`CMAKE_ARGV<n> <CMAKE_ARGV0>` variables passed to the
+script (including the ``--`` itself).
 
 
 Run a Command-Line Tool
@@ -553,6 +596,7 @@ Available commands are:
 
   ``serverMode``
     ``true`` if cmake supports server-mode and ``false`` otherwise.
+    Always false since CMake 3.20.
 
 ``cat <files>...``
   Concatenate files and print on the standard output.
@@ -562,7 +606,8 @@ Available commands are:
 
 ``compare_files [--ignore-eol] <file1> <file2>``
   Check if ``<file1>`` is same as ``<file2>``. If files are the same,
-  then returns ``0``, if not it returns ``1``.  The ``--ignore-eol`` option
+  then returns ``0``, if not it returns ``1``.  In case of invalid
+  arguments, it returns 2. The ``--ignore-eol`` option
   implies line-wise comparison and ignores LF/CRLF differences.
 
 ``copy <file>... <destination>``
@@ -589,6 +634,13 @@ Available commands are:
 
   .. note::
     Path to where ``<new>`` symbolic link will be created has to exist beforehand.
+
+``create_hardlink <old> <new>``
+  Create a hard link ``<new>`` naming ``<old>``.
+
+  .. note::
+    Path to where ``<new>`` hard link will be created has to exist beforehand.
+    ``<old>`` has to exist beforehand.
 
 ``echo [<string>...]``
   Displays arguments as text.
@@ -793,6 +845,11 @@ with one of the following options:
 
 .. include:: OPTIONS_HELP.txt
 
+To view the presets available for a project, use
+
+.. code-block:: shell
+
+  cmake <source-dir> --list-presets
 
 See Also
 ========

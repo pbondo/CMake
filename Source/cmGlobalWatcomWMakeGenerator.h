@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmGlobalWatcomWMakeGenerator_h
-#define cmGlobalWatcomWMakeGenerator_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
@@ -41,6 +40,9 @@ public:
   /** Get the documentation entry for this generator.  */
   static void GetDocumentation(cmDocumentationEntry& entry);
 
+  /** Tell the generator about the target system.  */
+  bool SetSystemName(std::string const& s, cmMakefile* mf) override;
+
   /**
    * Try to determine system information such as shared library
    * extension, pthreads, byte order etc.
@@ -61,5 +63,3 @@ protected:
 
   void PrintBuildCommandAdvice(std::ostream& os, int jobs) const override;
 };
-
-#endif

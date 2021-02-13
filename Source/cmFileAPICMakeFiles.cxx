@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-#include "cm_jsoncpp_value.h"
+#include <cm3p/json/value.h>
 
 #include "cmFileAPI.h"
 #include "cmGlobalGenerator.h"
@@ -41,7 +41,7 @@ CMakeFiles::CMakeFiles(cmFileAPI& fileAPI, unsigned long version)
   , CMakeModules(cmSystemTools::GetCMakeRoot() + "/Modules")
   , TopSource(this->FileAPI.GetCMakeInstance()->GetHomeDirectory())
   , TopBuild(this->FileAPI.GetCMakeInstance()->GetHomeOutputDirectory())
-  , OutOfSource(TopBuild != TopSource)
+  , OutOfSource(this->TopBuild != this->TopSource)
 {
   static_cast<void>(this->Version);
 }
@@ -50,7 +50,7 @@ Json::Value CMakeFiles::Dump()
 {
   Json::Value cmakeFiles = Json::objectValue;
   cmakeFiles["paths"] = this->DumpPaths();
-  cmakeFiles["inputs"] = DumpInputs();
+  cmakeFiles["inputs"] = this->DumpInputs();
   return cmakeFiles;
 }
 

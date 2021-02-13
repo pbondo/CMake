@@ -9,7 +9,6 @@ endif()
 set(__COMPILER_GNU 1)
 
 include(Compiler/CMakeCommonCompilerMacros)
-include(Internal/CMakeCheckCompilerFlag)
 
 set(__pch_header_C "c-header")
 set(__pch_header_CXX "c++-header")
@@ -49,7 +48,7 @@ macro(__compiler_gnu lang)
     # distcc does not transform -o to -MT when invoking the preprocessor
     # internally, as it ought to.  Work around this bug by setting -MT here
     # even though it isn't strictly necessary.
-    set(CMAKE_DEPFILE_FLAGS_${lang} "-MD -MT <OBJECT> -MF <DEPFILE>")
+    set(CMAKE_DEPFILE_FLAGS_${lang} "-MD -MT <DEP_TARGET> -MF <DEP_FILE>")
   endif()
 
   # Initial configuration flags.
@@ -111,11 +110,13 @@ macro(__compiler_gnu lang)
   endif()
   list(APPEND CMAKE_${lang}_COMPILER_PREDEFINES_COMMAND "-dM" "-E" "-c" "${CMAKE_ROOT}/Modules/CMakeCXXCompilerABI.cpp")
 
-  set(CMAKE_PCH_EXTENSION .gch)
-  if (NOT CMAKE_GENERATOR MATCHES "Xcode")
-    set(CMAKE_PCH_PROLOGUE "#pragma GCC system_header")
+  if(NOT "x${lang}" STREQUAL "xFortran")
+    set(CMAKE_PCH_EXTENSION .gch)
+    if (NOT CMAKE_GENERATOR MATCHES "Xcode")
+      set(CMAKE_PCH_PROLOGUE "#pragma GCC system_header")
+    endif()
+    set(CMAKE_${lang}_COMPILE_OPTIONS_INVALID_PCH -Winvalid-pch)
+    set(CMAKE_${lang}_COMPILE_OPTIONS_USE_PCH -include <PCH_HEADER>)
+    set(CMAKE_${lang}_COMPILE_OPTIONS_CREATE_PCH -x ${__pch_header_${lang}} -include <PCH_HEADER>)
   endif()
-  set(CMAKE_${lang}_COMPILE_OPTIONS_INVALID_PCH -Winvalid-pch)
-  set(CMAKE_${lang}_COMPILE_OPTIONS_USE_PCH -include <PCH_HEADER>)
-  set(CMAKE_${lang}_COMPILE_OPTIONS_CREATE_PCH -x ${__pch_header_${lang}} -include <PCH_HEADER>)
 endmacro()

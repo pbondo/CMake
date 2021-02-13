@@ -47,7 +47,8 @@ as ``EXISTS``, ``COMMAND``, and ``DEFINED``.  Then binary tests such as
 and ``MATCHES``.  Then the boolean operators in the order ``NOT``,  ``AND``,
 and finally ``OR``.
 
-Possible conditions are:
+Basic Expressions
+"""""""""""""""""
 
 ``if(<constant>)``
  True if the constant is ``1``, ``ON``, ``YES``, ``TRUE``, ``Y``,
@@ -62,6 +63,9 @@ Possible conditions are:
  True if given a variable that is defined to a value that is not a false
  constant.  False otherwise.  (Note macro arguments are not variables.)
 
+Logic Operators
+"""""""""""""""
+
 ``if(NOT <condition>)``
  True if the condition is not true.
 
@@ -70,6 +74,15 @@ Possible conditions are:
 
 ``if(<cond1> OR <cond2>)``
  True if either condition would be considered true individually.
+
+``if((condition) AND (condition OR (condition)))``
+ The conditions inside the parenthesis are evaluated first and then
+ the remaining condition is evaluated as in the other examples.
+ Where there are nested parenthesis the innermost are evaluated as part
+ of evaluating the condition that contains them.
+
+Existence Checks
+""""""""""""""""
 
 ``if(COMMAND command-name)``
  True if the given name is a command, macro or function that can be
@@ -85,14 +98,31 @@ Possible conditions are:
  (in any directory).
 
 ``if(TEST test-name)``
- True if the given name is an existing test name created by the
- :command:`add_test` command.
+ .. versionadded:: 3.3
+  True if the given name is an existing test name created by the
+  :command:`add_test` command.
+
+``if(DEFINED <name>|CACHE{<name>}|ENV{<name>})``
+ True if a variable, cache variable or environment variable
+ with given ``<name>`` is defined. The value of the variable
+ does not matter. Note that macro arguments are not variables.
+
+ .. versionadded:: 3.14
+  Added support for ``CACHE{<name>}`` variables.
+
+``if(<variable|string> IN_LIST <variable>)``
+ .. versionadded:: 3.3
+  True if the given element is contained in the named list variable.
+
+File Operations
+"""""""""""""""
 
 ``if(EXISTS path-to-file-or-directory)``
  True if the named file or directory exists.  Behavior is well-defined
- only for full paths. Resolves symbolic links, i.e. if the named file or
- directory is a symbolic link, returns true if the target of the
- symbolic link exists.
+ only for explicit full paths (a leading ``~/`` is not expanded as
+ a home directory and is considered a relative path).
+ Resolves symbolic links, i.e. if the named file or directory is a
+ symbolic link, returns true if the target of the symbolic link exists.
 
 ``if(file1 IS_NEWER_THAN file2)``
  True if ``file1`` is newer than ``file2`` or if one of the two files doesn't
@@ -113,10 +143,15 @@ Possible conditions are:
 ``if(IS_ABSOLUTE path)``
  True if the given path is an absolute path.
 
+Comparisons
+"""""""""""
+
 ``if(<variable|string> MATCHES regex)``
  True if the given string or variable's value matches the given regular
  condition.  See :ref:`Regex Specification` for regex format.
- ``()`` groups are captured in :variable:`CMAKE_MATCH_<n>` variables.
+
+ .. versionadded:: 3.9
+  ``()`` groups are captured in :variable:`CMAKE_MATCH_<n>` variables.
 
 ``if(<variable|string> LESS <variable|string>)``
  True if the given string or variable's value is a valid number and less
@@ -131,12 +166,14 @@ Possible conditions are:
  to that on the right.
 
 ``if(<variable|string> LESS_EQUAL <variable|string>)``
- True if the given string or variable's value is a valid number and less
- than or equal to that on the right.
+ .. versionadded:: 3.7
+  True if the given string or variable's value is a valid number and less
+  than or equal to that on the right.
 
 ``if(<variable|string> GREATER_EQUAL <variable|string>)``
- True if the given string or variable's value is a valid number and greater
- than or equal to that on the right.
+ .. versionadded:: 3.7
+  True if the given string or variable's value is a valid number and greater
+  than or equal to that on the right.
 
 ``if(<variable|string> STRLESS <variable|string>)``
  True if the given string or variable's value is lexicographically less
@@ -151,12 +188,17 @@ Possible conditions are:
  to the string or variable on the right.
 
 ``if(<variable|string> STRLESS_EQUAL <variable|string>)``
- True if the given string or variable's value is lexicographically less
- than or equal to the string or variable on the right.
+ .. versionadded:: 3.7
+  True if the given string or variable's value is lexicographically less
+  than or equal to the string or variable on the right.
 
 ``if(<variable|string> STRGREATER_EQUAL <variable|string>)``
- True if the given string or variable's value is lexicographically greater
- than or equal to the string or variable on the right.
+ .. versionadded:: 3.7
+  True if the given string or variable's value is lexicographically greater
+  than or equal to the string or variable on the right.
+
+Version Comparisons
+"""""""""""""""""""
 
 ``if(<variable|string> VERSION_LESS <variable|string>)``
  Component-wise integer version number comparison (version format is
@@ -177,30 +219,18 @@ Possible conditions are:
  component effectively truncates the string at that point.
 
 ``if(<variable|string> VERSION_LESS_EQUAL <variable|string>)``
- Component-wise integer version number comparison (version format is
- ``major[.minor[.patch[.tweak]]]``, omitted components are treated as zero).
- Any non-integer version component or non-integer trailing part of a version
- component effectively truncates the string at that point.
+ .. versionadded:: 3.7
+  Component-wise integer version number comparison (version format is
+  ``major[.minor[.patch[.tweak]]]``, omitted components are treated as zero).
+  Any non-integer version component or non-integer trailing part of a version
+  component effectively truncates the string at that point.
 
 ``if(<variable|string> VERSION_GREATER_EQUAL <variable|string>)``
- Component-wise integer version number comparison (version format is
- ``major[.minor[.patch[.tweak]]]``, omitted components are treated as zero).
- Any non-integer version component or non-integer trailing part of a version
- component effectively truncates the string at that point.
-
-``if(<variable|string> IN_LIST <variable>)``
- True if the given element is contained in the named list variable.
-
-``if(DEFINED <name>|CACHE{<name>}|ENV{<name>})``
- True if a variable, cache variable or environment variable
- with given ``<name>`` is defined. The value of the variable
- does not matter. Note that macro arguments are not variables.
-
-``if((condition) AND (condition OR (condition)))``
- The conditions inside the parenthesis are evaluated first and then
- the remaining condition is evaluated as in the previous examples.
- Where there are nested parenthesis the innermost are evaluated as part
- of evaluating the condition that contains them.
+ .. versionadded:: 3.7
+  Component-wise integer version number comparison (version format is
+  ``major[.minor[.patch[.tweak]]]``, omitted components are treated as zero).
+  Any non-integer version component or non-integer trailing part of a version
+  component effectively truncates the string at that point.
 
 Variable Expansion
 ^^^^^^^^^^^^^^^^^^
@@ -268,11 +298,12 @@ above-documented condition syntax accepts ``<variable|string>``:
   tested to see if they are boolean constants, if so they are used as
   such, otherwise they are assumed to be variables and are dereferenced.
 
-To prevent ambiguity, potential variable or keyword names can be
-specified in a :ref:`Quoted Argument` or a :ref:`Bracket Argument`.
-A quoted or bracketed variable or keyword will be interpreted as a
-string and not dereferenced or interpreted.
-See policy :policy:`CMP0054`.
+.. versionchanged:: 3.1
+  To prevent ambiguity, potential variable or keyword names can be
+  specified in a :ref:`Quoted Argument` or a :ref:`Bracket Argument`.
+  A quoted or bracketed variable or keyword will be interpreted as a
+  string and not dereferenced or interpreted.
+  See policy :policy:`CMP0054`.
 
 There is no automatic evaluation for environment or cache
 :ref:`Variable References`.  Their values must be referenced as

@@ -100,6 +100,24 @@ static const char* VSVersionToToolset(
   return "";
 }
 
+static const char* VSVersionToAndroidToolset(
+  cmGlobalVisualStudioGenerator::VSVersion v)
+{
+  switch (v) {
+    case cmGlobalVisualStudioGenerator::VS9:
+    case cmGlobalVisualStudioGenerator::VS10:
+    case cmGlobalVisualStudioGenerator::VS11:
+    case cmGlobalVisualStudioGenerator::VS12:
+      return "";
+    case cmGlobalVisualStudioGenerator::VS14:
+      return "Clang_3_8";
+    case cmGlobalVisualStudioGenerator::VS15:
+    case cmGlobalVisualStudioGenerator::VS16:
+      return "Clang_5_0";
+  }
+  return "";
+}
+
 static const char vs15generatorName[] = "Visual Studio 15 2017";
 
 // Map generator name without year to name with year.
@@ -122,7 +140,7 @@ class cmGlobalVisualStudioVersionedGenerator::Factory15
 {
 public:
   std::unique_ptr<cmGlobalGenerator> CreateGlobalGenerator(
-    const std::string& name, cmake* cm) const override
+    const std::string& name, bool allowArch, cmake* cm) const override
   {
     std::string genName;
     const char* p = cmVS15GenName(name, genName);
@@ -134,7 +152,7 @@ public:
         new cmGlobalVisualStudioVersionedGenerator(
           cmGlobalVisualStudioGenerator::VS15, cm, genName, ""));
     }
-    if (*p++ != ' ') {
+    if (!allowArch || *p++ != ' ') {
       return std::unique_ptr<cmGlobalGenerator>();
     }
     if (strcmp(p, "Win64") == 0) {
@@ -182,6 +200,7 @@ public:
     platforms.emplace_back("Win32");
     platforms.emplace_back("ARM");
     platforms.emplace_back("ARM64");
+    platforms.emplace_back("ARM64EC");
     return platforms;
   }
 
@@ -216,7 +235,7 @@ class cmGlobalVisualStudioVersionedGenerator::Factory16
 {
 public:
   std::unique_ptr<cmGlobalGenerator> CreateGlobalGenerator(
-    const std::string& name, cmake* cm) const override
+    const std::string& name, bool /*allowArch*/, cmake* cm) const override
   {
     std::string genName;
     const char* p = cmVS16GenName(name, genName);
@@ -284,6 +303,7 @@ cmGlobalVisualStudioVersionedGenerator::cmGlobalVisualStudioVersionedGenerator(
   this->Version = version;
   this->ExpressEdition = false;
   this->DefaultPlatformToolset = VSVersionToToolset(this->Version);
+  this->DefaultAndroidToolset = VSVersionToAndroidToolset(this->Version);
   this->DefaultCLFlagTableName = VSVersionToToolset(this->Version);
   this->DefaultCSharpFlagTableName = VSVersionToToolset(this->Version);
   this->DefaultLinkFlagTableName = VSVersionToToolset(this->Version);
@@ -366,6 +386,12 @@ bool cmGlobalVisualStudioVersionedGenerator::GetVSInstance(
   return vsSetupAPIHelper.GetVSInstanceInfo(dir);
 }
 
+bool cmGlobalVisualStudioVersionedGenerator::GetVSInstanceVersion(
+  unsigned long long& vsInstanceVersion) const
+{
+  return vsSetupAPIHelper.GetVSInstanceVersion(vsInstanceVersion);
+}
+
 bool cmGlobalVisualStudioVersionedGenerator::IsDefaultToolset(
   const std::string& version) const
 {
@@ -385,6 +411,40 @@ bool cmGlobalVisualStudioVersionedGenerator::IsDefaultToolset(
   }
 
   return false;
+}
+
+bool cmGlobalVisualStudioVersionedGenerator::IsStdOutEncodingSupported() const
+{
+  // Supported from Visual Studio 16.7 Preview 3.
+  if (this->Version > cmGlobalVisualStudioGenerator::VSVersion::VS16) {
+    return true;
+  }
+  if (this->Version < cmGlobalVisualStudioGenerator::VSVersion::VS16) {
+    return false;
+  }
+  unsigned long long const vsInstanceVersion16_7_P2 = 4503631666610212;
+  unsigned long long vsInstanceVersion;
+  return (this->GetVSInstanceVersion(vsInstanceVersion) &&
+          vsInstanceVersion > vsInstanceVersion16_7_P2);
+}
+
+const char*
+cmGlobalVisualStudioVersionedGenerator::GetAndroidApplicationTypeRevision()
+  const
+{
+  switch (this->Version) {
+    case cmGlobalVisualStudioGenerator::VS9:
+    case cmGlobalVisualStudioGenerator::VS10:
+    case cmGlobalVisualStudioGenerator::VS11:
+    case cmGlobalVisualStudioGenerator::VS12:
+      return "";
+    case cmGlobalVisualStudioGenerator::VS14:
+      return "2.0";
+    case cmGlobalVisualStudioGenerator::VS15:
+    case cmGlobalVisualStudioGenerator::VS16:
+      return "3.0";
+  }
+  return "";
 }
 
 std::string cmGlobalVisualStudioVersionedGenerator::GetAuxiliaryToolset() const
@@ -481,8 +541,9 @@ bool cmGlobalVisualStudioVersionedGenerator::IsWin81SDKInstalled() const
   return false;
 }
 
-std::string cmGlobalVisualStudioVersionedGenerator::GetWindows10SDKMaxVersion()
-  const
+std::string
+cmGlobalVisualStudioVersionedGenerator::GetWindows10SDKMaxVersionDefault(
+  cmMakefile*) const
 {
   return std::string();
 }

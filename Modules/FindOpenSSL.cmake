@@ -7,8 +7,20 @@ FindOpenSSL
 
 Find the OpenSSL encryption library.
 
+This module finds an installed OpenSSL library and determines its version.
+
+.. versionadded:: 3.19
+  When a version is requested, it can be specified as a simple value or as a
+  range. For a detailed description of version range usage and capabilities,
+  refer to the :command:`find_package` command.
+
+.. versionadded:: 3.18
+  Support for OpenSSL 3.0.
+
 Optional COMPONENTS
 ^^^^^^^^^^^^^^^^^^^
+
+.. versionadded:: 3.12
 
 This module supports two optional COMPONENTS: ``Crypto`` and ``SSL``.  Both
 components have associated imported targets, as described below.
@@ -16,12 +28,37 @@ components have associated imported targets, as described below.
 Imported Targets
 ^^^^^^^^^^^^^^^^
 
+.. versionadded:: 3.4
+
 This module defines the following :prop_tgt:`IMPORTED` targets:
 
 ``OpenSSL::SSL``
   The OpenSSL ``ssl`` library, if found.
 ``OpenSSL::Crypto``
   The OpenSSL ``crypto`` library, if found.
+``OpenSSL::applink``
+  .. versionadded:: 3.18
+
+  The OpenSSL ``applink`` components that might be need to be compiled into
+  projects under MSVC. This target is available only if found OpenSSL version
+  is not less than 0.9.8. By linking this target the above OpenSSL targets can
+  be linked even if the project has different MSVC runtime configurations with
+  the above OpenSSL targets. This target has no effect on platforms other than
+  MSVC.
+
+NOTE: Due to how ``INTERFACE_SOURCES`` are consumed by the consuming target,
+unless you certainly know what you are doing, it is always preferred to link
+``OpenSSL::applink`` target as ``PRIVATE`` and to make sure that this target is
+linked at most once for the whole dependency graph of any library or
+executable:
+
+.. code-block:: cmake
+
+   target_link_libraries(myTarget PRIVATE OpenSSL::applink)
+
+Otherwise you would probably encounter unexpected random problems when building
+and linking, as both the ISO C and the ISO C++ standard claims almost nothing
+about what a link process should be.
 
 Result Variables
 ^^^^^^^^^^^^^^^^
@@ -45,13 +82,21 @@ This module will set the following variables in your project:
   All OpenSSL libraries and their dependencies.
 ``OPENSSL_VERSION``
   This is set to ``$major.$minor.$revision$patch`` (e.g. ``0.9.8s``).
+``OPENSSL_APPLINK_SOURCE``
+  The sources in the target ``OpenSSL::applink`` that is mentioned above. This
+  variable shall always be undefined if found openssl version is less than
+  0.9.8 or if platform is not MSVC.
 
 Hints
 ^^^^^
 
 Set ``OPENSSL_ROOT_DIR`` to the root directory of an OpenSSL installation.
-Set ``OPENSSL_USE_STATIC_LIBS`` to ``TRUE`` to look for static libraries.
-Set ``OPENSSL_MSVC_STATIC_RT`` set ``TRUE`` to choose the MT version of the lib.
+
+.. versionadded:: 3.4
+  Set ``OPENSSL_USE_STATIC_LIBS`` to ``TRUE`` to look for static libraries.
+
+.. versionadded:: 3.5
+  Set ``OPENSSL_MSVC_STATIC_RT`` set ``TRUE`` to choose the MT version of the lib.
 #]=======================================================================]
 
 macro(_OpenSSL_test_and_find_dependencies ssl_library crypto_library)
@@ -103,16 +148,30 @@ if (WIN32)
     "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\OpenSSL (64-bit)_is1;Inno Setup: App Path]"
     ENV OPENSSL_ROOT_DIR
     )
-  file(TO_CMAKE_PATH "$ENV{PROGRAMFILES}" _programfiles)
+
+  if("${CMAKE_SIZEOF_VOID_P}" STREQUAL "8")
+    set(_arch "Win64")
+    file(TO_CMAKE_PATH "$ENV{PROGRAMFILES}" _programfiles)
+  else()
+    set(_arch "Win32")
+    set(_progfiles_x86 "ProgramFiles(x86)")
+    if(NOT "$ENV{${_progfiles_x86}}" STREQUAL "")
+      # under windows 64 bit machine
+      file(TO_CMAKE_PATH "$ENV{${_progfiles_x86}}" _programfiles)
+    else()
+      # under windows 32 bit machine
+      file(TO_CMAKE_PATH "$ENV{ProgramFiles}" _programfiles)
+    endif()
+  endif()
+
   set(_OPENSSL_ROOT_PATHS
     "${_programfiles}/OpenSSL"
-    "${_programfiles}/OpenSSL-Win32"
-    "${_programfiles}/OpenSSL-Win64"
+    "${_programfiles}/OpenSSL-${_arch}"
     "C:/OpenSSL/"
-    "C:/OpenSSL-Win32/"
-    "C:/OpenSSL-Win64/"
+    "C:/OpenSSL-${_arch}/"
     )
   unset(_programfiles)
+  unset(_arch)
 else ()
   set(_OPENSSL_ROOT_HINTS
     ${OPENSSL_ROOT_DIR}
@@ -168,12 +227,18 @@ if(WIN32 AND NOT CYGWIN)
     endif()
 
     if(OPENSSL_USE_STATIC_LIBS)
+      set(_OPENSSL_STATIC_SUFFIX
+        "_static"
+      )
       set(_OPENSSL_PATH_SUFFIXES
         "lib/VC/static"
         "VC/static"
         "lib"
         )
     else()
+      set(_OPENSSL_STATIC_SUFFIX
+        ""
+      )
       set(_OPENSSL_PATH_SUFFIXES
         "lib/VC"
         "VC"
@@ -183,6 +248,17 @@ if(WIN32 AND NOT CYGWIN)
 
     find_library(LIB_EAY_DEBUG
       NAMES
+        # When OpenSSL is built with default options, the static library name is suffixed with "_static".
+        # Looking the "libcrypto_static.lib" with a higher priority than "libcrypto.lib" which is the
+        # import library of "libcrypto.dll".
+        libcrypto${_OPENSSL_STATIC_SUFFIX}${_OPENSSL_MSVC_ARCH_SUFFIX}${_OPENSSL_MSVC_RT_MODE}d
+        libcrypto${_OPENSSL_STATIC_SUFFIX}${_OPENSSL_MSVC_RT_MODE}d
+        libcrypto${_OPENSSL_STATIC_SUFFIX}d
+        libeay32${_OPENSSL_STATIC_SUFFIX}${_OPENSSL_MSVC_RT_MODE}d
+        libeay32${_OPENSSL_STATIC_SUFFIX}d
+        crypto${_OPENSSL_STATIC_SUFFIX}d
+        # When OpenSSL is built with the "-static" option, only the static build is produced,
+        # and it is not suffixed with "_static".
         libcrypto${_OPENSSL_MSVC_ARCH_SUFFIX}${_OPENSSL_MSVC_RT_MODE}d
         libcrypto${_OPENSSL_MSVC_RT_MODE}d
         libcryptod
@@ -197,6 +273,17 @@ if(WIN32 AND NOT CYGWIN)
 
     find_library(LIB_EAY_RELEASE
       NAMES
+        # When OpenSSL is built with default options, the static library name is suffixed with "_static".
+        # Looking the "libcrypto_static.lib" with a higher priority than "libcrypto.lib" which is the
+        # import library of "libcrypto.dll".
+        libcrypto${_OPENSSL_STATIC_SUFFIX}${_OPENSSL_MSVC_ARCH_SUFFIX}${_OPENSSL_MSVC_RT_MODE}
+        libcrypto${_OPENSSL_STATIC_SUFFIX}${_OPENSSL_MSVC_RT_MODE}
+        libcrypto${_OPENSSL_STATIC_SUFFIX}
+        libeay32${_OPENSSL_STATIC_SUFFIX}${_OPENSSL_MSVC_RT_MODE}
+        libeay32${_OPENSSL_STATIC_SUFFIX}
+        crypto${_OPENSSL_STATIC_SUFFIX}
+        # When OpenSSL is built with the "-static" option, only the static build is produced,
+        # and it is not suffixed with "_static".
         libcrypto${_OPENSSL_MSVC_ARCH_SUFFIX}${_OPENSSL_MSVC_RT_MODE}
         libcrypto${_OPENSSL_MSVC_RT_MODE}
         libcrypto
@@ -211,6 +298,17 @@ if(WIN32 AND NOT CYGWIN)
 
     find_library(SSL_EAY_DEBUG
       NAMES
+        # When OpenSSL is built with default options, the static library name is suffixed with "_static".
+        # Looking the "libssl_static.lib" with a higher priority than "libssl.lib" which is the
+        # import library of "libssl.dll".
+        libssl${_OPENSSL_STATIC_SUFFIX}${_OPENSSL_MSVC_ARCH_SUFFIX}${_OPENSSL_MSVC_RT_MODE}d
+        libssl${_OPENSSL_STATIC_SUFFIX}${_OPENSSL_MSVC_RT_MODE}d
+        libssl${_OPENSSL_STATIC_SUFFIX}d
+        ssleay32${_OPENSSL_STATIC_SUFFIX}${_OPENSSL_MSVC_RT_MODE}d
+        ssleay32${_OPENSSL_STATIC_SUFFIX}d
+        ssl${_OPENSSL_STATIC_SUFFIX}d
+        # When OpenSSL is built with the "-static" option, only the static build is produced,
+        # and it is not suffixed with "_static".
         libssl${_OPENSSL_MSVC_ARCH_SUFFIX}${_OPENSSL_MSVC_RT_MODE}d
         libssl${_OPENSSL_MSVC_RT_MODE}d
         libssld
@@ -225,6 +323,17 @@ if(WIN32 AND NOT CYGWIN)
 
     find_library(SSL_EAY_RELEASE
       NAMES
+        # When OpenSSL is built with default options, the static library name is suffixed with "_static".
+        # Looking the "libssl_static.lib" with a higher priority than "libssl.lib" which is the
+        # import library of "libssl.dll".
+        libssl${_OPENSSL_STATIC_SUFFIX}${_OPENSSL_MSVC_ARCH_SUFFIX}${_OPENSSL_MSVC_RT_MODE}
+        libssl${_OPENSSL_STATIC_SUFFIX}${_OPENSSL_MSVC_RT_MODE}
+        libssl${_OPENSSL_STATIC_SUFFIX}
+        ssleay32${_OPENSSL_STATIC_SUFFIX}${_OPENSSL_MSVC_RT_MODE}
+        ssleay32${_OPENSSL_STATIC_SUFFIX}
+        ssl${_OPENSSL_STATIC_SUFFIX}
+        # When OpenSSL is built with the "-static" option, only the static build is produced,
+        # and it is not suffixed with "_static".
         libssl${_OPENSSL_MSVC_ARCH_SUFFIX}${_OPENSSL_MSVC_RT_MODE}
         libssl${_OPENSSL_MSVC_RT_MODE}
         libssl
@@ -415,6 +524,17 @@ if(OPENSSL_INCLUDE_DIR AND EXISTS "${OPENSSL_INCLUDE_DIR}/openssl/opensslv.h")
     endif ()
 
     set(OPENSSL_VERSION "${OPENSSL_VERSION_MAJOR}.${OPENSSL_VERSION_MINOR}.${OPENSSL_VERSION_FIX}${OPENSSL_VERSION_PATCH_STRING}")
+  else ()
+    # Since OpenSSL 3.0.0, the new version format is MAJOR.MINOR.PATCH and
+    # a new OPENSSL_VERSION_STR macro contains exactly that
+    file(STRINGS "${OPENSSL_INCLUDE_DIR}/openssl/opensslv.h" OPENSSL_VERSION_STR
+         REGEX "^#[\t ]*define[\t ]+OPENSSL_VERSION_STR[\t ]+\"([0-9])+\\.([0-9])+\\.([0-9])+\".*")
+    string(REGEX REPLACE "^.*OPENSSL_VERSION_STR[\t ]+\"([0-9]+\\.[0-9]+\\.[0-9]+)\".*$"
+           "\\1" OPENSSL_VERSION_STR "${OPENSSL_VERSION_STR}")
+
+    set(OPENSSL_VERSION "${OPENSSL_VERSION_STR}")
+
+    unset(OPENSSL_VERSION_STR)
   endif ()
 endif ()
 
@@ -453,6 +573,7 @@ find_package_handle_standard_args(OpenSSL
     OPENSSL_INCLUDE_DIR
   VERSION_VAR
     OPENSSL_VERSION
+  HANDLE_VERSION_RANGE
   HANDLE_COMPONENTS
   FAIL_MESSAGE
     "Could NOT find OpenSSL, try to set the path to OpenSSL root folder in the system variable OPENSSL_ROOT_DIR"
@@ -523,6 +644,28 @@ if(OPENSSL_FOUND)
         INTERFACE_LINK_LIBRARIES OpenSSL::Crypto)
     endif()
     _OpenSSL_target_add_dependencies(OpenSSL::SSL)
+  endif()
+
+  if("${OPENSSL_VERSION_MAJOR}.${OPENSSL_VERSION_MAJOR}.${OPENSSL_VERSION_FIX}" VERSION_GREATER_EQUAL "0.9.8")
+    if(MSVC)
+      if(EXISTS "${OPENSSL_INCLUDE_DIR}")
+        set(_OPENSSL_applink_paths PATHS ${OPENSSL_INCLUDE_DIR})
+      endif()
+      find_file(OPENSSL_APPLINK_SOURCE
+        NAMES
+          openssl/applink.c
+        ${_OPENSSL_applink_paths}
+        NO_DEFAULT_PATH)
+      if(OPENSSL_APPLINK_SOURCE)
+        set(_OPENSSL_applink_interface_srcs ${OPENSSL_APPLINK_SOURCE})
+      endif()
+    endif()
+    if(NOT TARGET OpenSSL::applink)
+      add_library(OpenSSL::applink INTERFACE IMPORTED)
+      set_property(TARGET OpenSSL::applink APPEND
+        PROPERTY INTERFACE_SOURCES
+          ${_OPENSSL_applink_interface_srcs})
+    endif()
   endif()
 endif()
 

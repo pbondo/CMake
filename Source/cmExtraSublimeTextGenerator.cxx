@@ -17,13 +17,12 @@
 #include "cmLocalGenerator.h"
 #include "cmMakefile.h"
 #include "cmMessageType.h"
+#include "cmProperty.h"
 #include "cmSourceFile.h"
 #include "cmStateTypes.h"
 #include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 #include "cmake.h"
-
-using cmProp = const std::string*; // just to silence IWYU
 
 /*
 Sublime Text 2 Generator
@@ -133,7 +132,7 @@ void cmExtraSublimeTextGenerator::CreateNewProjectFile(
   // doesn't currently support these settings per build system, only project
   // wide
   MapSourceFileFlags sourceFileFlags;
-  AppendAllTargets(lgs, mf, fout, sourceFileFlags);
+  this->AppendAllTargets(lgs, mf, fout, sourceFileFlags);
 
   // End of build_systems
   fout << "\n\t]";
@@ -329,7 +328,7 @@ std::string cmExtraSublimeTextGenerator::BuildMakeCommand(
     std::string makefileName;
     if (generator == "MinGW Makefiles") {
       // no escaping of spaces in this case, see
-      // https://gitlab.kitware.com/cmake/cmake/issues/10014
+      // https://gitlab.kitware.com/cmake/cmake/-/issues/10014
       makefileName = makefile;
     } else {
       makefileName = cmSystemTools::ConvertToOutputPath(makefile);
@@ -350,6 +349,11 @@ std::string cmExtraSublimeTextGenerator::ComputeFlagsForObject(
   if (language.empty()) {
     language = "C";
   }
+
+  // Explicitly add the explicit language flag before any other flag
+  // so user flags can override it.
+  gtgt->AddExplicitLanguageFlags(flags, *source);
+
   std::string const& config =
     lg->GetMakefile()->GetSafeDefinition("CMAKE_BUILD_TYPE");
 
@@ -440,13 +444,13 @@ bool cmExtraSublimeTextGenerator::Open(const std::string& bindir,
                                        const std::string& projectName,
                                        bool dryRun)
 {
-  const char* sublExecutable =
+  cmProp sublExecutable =
     this->GlobalGenerator->GetCMakeInstance()->GetCacheDefinition(
       "CMAKE_SUBLIMETEXT_EXECUTABLE");
   if (!sublExecutable) {
     return false;
   }
-  if (cmIsNOTFOUND(sublExecutable)) {
+  if (cmIsNOTFOUND(*sublExecutable)) {
     return false;
   }
 
@@ -456,5 +460,5 @@ bool cmExtraSublimeTextGenerator::Open(const std::string& bindir,
   }
 
   return cmSystemTools::RunSingleCommand(
-    { sublExecutable, "--project", filename });
+    { *sublExecutable, "--project", filename });
 }

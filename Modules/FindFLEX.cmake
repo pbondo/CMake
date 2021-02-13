@@ -37,11 +37,20 @@ If flex is found on the system, the module provides the macro:
               )
 
 which creates a custom command to generate the ``FlexOutput`` file from
-the ``FlexInput`` file.  If ``COMPILE_FLAGS`` option is specified, the next
-parameter is added to the flex command line. If flex is configured to
-output a header file, the ``DEFINES_FILE`` option may be used to specify its
-name. Name is an alias used to get details of this custom command.
-Indeed the macro defines the following variables:
+the ``FlexInput`` file.  Name is an alias used to get details of this custom
+command.  If ``COMPILE_FLAGS`` option is specified, the next
+parameter is added to the flex command line.
+
+.. versionadded:: 3.5
+  If flex is configured to
+  output a header file, the ``DEFINES_FILE`` option may be used to specify its
+  name.
+
+.. versionchanged:: 3.17
+  When :policy:`CMP0098` is set to ``NEW``, ``flex`` runs in the
+  :variable:`CMAKE_CURRENT_BINARY_DIR` directory.
+
+The macro defines the following variables:
 
 ::
 
@@ -99,7 +108,7 @@ respectively ``FLEX_TARGET`` and ``BISON_TARGET`` macros.
   ====================================================================
 #]=======================================================================]
 
-find_program(FLEX_EXECUTABLE NAMES flex win_flex DOC "path to the flex executable")
+find_program(FLEX_EXECUTABLE NAMES flex win-flex win_flex DOC "path to the flex executable")
 mark_as_advanced(FLEX_EXECUTABLE)
 
 find_library(FL_LIBRARY NAMES fl

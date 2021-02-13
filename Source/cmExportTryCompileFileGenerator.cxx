@@ -12,6 +12,7 @@
 #include "cmGlobalGenerator.h"
 #include "cmLocalGenerator.h"
 #include "cmMakefile.h"
+#include "cmProperty.h"
 #include "cmStateTypes.h"
 #include "cmStringAlgorithms.h"
 #include "cmTarget.h"
@@ -71,7 +72,7 @@ std::string cmExportTryCompileFileGenerator::FindTargets(
 
   cmTarget dummyHead("try_compile_dummy_exe", cmStateEnums::EXECUTABLE,
                      cmTarget::VisibilityNormal, tgt->Target->GetMakefile(),
-                     true);
+                     cmTarget::PerConfig::Yes);
 
   cmGeneratorTarget gDummyHead(&dummyHead, tgt->GetLocalGenerator());
 

@@ -4,7 +4,6 @@
 
 #include <algorithm>
 #include <array>
-#include <cstring>
 #include <utility>
 
 #include <cmext/algorithm>
@@ -12,6 +11,7 @@
 #include "cmExecutionStatus.h"
 #include "cmMakefile.h"
 #include "cmMessageType.h"
+#include "cmProperty.h"
 #include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 #include "cmake.h"
@@ -182,10 +182,10 @@ void cmFindCommon::SelectDefaultSearchModes()
       { this->NoCMakeSystemPath, "CMAKE_FIND_USE_CMAKE_SYSTEM_PATH" } }
   };
 
-  for (auto& path : search_paths) {
-    const char* def = this->Makefile->GetDefinition(path.second);
+  for (auto const& path : search_paths) {
+    cmProp def = this->Makefile->GetDefinition(path.second);
     if (def) {
-      path.first = !cmIsOn(def);
+      path.first = !cmIsOn(*def);
     }
   }
 }
@@ -203,16 +203,15 @@ void cmFindCommon::RerootPaths(std::vector<std::string>& paths)
     return;
   }
 
-  const char* sysroot = this->Makefile->GetDefinition("CMAKE_SYSROOT");
-  const char* sysrootCompile =
+  cmProp sysroot = this->Makefile->GetDefinition("CMAKE_SYSROOT");
+  cmProp sysrootCompile =
     this->Makefile->GetDefinition("CMAKE_SYSROOT_COMPILE");
-  const char* sysrootLink =
-    this->Makefile->GetDefinition("CMAKE_SYSROOT_LINK");
-  const char* rootPath = this->Makefile->GetDefinition("CMAKE_FIND_ROOT_PATH");
-  const bool noSysroot = !sysroot || !*sysroot;
-  const bool noCompileSysroot = !sysrootCompile || !*sysrootCompile;
-  const bool noLinkSysroot = !sysrootLink || !*sysrootLink;
-  const bool noRootPath = !rootPath || !*rootPath;
+  cmProp sysrootLink = this->Makefile->GetDefinition("CMAKE_SYSROOT_LINK");
+  cmProp rootPath = this->Makefile->GetDefinition("CMAKE_FIND_ROOT_PATH");
+  const bool noSysroot = !cmNonempty(sysroot);
+  const bool noCompileSysroot = !cmNonempty(sysrootCompile);
+  const bool noLinkSysroot = !cmNonempty(sysrootLink);
+  const bool noRootPath = !cmNonempty(rootPath);
   if (noSysroot && noCompileSysroot && noLinkSysroot && noRootPath) {
     return;
   }
@@ -220,23 +219,22 @@ void cmFindCommon::RerootPaths(std::vector<std::string>& paths)
   // Construct the list of path roots with no trailing slashes.
   std::vector<std::string> roots;
   if (rootPath) {
-    cmExpandList(rootPath, roots);
+    cmExpandList(*rootPath, roots);
   }
   if (sysrootCompile) {
-    roots.emplace_back(sysrootCompile);
+    roots.emplace_back(*sysrootCompile);
   }
   if (sysrootLink) {
-    roots.emplace_back(sysrootLink);
+    roots.emplace_back(*sysrootLink);
   }
   if (sysroot) {
-    roots.emplace_back(sysroot);
+    roots.emplace_back(*sysroot);
   }
   for (std::string& r : roots) {
     cmSystemTools::ConvertToUnixSlashes(r);
   }
 
-  const char* stagePrefix =
-    this->Makefile->GetDefinition("CMAKE_STAGING_PREFIX");
+  cmProp stagePrefix = this->Makefile->GetDefinition("CMAKE_STAGING_PREFIX");
 
   // Copy the original set of unrooted paths.
   std::vector<std::string> unrootedPaths = paths;
@@ -249,7 +247,7 @@ void cmFindCommon::RerootPaths(std::vector<std::string>& paths)
       // a user home directory or is empty.
       std::string rootedDir;
       if (cmSystemTools::IsSubDirectory(up, r) ||
-          (stagePrefix && cmSystemTools::IsSubDirectory(up, stagePrefix))) {
+          (stagePrefix && cmSystemTools::IsSubDirectory(up, *stagePrefix))) {
         rootedDir = up;
       } else if (!up.empty() && up[0] != '~') {
         // Start with the new root.
@@ -280,12 +278,7 @@ void cmFindCommon::GetIgnoredPaths(std::vector<std::string>& ignore)
   // Construct the list of path roots with no trailing slashes.
   for (const char** pathName = paths; *pathName; ++pathName) {
     // Get the list of paths to ignore from the variable.
-    const char* ignorePath = this->Makefile->GetDefinition(*pathName);
-    if ((ignorePath == nullptr) || (strlen(ignorePath) == 0)) {
-      continue;
-    }
-
-    cmExpandList(ignorePath, ignore);
+    this->Makefile->GetDefExpandList(*pathName, ignore);
   }
 
   for (std::string& i : ignore) {
@@ -296,7 +289,7 @@ void cmFindCommon::GetIgnoredPaths(std::vector<std::string>& ignore)
 void cmFindCommon::GetIgnoredPaths(std::set<std::string>& ignore)
 {
   std::vector<std::string> ignoreVec;
-  GetIgnoredPaths(ignoreVec);
+  this->GetIgnoredPaths(ignoreVec);
   ignore.insert(ignoreVec.begin(), ignoreVec.end());
 }
 

@@ -42,7 +42,7 @@ else()
     if(NOT $ENV{CXX} STREQUAL "")
       get_filename_component(CMAKE_CXX_COMPILER_INIT $ENV{CXX} PROGRAM PROGRAM_ARGS CMAKE_CXX_FLAGS_ENV_INIT)
       if(CMAKE_CXX_FLAGS_ENV_INIT)
-        set(CMAKE_CXX_COMPILER_ARG1 "${CMAKE_CXX_FLAGS_ENV_INIT}" CACHE STRING "First argument to CXX compiler")
+        set(CMAKE_CXX_COMPILER_ARG1 "${CMAKE_CXX_FLAGS_ENV_INIT}" CACHE STRING "Arguments to CXX compiler")
       endif()
       if(NOT EXISTS ${CMAKE_CXX_COMPILER_INIT})
         message(FATAL_ERROR "Could not find compiler set in environment variable CXX:\n$ENV{CXX}.\n${CMAKE_CXX_COMPILER_INIT}")
@@ -58,7 +58,7 @@ else()
 
     # finally list compilers to try
     if(NOT CMAKE_CXX_COMPILER_INIT)
-      set(CMAKE_CXX_COMPILER_LIST CC ${_CMAKE_TOOLCHAIN_PREFIX}c++ ${_CMAKE_TOOLCHAIN_PREFIX}g++ aCC cl bcc xlC clang++)
+      set(CMAKE_CXX_COMPILER_LIST CC ${_CMAKE_TOOLCHAIN_PREFIX}c++ ${_CMAKE_TOOLCHAIN_PREFIX}g++ aCC cl bcc xlC icpx icx clang++)
     endif()
 
     _cmake_find_compiler(CXX)
@@ -83,6 +83,10 @@ else()
     )
 endif()
 
+if(CMAKE_CXX_COMPILER_TARGET)
+  set(CMAKE_CXX_COMPILER_ID_TEST_FLAGS_FIRST "-c --target=${CMAKE_CXX_COMPILER_TARGET}")
+endif()
+
 # Build a small source file to identify the compiler.
 if(NOT CMAKE_CXX_COMPILER_ID_RUN)
   set(CMAKE_CXX_COMPILER_ID_RUN 1)
@@ -94,7 +98,7 @@ if(NOT CMAKE_CXX_COMPILER_ID_RUN)
     CMAKE_CXX_COMPILER_ID_PLATFORM_CONTENT)
 
   # The IAR compiler produces weird output.
-  # See https://gitlab.kitware.com/cmake/cmake/issues/10176#note_153591
+  # See https://gitlab.kitware.com/cmake/cmake/-/issues/10176#note_153591
   list(APPEND CMAKE_CXX_COMPILER_ID_VENDORS IAR)
   set(CMAKE_CXX_COMPILER_ID_VENDOR_FLAGS_IAR )
   set(CMAKE_CXX_COMPILER_ID_VENDOR_REGEX_IAR "IAR .+ Compiler")
@@ -104,7 +108,7 @@ if(NOT CMAKE_CXX_COMPILER_ID_RUN)
   #      ...
   #      /path/to/cc ...CompilerIdCXX/...
   # to extract the compiler front-end for the language.
-  set(CMAKE_CXX_COMPILER_ID_TOOL_MATCH_REGEX "\nLd[^\n]*(\n[ \t]+[^\n]*)*\n[ \t]+([^ \t\r\n]+)[^\r\n]*-o[^\r\n]*CompilerIdCXX/(\\./)?(CompilerIdCXX.(framework|xctest)/)?CompilerIdCXX[ \t\n\\\"]")
+  set(CMAKE_CXX_COMPILER_ID_TOOL_MATCH_REGEX "\nLd[^\n]*(\n[ \t]+[^\n]*)*\n[ \t]+([^ \t\r\n]+)[^\r\n]*-o[^\r\n]*CompilerIdCXX/(\\./)?(CompilerIdCXX.(framework|xctest|build/[^ \t\r\n]+)/)?CompilerIdCXX[ \t\n\\\"]")
   set(CMAKE_CXX_COMPILER_ID_TOOL_MATCH_INDEX 2)
 
   include(${CMAKE_ROOT}/Modules/CMakeDetermineCompilerId.cmake)
@@ -127,7 +131,8 @@ else()
     # variable but are not aware of CMAKE_CXX_COMPILER_FRONTEND_VARIANT.
     # They pre-date our support for the GNU-like variant targeting the
     # MSVC ABI so we do not consider that here.
-    if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang"
+      OR "x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xIntelLLVM")
       if("x${CMAKE_CXX_SIMULATE_ID}" STREQUAL "xMSVC")
         set(CMAKE_CXX_COMPILER_FRONTEND_VARIANT "MSVC")
       else()
@@ -156,8 +161,9 @@ if (NOT _CMAKE_TOOLCHAIN_PREFIX)
 
   if("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU|Clang|QCC")
     get_filename_component(COMPILER_BASENAME "${CMAKE_CXX_COMPILER}" NAME)
-    if (COMPILER_BASENAME MATCHES "^(.+-)(clan)?[gc]\\+\\+(-[0-9]+(\\.[0-9]+)*)?(-[^.]+)?(\\.exe)?$")
+    if (COMPILER_BASENAME MATCHES "^(.+-)?(clang\\+\\+|g\\+\\+|clang-cl)(-[0-9]+(\\.[0-9]+)*)?(-[^.]+)?(\\.exe)?$")
       set(_CMAKE_TOOLCHAIN_PREFIX ${CMAKE_MATCH_1})
+      set(_CMAKE_TOOLCHAIN_SUFFIX ${CMAKE_MATCH_3})
       set(_CMAKE_COMPILER_SUFFIX ${CMAKE_MATCH_5})
     elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
       if(CMAKE_CXX_COMPILER_TARGET)
